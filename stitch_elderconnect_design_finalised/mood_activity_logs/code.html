@@ -1,0 +1,342 @@
+<!DOCTYPE html>
+
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            "colors": {
+                    "on-tertiary-fixed-variant": "#005047",
+                    "primary": "#00364c",
+                    "secondary-container": "#cae4f1",
+                    "inverse-surface": "#2e3132",
+                    "surface-container-low": "#f2f4f5",
+                    "on-surface": "#191c1d",
+                    "tertiary": "#003932",
+                    "surface-dim": "#d8dadb",
+                    "on-tertiary-container": "#6bc7b7",
+                    "on-error": "#ffffff",
+                    "on-surface-variant": "#41484d",
+                    "primary-fixed": "#c4e7ff",
+                    "tertiary-fixed-dim": "#7ad7c6",
+                    "secondary-fixed-dim": "#b1cad8",
+                    "error-container": "#ffdad6",
+                    "surface": "#f8fafb",
+                    "secondary": "#4a626d",
+                    "background": "#f8fafb",
+                    "secondary-fixed": "#cde6f4",
+                    "surface-variant": "#e1e3e4",
+                    "on-secondary-fixed-variant": "#324a55",
+                    "surface-container-high": "#e6e8e9",
+                    "on-primary-fixed-variant": "#184c65",
+                    "surface-bright": "#f8fafb",
+                    "tertiary-container": "#005248",
+                    "surface-tint": "#34647d",
+                    "on-background": "#191c1d",
+                    "error": "#ba1a1a",
+                    "on-error-container": "#93000a",
+                    "outline": "#71787d",
+                    "on-tertiary-fixed": "#00201b",
+                    "on-primary": "#ffffff",
+                    "tertiary-fixed": "#97f3e2",
+                    "surface-container-lowest": "#ffffff",
+                    "primary-fixed-dim": "#9ecdea",
+                    "inverse-on-surface": "#eff1f2",
+                    "on-tertiary": "#ffffff",
+                    "on-secondary-container": "#4e6672",
+                    "on-primary-container": "#8fbdda",
+                    "on-secondary-fixed": "#041e28",
+                    "surface-container": "#eceeef",
+                    "inverse-primary": "#9ecdea",
+                    "on-secondary": "#ffffff",
+                    "on-primary-fixed": "#001e2d",
+                    "surface-container-highest": "#e1e3e4",
+                    "primary-container": "#1a4d66",
+                    "outline-variant": "#c1c7cd"
+            },
+            "borderRadius": {
+                    "DEFAULT": "0.125rem",
+                    "lg": "0.25rem",
+                    "xl": "0.5rem",
+                    "full": "0.75rem"
+            },
+            "fontFamily": {
+                    "headline": ["Plus Jakarta Sans"],
+                    "body": ["Plus Jakarta Sans"],
+                    "label": ["Plus Jakarta Sans"]
+            }
+          },
+        },
+      }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        .chart-gradient-stable { background: linear-gradient(to top, rgba(0, 57, 50, 0.1), transparent); }
+        .chart-gradient-warning { background: linear-gradient(to top, rgba(74, 98, 109, 0.1), transparent); }
+        .chart-gradient-urgent { background: linear-gradient(to top, rgba(186, 26, 26, 0.1), transparent); }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-surface font-body text-on-surface min-h-screen pb-24">
+<!-- TopAppBar -->
+<nav class="docked full-width top-0 sticky z-50 bg-[#f8fafb]/80 dark:bg-slate-950/80 backdrop-blur-md shadow-[0_2px_15px_-3px_rgba(25,28,29,0.06)] flex justify-between items-center w-full px-6 py-4">
+<div class="flex items-center gap-3">
+<span class="material-symbols-outlined text-[#00364c] dark:text-sky-400">medical_services</span>
+<h1 class="text-xl font-bold tracking-tighter text-[#00364c] dark:text-sky-100 font-headline">ElderConnect</h1>
+</div>
+<div class="hidden md:flex items-center gap-8">
+<a class="font-['Plus_Jakarta_Sans'] text-sm tracking-tight font-semibold text-[#41484d] hover:bg-[#f2f4f5] px-3 py-2 rounded-lg transition-colors" href="#">Dashboard</a>
+<a class="font-['Plus_Jakarta_Sans'] text-sm tracking-tight font-semibold text-[#41484d] hover:bg-[#f2f4f5] px-3 py-2 rounded-lg transition-colors" href="#">Elder</a>
+<a class="font-['Plus_Jakarta_Sans'] text-sm tracking-tight font-semibold text-[#00364c] bg-[#f2f4f5] px-3 py-2 rounded-lg transition-colors" href="#">Mood &amp; Activity</a>
+<a class="font-['Plus_Jakarta_Sans'] text-sm tracking-tight font-semibold text-[#41484d] hover:bg-[#f2f4f5] px-3 py-2 rounded-lg transition-colors" href="#">Links</a>
+</div>
+<div class="flex items-center gap-2">
+<img class="w-10 h-10 rounded-full border-2 border-surface-container-high object-cover" data-alt="professional female caretaker headshot with a friendly expression in a brightly lit modern office setting" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCGJdXBhdYdjY3vhRApB2zVY_AuTwk5HuDlKJ4m0-smb1iTN-s2lImqnlim52XviaT5WSd_MR7-9dz6qTZhem8IWS7OZy4bwFMf4i8AY-8MdeZWslXI46zSiI0SQY_rbDjFZlPTcv4StETMmKblIQW_36pn0Nu_fqFAdBkrvnJDiM9oPLls4U4mQtTPkEJ3RgcnYa8dliHdTGfQz2FfM_U_1pOQH3qrVWmhaAIDUvnQA3plRdHsprwQWLOJOL9EusxsIrl2kAw4ZVg"/>
+</div>
+</nav>
+<main class="max-w-7xl mx-auto px-6 py-8">
+<!-- Header Section -->
+<header class="mb-10">
+<div class="flex flex-col md:flex-row md:items-end justify-between gap-4">
+<div>
+<p class="text-secondary font-medium tracking-wide uppercase text-[10px] mb-1">Caretaker Portal</p>
+<h2 class="text-3xl font-bold text-primary tracking-tight">Mood &amp; Activity Trends</h2>
+</div>
+<div class="flex bg-surface-container-low p-1 rounded-xl">
+<button class="px-4 py-2 text-sm font-semibold rounded-lg bg-surface-container-lowest shadow-sm text-primary">Last 7 Days</button>
+<button class="px-4 py-2 text-sm font-semibold rounded-lg text-on-surface-variant hover:bg-surface-container-high transition-colors">Last 30 Days</button>
+</div>
+</div>
+</header>
+<!-- Bento Grid Layout -->
+<div class="grid grid-cols-1 md:grid-cols-12 gap-6">
+<!-- Mood Trend Line Chart (Primary Module) -->
+<section class="md:col-span-8 bg-surface-container-lowest rounded-xl p-6 shadow-[0_32px_64px_-12px_rgba(0,0,0,0.04)] relative overflow-hidden">
+<div class="flex items-center justify-between mb-8">
+<div>
+<h3 class="text-lg font-bold text-primary">Mood Progression</h3>
+<p class="text-sm text-on-surface-variant">Aggregate daily emotional stability scores</p>
+</div>
+<div class="flex items-center gap-4">
+<div class="flex items-center gap-1.5">
+<span class="w-2 h-2 rounded-full bg-tertiary"></span>
+<span class="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant">Stable</span>
+</div>
+<div class="flex items-center gap-1.5">
+<span class="w-2 h-2 rounded-full bg-secondary"></span>
+<span class="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant">Warning</span>
+</div>
+<div class="flex items-center gap-1.5">
+<span class="w-2 h-2 rounded-full bg-error"></span>
+<span class="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant">Urgent</span>
+</div>
+</div>
+</div>
+<!-- Abstract Chart Visualization -->
+<div class="h-64 w-full relative flex items-end justify-between px-2">
+<!-- Zone Backgrounds -->
+<div class="absolute inset-x-0 bottom-0 h-1/3 bg-tertiary/5 rounded-t-lg"></div>
+<div class="absolute inset-x-0 bottom-1/3 h-1/3 bg-secondary/5"></div>
+<div class="absolute inset-x-0 top-0 h-1/3 bg-error/5 rounded-b-lg"></div>
+<!-- Simplified Chart Logic - Heights representing mood -->
+<div class="group relative flex flex-col items-center flex-1">
+<div class="w-1 bg-tertiary rounded-full h-32 opacity-40 group-hover:opacity-100 transition-opacity"></div>
+<div class="w-3 h-3 bg-tertiary border-2 border-surface-container-lowest rounded-full -mt-1.5 z-10"></div>
+<span class="text-[10px] mt-2 font-bold text-on-surface-variant">MON</span>
+</div>
+<div class="group relative flex flex-col items-center flex-1">
+<div class="w-1 bg-tertiary rounded-full h-40 opacity-40 group-hover:opacity-100 transition-opacity"></div>
+<div class="w-3 h-3 bg-tertiary border-2 border-surface-container-lowest rounded-full -mt-1.5 z-10"></div>
+<span class="text-[10px] mt-2 font-bold text-on-surface-variant">TUE</span>
+</div>
+<div class="group relative flex flex-col items-center flex-1">
+<div class="w-1 bg-secondary rounded-full h-24 opacity-40 group-hover:opacity-100 transition-opacity"></div>
+<div class="w-3 h-3 bg-secondary border-2 border-surface-container-lowest rounded-full -mt-1.5 z-10"></div>
+<span class="text-[10px] mt-2 font-bold text-on-surface-variant">WED</span>
+</div>
+<div class="group relative flex flex-col items-center flex-1">
+<div class="w-1 bg-tertiary rounded-full h-36 opacity-40 group-hover:opacity-100 transition-opacity"></div>
+<div class="w-3 h-3 bg-tertiary border-2 border-surface-container-lowest rounded-full -mt-1.5 z-10"></div>
+<span class="text-[10px] mt-2 font-bold text-on-surface-variant">THU</span>
+</div>
+<div class="group relative flex flex-col items-center flex-1">
+<div class="w-1 bg-error rounded-full h-52 opacity-40 group-hover:opacity-100 transition-opacity"></div>
+<div class="w-3 h-3 bg-error border-2 border-surface-container-lowest rounded-full -mt-1.5 z-10"></div>
+<div class="absolute -top-8 bg-error text-white text-[10px] px-2 py-0.5 rounded font-bold">ANXIOUS</div>
+<span class="text-[10px] mt-2 font-bold text-on-surface-variant">FRI</span>
+</div>
+<div class="group relative flex flex-col items-center flex-1">
+<div class="w-1 bg-tertiary rounded-full h-28 opacity-40 group-hover:opacity-100 transition-opacity"></div>
+<div class="w-3 h-3 bg-tertiary border-2 border-surface-container-lowest rounded-full -mt-1.5 z-10"></div>
+<span class="text-[10px] mt-2 font-bold text-on-surface-variant">SAT</span>
+</div>
+<div class="group relative flex flex-col items-center flex-1">
+<div class="w-1 bg-tertiary rounded-full h-34 opacity-40 group-hover:opacity-100 transition-opacity"></div>
+<div class="w-3 h-3 bg-tertiary border-2 border-surface-container-lowest rounded-full -mt-1.5 z-10"></div>
+<span class="text-[10px] mt-2 font-bold text-on-surface-variant">SUN</span>
+</div>
+</div>
+</section>
+<!-- Activity Log Module -->
+<section class="md:col-span-4 bg-surface-container-low rounded-xl p-6 flex flex-col">
+<div class="flex items-center gap-2 mb-6">
+<span class="material-symbols-outlined text-primary-container">list_alt</span>
+<h3 class="text-lg font-bold text-primary tracking-tight">Activity Stream</h3>
+</div>
+<div class="space-y-4 flex-grow">
+<!-- Log Row: Login -->
+<div class="flex items-center justify-between p-3 bg-surface-container-lowest rounded-lg">
+<div class="flex items-center gap-3">
+<div class="w-8 h-8 rounded-full bg-secondary-container flex items-center justify-center">
+<span class="material-symbols-outlined text-primary scale-75">login</span>
+</div>
+<div>
+<p class="text-xs font-bold text-primary">Login status</p>
+<p class="text-[10px] text-on-surface-variant">Active 2h ago</p>
+</div>
+</div>
+<span class="text-[10px] font-bold text-tertiary">STABLE</span>
+</div>
+<!-- Log Row: Posts -->
+<div class="flex items-center justify-between p-3 bg-surface-container-lowest rounded-lg">
+<div class="flex items-center gap-3">
+<div class="w-8 h-8 rounded-full bg-secondary-container flex items-center justify-center">
+<span class="material-symbols-outlined text-primary scale-75">rate_review</span>
+</div>
+<div>
+<p class="text-xs font-bold text-primary">Posts made</p>
+<p class="text-[10px] text-on-surface-variant">3 updates shared</p>
+</div>
+</div>
+<span class="text-[10px] font-bold text-primary">HIGH</span>
+</div>
+<!-- Log Row: Games -->
+<div class="flex items-center justify-between p-3 bg-surface-container-lowest rounded-lg">
+<div class="flex items-center gap-3">
+<div class="w-8 h-8 rounded-full bg-secondary-container flex items-center justify-center">
+<span class="material-symbols-outlined text-primary scale-75">sports_esports</span>
+</div>
+<div>
+<p class="text-xs font-bold text-primary">Games played</p>
+<p class="text-[10px] text-on-surface-variant">Memory Match (15m)</p>
+</div>
+</div>
+<span class="text-[10px] font-bold text-primary">NORMAL</span>
+</div>
+<!-- Log Row: Meds -->
+<div class="flex items-center justify-between p-3 border border-error-container bg-error-container/10 rounded-lg">
+<div class="flex items-center gap-3">
+<div class="w-8 h-8 rounded-full bg-error-container flex items-center justify-center">
+<span class="material-symbols-outlined text-error scale-75">pill</span>
+</div>
+<div>
+<p class="text-xs font-bold text-error">Meds confirmed</p>
+<p class="text-[10px] text-error/80">Pending: Morning dose</p>
+</div>
+</div>
+<div class="w-2 h-2 rounded-full bg-error animate-pulse"></div>
+</div>
+</div>
+<button class="mt-6 w-full py-2 text-[10px] font-bold uppercase tracking-widest text-primary border border-primary/10 rounded-lg hover:bg-primary/5 transition-colors">
+                    Export Full Report
+                </button>
+</section>
+<!-- Game Progress (Data Intensive) -->
+<section class="md:col-span-5 bg-surface-container-lowest rounded-xl p-6 shadow-[0_2px_15px_-3px_rgba(25,28,29,0.06)]">
+<div class="flex items-center justify-between mb-6">
+<h3 class="text-lg font-bold text-primary">Cognitive Training</h3>
+<span class="material-symbols-outlined text-on-surface-variant">psychology</span>
+</div>
+<div class="space-y-6">
+<div>
+<div class="flex justify-between mb-2">
+<span class="text-xs font-bold text-primary">Pattern Recognition</span>
+<span class="text-xs font-medium text-secondary">Level 14</span>
+</div>
+<div class="h-2 w-full bg-surface-container-high rounded-full overflow-hidden">
+<div class="h-full bg-gradient-to-r from-primary to-primary-container w-[75%]"></div>
+</div>
+</div>
+<div>
+<div class="flex justify-between mb-2">
+<span class="text-xs font-bold text-primary">Spatial Memory</span>
+<span class="text-xs font-medium text-secondary">Level 8</span>
+</div>
+<div class="h-2 w-full bg-surface-container-high rounded-full overflow-hidden">
+<div class="h-full bg-gradient-to-r from-primary to-primary-container w-[40%]"></div>
+</div>
+</div>
+<div class="pt-4 grid grid-cols-2 gap-4">
+<div class="p-3 bg-surface-container-low rounded-lg text-center">
+<p class="text-[10px] font-bold text-secondary uppercase tracking-tighter">Avg Session</p>
+<p class="text-xl font-extrabold text-primary">22m</p>
+</div>
+<div class="p-3 bg-surface-container-low rounded-lg text-center">
+<p class="text-[10px] font-bold text-secondary uppercase tracking-tighter">Daily Streak</p>
+<p class="text-xl font-extrabold text-primary">5 Days</p>
+</div>
+</div>
+</div>
+</section>
+<!-- Post History (Editorial Style) -->
+<section class="md:col-span-7 bg-surface-container-lowest rounded-xl p-6 shadow-[0_2px_15px_-3px_rgba(25,28,29,0.06)]">
+<h3 class="text-lg font-bold text-primary mb-6">Recent Journal Entries</h3>
+<div class="divide-y divide-surface-container">
+<article class="py-4 first:pt-0">
+<div class="flex justify-between items-start mb-2">
+<h4 class="font-bold text-primary text-sm">"Had a lovely morning walk"</h4>
+<span class="text-[10px] font-medium text-on-surface-variant bg-surface-container-high px-2 py-0.5 rounded">Today, 09:15 AM</span>
+</div>
+<p class="text-sm text-secondary line-clamp-2 leading-relaxed">The sun was out and we managed to walk around the block twice. Resident was in high spirits and mentioned the garden looks well-tended...</p>
+</article>
+<article class="py-4">
+<div class="flex justify-between items-start mb-2">
+<h4 class="font-bold text-primary text-sm">"Memory exercises completed"</h4>
+<span class="text-[10px] font-medium text-on-surface-variant bg-surface-container-high px-2 py-0.5 rounded">Yesterday, 04:30 PM</span>
+</div>
+<p class="text-sm text-secondary line-clamp-2 leading-relaxed">Finished three rounds of the card matching game. Slight frustration during the second round but recovered well after a short tea break...</p>
+</article>
+<article class="py-4 last:pb-0">
+<div class="flex justify-between items-start mb-2">
+<h4 class="font-bold text-primary text-sm">"General health update"</h4>
+<span class="text-[10px] font-medium text-on-surface-variant bg-surface-container-high px-2 py-0.5 rounded">Oct 12, 11:20 AM</span>
+</div>
+<p class="text-sm text-secondary line-clamp-2 leading-relaxed">Appetite is stable. Consumed all lunch and dinner portions. No complaints of physical discomfort throughout the evening shifts...</p>
+</article>
+</div>
+</section>
+</div>
+</main>
+<!-- BottomNavBar (Mobile Only) -->
+<footer class="md:hidden fixed bottom-0 left-0 w-full z-50 bg-white/90 dark:bg-slate-900/90 backdrop-blur-xl flex justify-around items-center px-2 pt-2 pb-safe-offset-4 shadow-[0_-8px_32px_rgba(25,28,29,0.06)]">
+<div class="flex flex-col items-center justify-center text-[#41484d] dark:text-slate-400 py-1.5 transition-all">
+<span class="material-symbols-outlined">dashboard</span>
+<span class="font-['Plus_Jakarta_Sans'] text-[10px] font-medium uppercase tracking-wider mt-1">Dashboard</span>
+</div>
+<div class="flex flex-col items-center justify-center text-[#41484d] dark:text-slate-400 py-1.5 transition-all">
+<span class="material-symbols-outlined">elderly</span>
+<span class="font-['Plus_Jakarta_Sans'] text-[10px] font-medium uppercase tracking-wider mt-1">Elder</span>
+</div>
+<div class="flex flex-col items-center justify-center bg-[#f2f4f5] dark:bg-sky-900/30 text-[#00364c] dark:text-sky-200 rounded-xl px-4 py-1.5 transition-all">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">psychology</span>
+<span class="font-['Plus_Jakarta_Sans'] text-[10px] font-medium uppercase tracking-wider mt-1">Mood</span>
+</div>
+<div class="flex flex-col items-center justify-center text-[#41484d] dark:text-slate-400 py-1.5 transition-all">
+<span class="material-symbols-outlined">link</span>
+<span class="font-['Plus_Jakarta_Sans'] text-[10px] font-medium uppercase tracking-wider mt-1">Links</span>
+</div>
+</footer>
+</body></html>

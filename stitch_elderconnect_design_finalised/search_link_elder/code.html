@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>ElderConnect - Caretaker Linking</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+          darkMode: "class",
+          theme: {
+            extend: {
+              "colors": {
+                      "on-tertiary-fixed-variant": "#005047",
+                      "primary": "#00364c",
+                      "secondary-container": "#cae4f1",
+                      "inverse-surface": "#2e3132",
+                      "surface-container-low": "#f2f4f5",
+                      "on-surface": "#191c1d",
+                      "tertiary": "#003932",
+                      "surface-dim": "#d8dadb",
+                      "on-tertiary-container": "#6bc7b7",
+                      "on-error": "#ffffff",
+                      "on-surface-variant": "#41484d",
+                      "primary-fixed": "#c4e7ff",
+                      "tertiary-fixed-dim": "#7ad7c6",
+                      "secondary-fixed-dim": "#b1cad8",
+                      "error-container": "#ffdad6",
+                      "surface": "#f8fafb",
+                      "secondary": "#4a626d",
+                      "background": "#f8fafb",
+                      "secondary-fixed": "#cde6f4",
+                      "surface-variant": "#e1e3e4",
+                      "on-secondary-fixed-variant": "#324a55",
+                      "surface-container-high": "#e6e8e9",
+                      "on-primary-fixed-variant": "#184c65",
+                      "surface-bright": "#f8fafb",
+                      "tertiary-container": "#005248",
+                      "surface-tint": "#34647d",
+                      "on-background": "#191c1d",
+                      "error": "#ba1a1a",
+                      "on-error-container": "#93000a",
+                      "outline": "#71787d",
+                      "on-tertiary-fixed": "#00201b",
+                      "on-primary": "#ffffff",
+                      "tertiary-fixed": "#97f3e2",
+                      "surface-container-lowest": "#ffffff",
+                      "primary-fixed-dim": "#9ecdea",
+                      "inverse-on-surface": "#eff1f2",
+                      "on-tertiary": "#ffffff",
+                      "on-secondary-container": "#4e6672",
+                      "on-primary-container": "#8fbdda",
+                      "on-secondary-fixed": "#041e28",
+                      "surface-container": "#eceeef",
+                      "inverse-primary": "#9ecdea",
+                      "on-secondary": "#ffffff",
+                      "on-primary-fixed": "#001e2d",
+                      "surface-container-highest": "#e1e3e4",
+                      "primary-container": "#1a4d66",
+                      "outline-variant": "#c1c7cd"
+              },
+              "borderRadius": {
+                      "DEFAULT": "0.125rem",
+                      "lg": "0.25rem",
+                      "xl": "0.5rem",
+                      "full": "0.75rem"
+              },
+              "fontFamily": {
+                      "headline": ["Plus Jakarta Sans"],
+                      "body": ["Plus Jakarta Sans"],
+                      "label": ["Plus Jakarta Sans"]
+              }
+            },
+          },
+        }
+    </script>
+<style>
+        body { font-family: 'Plus Jakarta Sans', sans-serif; }
+        .material-symbols-outlined { font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24; }
+        .glass-panel { background: rgba(248, 250, 251, 0.8); backdrop-filter: blur(12px); }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-surface text-on-surface min-h-screen pb-24">
+<!-- TopAppBar -->
+<header class="bg-[#f8fafb]/80 dark:bg-slate-950/80 backdrop-blur-md docked full-width top-0 sticky z-50 no-border tonal-shift shadow-[0_2px_15px_-3px_rgba(25,28,29,0.06)] flex justify-between items-center w-full px-6 py-4">
+<div class="flex items-center gap-3">
+<span class="material-symbols-outlined text-[#00364c] dark:text-sky-400" data-icon="medical_services">medical_services</span>
+<h1 class="text-xl font-bold tracking-tighter text-[#00364c] dark:text-sky-100">ElderConnect</h1>
+</div>
+<div class="flex items-center gap-4">
+<nav class="hidden md:flex gap-6 items-center">
+<a class="text-[#41484d] dark:text-slate-400 font-semibold text-sm tracking-tight hover:bg-[#f2f4f5] dark:hover:bg-slate-800 transition-colors duration-200 px-3 py-1 rounded-lg" href="#">Dashboard</a>
+<a class="text-[#00364c] dark:text-sky-200 font-semibold text-sm tracking-tight px-3 py-1 rounded-lg" href="#">Elder</a>
+</nav>
+<div class="w-10 h-10 rounded-full bg-secondary-container flex items-center justify-center overflow-hidden active:opacity-80 transition-opacity">
+<img class="w-full h-full object-cover" data-alt="professional portrait of a healthcare worker smiling gently in a clean office setting" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDAGGiQW4bqrvTg3Q_LzejBRHSFK7ANsHhvAaqKzTldBTF3cQTmwS3Gqm3gVbz-2ctk08JUB49gP0zQ1BcSYcdzuPFye6Szx1yjA610IA3mq_NWG4m-ueg_GaLK8qmBg_DiyFqPc7etHKe3-_mhD5m5UjuoywX5S5jDRiAZ5zVdWtuMU33yGQyfyVqfmpLBvbOY7oIAUy1_F1v5ykAPc9kUXj74DfYo2b4s0UeQqJy2wjelRvgCfKd7LOFaNZ8VAqT-YOTQh49vdE0"/>
+</div>
+</div>
+</header>
+<main class="max-w-4xl mx-auto px-6 pt-12 animate-in fade-in duration-700">
+<!-- Editorial Header -->
+<div class="mb-12">
+<span class="text-secondary font-medium tracking-wider text-xs uppercase mb-2 block">Connection Portal</span>
+<h2 class="text-3xl font-extrabold text-primary tracking-tight leading-tight mb-4">Link with an Elder</h2>
+<p class="text-on-surface-variant max-w-xl body-md">Enter the username of the person you wish to care for. Once they accept your request, you will gain access to their health logs and activity alerts.</p>
+</div>
+<div class="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+<!-- Main Form Card -->
+<div class="lg:col-span-7 bg-surface-container-lowest p-8 rounded-xl shadow-[0_32px_64px_-12px_rgba(25,28,29,0.06)] space-y-8">
+<!-- Search Input -->
+<div class="space-y-2">
+<label class="text-xs font-semibold text-on-surface-variant px-1" for="elder-username">ELDER'S USERNAME</label>
+<div class="relative flex items-center">
+<span class="material-symbols-outlined absolute left-4 text-outline" data-icon="search">search</span>
+<input class="w-full pl-12 pr-4 py-4 bg-surface-container-low border-none rounded-xl focus:ring-2 focus:ring-primary/20 text-on-surface placeholder:text-outline/50 transition-all" id="elder-username" placeholder="e.g. robert_chen_45" type="text"/>
+</div>
+<p class="text-[10px] text-secondary/60 px-1">Tip: Usernames are case-sensitive.</p>
+</div>
+<!-- Relationship Dropdown -->
+<div class="space-y-2">
+<label class="text-xs font-semibold text-on-surface-variant px-1">YOUR RELATIONSHIP</label>
+<div class="relative">
+<select class="w-full appearance-none bg-surface-container-low border-none rounded-xl py-4 pl-4 pr-12 focus:ring-2 focus:ring-primary/20 text-on-surface cursor-pointer">
+<option disabled="" selected="" value="">Select relationship...</option>
+<option>Son</option>
+<option>Daughter</option>
+<option>Spouse</option>
+<option>Friend</option>
+<option>Professional Carer</option>
+<option>Other</option>
+</select>
+<span class="material-symbols-outlined absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-outline" data-icon="expand_more">expand_more</span>
+</div>
+</div>
+<!-- Action Button -->
+<button class="w-full bg-gradient-to-br from-primary to-primary-container text-white font-bold py-4 rounded-xl active:scale-[0.98] transition-transform duration-150 flex items-center justify-center gap-2">
+<span>Send Request</span>
+<span class="material-symbols-outlined" data-icon="send">send</span>
+</button>
+</div>
+<!-- Contextual Info / "Bento" Style Side Modules -->
+<div class="lg:col-span-5 space-y-6">
+<!-- Status Card -->
+<div class="bg-surface-container-low p-6 rounded-xl border-l-4 border-primary">
+<div class="flex items-center gap-2 mb-3">
+<span class="material-symbols-outlined text-primary text-sm" data-icon="info" style="font-variation-settings: 'FILL' 1;">info</span>
+<h3 class="text-sm font-bold text-primary">Privacy &amp; Access</h3>
+</div>
+<p class="text-xs text-on-surface-variant leading-relaxed">
+                        Linking allows you to view medication schedules, mood tracking, and emergency alerts. Both parties must agree before data is shared.
+                    </p>
+</div>
+<!-- Visual Accent Card -->
+<div class="relative h-48 rounded-xl overflow-hidden group">
+<img class="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" data-alt="close-up of two people's hands gently resting together on a wooden table, symbolizing care and connection" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBzzGGR5kwfBMWBWGDo3cJ0yTwfgkIoZ2QvHOqq8eiJCeglJtWMhJQFxlzHGWom-rNwzyC5ebI0OuTYH7GidQlcFcXxQcLw883atmuDFausqaTKblJLv-xnULpWudIbrCmXvb5WchlMo9-t8gX5AaDN5AR7QiMnWWNiYqGtDmbtC-sZ4EziQTuMAIZ2KRwrxhp4Gj0odnzwslIaP4v2qrD1fNUP5z9a9r9gDjydA11BIaawldIIxDDiN9hmJBpSHJ5WA4QmsEX5sgg"/>
+<div class="absolute inset-0 bg-gradient-to-t from-primary/80 to-transparent flex flex-col justify-end p-6">
+<span class="text-[10px] text-primary-fixed font-bold tracking-widest uppercase">Trusted Care</span>
+<p class="text-white text-sm font-medium">Helping you stay connected to those who matter most.</p>
+</div>
+</div>
+<!-- Suggested Connections / Recent -->
+<div class="bg-surface-container-high/30 p-6 rounded-xl">
+<h3 class="text-xs font-bold text-on-surface-variant mb-4 uppercase tracking-wider">Recently Connected</h3>
+<div class="flex gap-2">
+<div class="w-8 h-8 rounded-full bg-tertiary-fixed flex items-center justify-center overflow-hidden border-2 border-white">
+<img class="w-full h-full object-cover" data-alt="elderly man with gray hair and glasses smiling warmly" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDkYmOH0dAJSUe35VIlUmzysZR_WqEWKuIUzBct2MmKxbygEG2vSz8PnPKgUyCJcDw3NrJMHeKe-NhQQq1fVxTK_VoCMpJvzO4S-qXezd1C4JP2QXmdgFUYMdCNyX93mPuHBybR7ZRb6cHPNvwdr4UfCFAxq18IYbQOAwGOS7ZwiVZIzXh3_WBTbxyNohE1fGv1JKcX80QsQNlILuLYKfDN8nRU0MIR-4Vh-cOernPA4o8Hf0SDe9yF7ikz2mUEi11H_YLBlvY_wzA"/>
+</div>
+<div class="w-8 h-8 rounded-full bg-secondary-fixed flex items-center justify-center overflow-hidden border-2 border-white -ml-4">
+<img class="w-full h-full object-cover" data-alt="elderly woman with white hair looking out a window" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBlOcPyWSYUKmpS89bsLVtvBEKZhuSY-N7Lb8StGnmt3E-nA_b0-JP6UL3DBsareatMjv6IoLUxW-CqJrgojpc6hs4j-XBBBhCJCrxwf5ehkJoazJiM3Sp03kHbm6c6TYqnlQBaXcwjicYzPy_ZL1DJr9K1YdSr_JpcsylTKXw9IGFXCDAWQqaZzK4nP9_-IdRZzdrZt817Yj_PH6s9zY-RgyHH7wWd0yw6L-5cWp_68eDft-IKvXXUmRbCF7FUzfMSpi-LqF7htzg"/>
+</div>
+<div class="w-8 h-8 rounded-full bg-primary-fixed flex items-center justify-center border-2 border-white -ml-4">
+<span class="text-[10px] font-bold text-primary">+2</span>
+</div>
+</div>
+</div>
+</div>
+</div>
+</main>
+<!-- BottomNavBar (Mobile only as per design system guidelines) -->
+<nav class="md:hidden fixed bottom-0 left-0 w-full z-50 flex justify-around items-center px-2 pt-2 pb-safe-offset-4 bg-white/90 dark:bg-slate-900/90 backdrop-blur-xl shadow-[0_-8px_32px_rgba(25,28,29,0.06)] rounded-t-lg">
+<div class="flex flex-col items-center justify-center text-[#41484d] dark:text-slate-400 px-4 py-1.5 transition-all active:scale-95">
+<span class="material-symbols-outlined" data-icon="dashboard">dashboard</span>
+<span class="font-['Plus_Jakarta_Sans'] text-[10px] font-medium uppercase tracking-wider mt-1">Dashboard</span>
+</div>
+<div class="flex flex-col items-center justify-center bg-[#f2f4f5] dark:bg-sky-900/30 text-[#00364c] dark:text-sky-200 rounded-xl px-4 py-1.5 transition-all active:scale-95">
+<span class="material-symbols-outlined" data-icon="elderly">elderly</span>
+<span class="font-['Plus_Jakarta_Sans'] text-[10px] font-medium uppercase tracking-wider mt-1">Elder</span>
+</div>
+<div class="flex flex-col items-center justify-center text-[#41484d] dark:text-slate-400 px-4 py-1.5 transition-all active:scale-95">
+<span class="material-symbols-outlined" data-icon="psychology">psychology</span>
+<span class="font-['Plus_Jakarta_Sans'] text-[10px] font-medium uppercase tracking-wider mt-1">Mood &amp; Activity</span>
+</div>
+<div class="flex flex-col items-center justify-center text-[#41484d] dark:text-slate-400 px-4 py-1.5 transition-all active:scale-95">
+<span class="material-symbols-outlined" data-icon="link">link</span>
+<span class="font-['Plus_Jakarta_Sans'] text-[10px] font-medium uppercase tracking-wider mt-1">Links</span>
+</div>
+</nav>
+</body></html>

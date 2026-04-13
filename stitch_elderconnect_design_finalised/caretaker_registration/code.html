@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Caretaker Registration - ElderConnect</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            "colors": {
+                    "on-tertiary-fixed-variant": "#005047",
+                    "primary": "#00364c",
+                    "secondary-container": "#cae4f1",
+                    "inverse-surface": "#2e3132",
+                    "surface-container-low": "#f2f4f5",
+                    "on-surface": "#191c1d",
+                    "tertiary": "#003932",
+                    "surface-dim": "#d8dadb",
+                    "on-tertiary-container": "#6bc7b7",
+                    "on-error": "#ffffff",
+                    "on-surface-variant": "#41484d",
+                    "primary-fixed": "#c4e7ff",
+                    "tertiary-fixed-dim": "#7ad7c6",
+                    "secondary-fixed-dim": "#b1cad8",
+                    "error-container": "#ffdad6",
+                    "surface": "#f8fafb",
+                    "secondary": "#4a626d",
+                    "background": "#f8fafb",
+                    "secondary-fixed": "#cde6f4",
+                    "surface-variant": "#e1e3e4",
+                    "on-secondary-fixed-variant": "#324a55",
+                    "surface-container-high": "#e6e8e9",
+                    "on-primary-fixed-variant": "#184c65",
+                    "surface-bright": "#f8fafb",
+                    "tertiary-container": "#005248",
+                    "surface-tint": "#34647d",
+                    "on-background": "#191c1d",
+                    "error": "#ba1a1a",
+                    "on-error-container": "#93000a",
+                    "outline": "#71787d",
+                    "on-tertiary-fixed": "#00201b",
+                    "on-primary": "#ffffff",
+                    "tertiary-fixed": "#97f3e2",
+                    "surface-container-lowest": "#ffffff",
+                    "primary-fixed-dim": "#9ecdea",
+                    "inverse-on-surface": "#eff1f2",
+                    "on-tertiary": "#ffffff",
+                    "on-secondary-container": "#4e6672",
+                    "on-primary-container": "#8fbdda",
+                    "on-secondary-fixed": "#041e28",
+                    "surface-container": "#eceeef",
+                    "inverse-primary": "#9ecdea",
+                    "on-secondary": "#ffffff",
+                    "on-primary-fixed": "#001e2d",
+                    "surface-container-highest": "#e1e3e4",
+                    "primary-container": "#1a4d66",
+                    "outline-variant": "#c1c7cd"
+            },
+            "borderRadius": {
+                    "DEFAULT": "0.125rem",
+                    "lg": "0.25rem",
+                    "xl": "0.5rem",
+                    "full": "0.75rem"
+            },
+            "fontFamily": {
+                    "headline": ["Plus Jakarta Sans"],
+                    "body": ["Plus Jakarta Sans"],
+                    "label": ["Plus Jakarta Sans"]
+            }
+          },
+        },
+      }
+    </script>
+<style>
+        body { font-family: 'Plus Jakarta Sans', sans-serif; }
+        .glass-effect {
+            backdrop-filter: blur(24px);
+            background-color: rgba(248, 250, 251, 0.8);
+        }
+        .clinical-gradient {
+            background: linear-gradient(135deg, #00364c 0%, #1a4d66 100%);
+        }
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-surface text-on-surface min-h-screen flex flex-col items-center">
+<!-- Top Navigation Bar - Contextually restricted shell -->
+<header class="docked full-width top-0 sticky z-50 bg-[#f8fafb]/80 dark:bg-slate-950/80 backdrop-blur-md shadow-[0_2px_15px_-3px_rgba(25,28,29,0.06)] flex justify-between items-center w-full px-6 py-4">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-[#00364c]" data-icon="medical_services">medical_services</span>
+<h1 class="text-xl font-bold tracking-tighter text-[#00364c] dark:text-sky-100">ElderConnect</h1>
+</div>
+<div class="flex items-center gap-4">
+<span class="text-sm font-semibold tracking-tight text-[#41484d] font-headline">Join as Provider</span>
+</div>
+</header>
+<main class="w-full max-w-6xl px-6 py-12 grid grid-cols-1 md:grid-cols-2 gap-16 items-center">
+<!-- Visual Section: The Clinical Sanctuary Philosophy -->
+<section class="hidden md:flex flex-col gap-8">
+<div class="relative group">
+<div class="absolute -inset-4 clinical-gradient opacity-10 rounded-full blur-3xl group-hover:opacity-20 transition duration-1000"></div>
+<img alt="Empathetic healthcare support" class="relative rounded-xl w-full aspect-video object-cover shadow-2xl" data-alt="Modern clinical interior with soft natural light, warm wooden textures, and a professional health professional interacting warmly with a digital tablet" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBUpwO5DO7NQyTzLmN7EEa8aZ0gaC3kS08lDAZaHdnZ-1PIuvvWGEuBw6j-zt5eaIg7dqeNCR6fy_VsycAE740B4DPtrtdbSccpWmqFXwOGX3KgVdE2pnzOfhzqmUzI4kP1RQU5dwsB6-yIjey6BTB7qlE4y9RpOv-JqUUFDoKcN0miwjAJcotbF4Riz66Ns9WLAveHqVU-WozLZczOkDM5_HXPkpM2fp2RQkDJ5q7zw4pHGjgRAEsyjuN35Rz-uMg5FHe1Sa24jr0"/>
+</div>
+<div class="space-y-4">
+<h2 class="text-primary text-2xl font-bold tracking-tight">The Clinical Sanctuary</h2>
+<p class="text-secondary body-md leading-relaxed max-w-md">
+                    Join a dedicated network of caretakers. We provide the tools for precision care, so you can focus on the human connection. 
+                </p>
+<div class="flex gap-6 pt-4">
+<div class="flex flex-col gap-1">
+<span class="text-primary font-bold text-lg">15k+</span>
+<span class="text-on-surface-variant text-[10px] uppercase tracking-widest font-bold">Active Providers</span>
+</div>
+<div class="flex flex-col gap-1">
+<span class="text-primary font-bold text-lg">98%</span>
+<span class="text-on-surface-variant text-[10px] uppercase tracking-widest font-bold">Trust Score</span>
+</div>
+</div>
+</div>
+</section>
+<!-- Registration Form Section -->
+<section class="w-full max-w-md mx-auto">
+<div class="space-y-2 mb-8">
+<span class="bg-tertiary-container text-on-tertiary-container px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider">Caretaker Account</span>
+<h3 class="text-on-surface text-xl font-bold tracking-tight">Create your profile</h3>
+<p class="text-on-surface-variant text-sm">Professional and clean registration for medical providers.</p>
+</div>
+<form class="space-y-6">
+<!-- Field: Full Name -->
+<div class="space-y-1.5">
+<label class="text-on-surface-variant text-[11px] font-semibold uppercase tracking-wider ml-1" for="name">Full Name</label>
+<div class="relative">
+<div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+<span class="material-symbols-outlined text-outline text-[20px]" data-icon="person">person</span>
+</div>
+<input class="w-full pl-10 pr-4 py-3 bg-surface-container-highest border-none rounded-xl text-sm focus:ring-2 focus:ring-primary/40 focus:bg-surface-container-lowest transition-all" id="name" placeholder="Dr. Sarah Jenkins" type="text"/>
+</div>
+</div>
+<!-- Field: Phone Number -->
+<div class="space-y-1.5">
+<label class="text-on-surface-variant text-[11px] font-semibold uppercase tracking-wider ml-1" for="phone">Phone Number</label>
+<div class="relative">
+<div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+<span class="material-symbols-outlined text-outline text-[20px]" data-icon="call">call</span>
+</div>
+<input class="w-full pl-10 pr-4 py-3 bg-surface-container-highest border-none rounded-xl text-sm focus:ring-2 focus:ring-primary/40 focus:bg-surface-container-lowest transition-all" id="phone" placeholder="+1 (555) 000-0000" type="tel"/>
+</div>
+</div>
+<!-- Field: Email Address -->
+<div class="space-y-1.5">
+<label class="text-on-surface-variant text-[11px] font-semibold uppercase tracking-wider ml-1" for="email">Email Address</label>
+<div class="relative">
+<div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+<span class="material-symbols-outlined text-outline text-[20px]" data-icon="mail">mail</span>
+</div>
+<input class="w-full pl-10 pr-4 py-3 bg-surface-container-highest border-none rounded-xl text-sm focus:ring-2 focus:ring-primary/40 focus:bg-surface-container-lowest transition-all" id="email" placeholder="sarah.j@elderconnect.care" type="email"/>
+</div>
+</div>
+<!-- Field: Password -->
+<div class="space-y-1.5">
+<label class="text-on-surface-variant text-[11px] font-semibold uppercase tracking-wider ml-1" for="password">Password</label>
+<div class="relative">
+<div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+<span class="material-symbols-outlined text-outline text-[20px]" data-icon="lock">lock</span>
+</div>
+<input class="w-full pl-10 pr-4 py-3 bg-surface-container-highest border-none rounded-xl text-sm focus:ring-2 focus:ring-primary/40 focus:bg-surface-container-lowest transition-all" id="password" placeholder="••••••••" type="password"/>
+</div>
+</div>
+<div class="flex items-start gap-3 py-2">
+<input class="mt-1 rounded text-primary focus:ring-primary h-4 w-4 bg-surface-container-highest border-none" id="terms" type="checkbox"/>
+<label class="text-xs text-on-surface-variant leading-relaxed" for="terms">
+                        I agree to the <span class="text-primary font-semibold">Terms of Service</span> and acknowledge the <span class="text-primary font-semibold">Privacy Policy</span> regarding clinical data handling.
+                    </label>
+</div>
+<!-- Primary CTA -->
+<button class="w-full clinical-gradient text-on-primary font-semibold py-3.5 rounded-xl shadow-lg active:scale-[0.98] transition-transform flex items-center justify-center gap-2" type="submit">
+                    Continue
+                    <span class="material-symbols-outlined text-[18px]" data-icon="arrow_forward">arrow_forward</span>
+</button>
+<!-- Alternate Option -->
+<p class="text-center text-xs text-on-surface-variant pt-4">
+                    Already have a professional account? <a class="text-primary font-bold" href="#">Sign In</a>
+</p>
+</form>
+</section>
+</main>
+<!-- Footer Identity -->
+<footer class="mt-auto w-full max-w-6xl px-6 py-12 flex flex-col md:flex-row justify-between items-center gap-8 opacity-60">
+<div class="flex items-center gap-6">
+<span class="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant">HIPAA Compliant</span>
+<span class="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant">256-bit Encrypted</span>
+<span class="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant">ISO Certified</span>
+</div>
+<p class="text-[10px] font-medium text-on-surface-variant">© 2024 ElderConnect Health Systems. All rights reserved.</p>
+</footer>
+<!-- No BottomNavBar rendered as this is a focused transactional screen -->
+</body></html>

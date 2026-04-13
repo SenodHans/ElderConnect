@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>ElderConnect - Medication</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&amp;family=Lexend:wght@400;500;600&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<style>
+        body {
+            font-family: 'Lexend', sans-serif;
+        }
+        h1, h2, h3, h4, h5, h6, .font-headline {
+            font-family: 'Plus Jakarta Sans', sans-serif;
+        }
+    </style>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "surface-container": "#eeeeee",
+                        "inverse-on-surface": "#f1f0f1",
+                        "secondary-fixed-dim": "#ffb778",
+                        "background": "#faf9fa",
+                        "primary": "#005050",
+                        "surface-tint": "#006a6a",
+                        "on-surface-variant": "#3e4948",
+                        "on-tertiary-container": "#bbddff",
+                        "primary-fixed-dim": "#84d4d3",
+                        "tertiary": "#004b74",
+                        "on-surface": "#1a1c1d",
+                        "on-tertiary": "#ffffff",
+                        "surface-dim": "#dadadb",
+                        "secondary-fixed": "#ffdcc1",
+                        "surface-variant": "#e3e2e3",
+                        "on-primary-container": "#97e7e6",
+                        "on-secondary": "#ffffff",
+                        "primary-fixed": "#a0f0f0",
+                        "error": "#ba1a1a",
+                        "on-error-container": "#93000a",
+                        "surface": "#faf9fa",
+                        "inverse-primary": "#84d4d3",
+                        "outline-variant": "#bec9c8",
+                        "on-secondary-fixed": "#2e1500",
+                        "surface-container-lowest": "#ffffff",
+                        "on-tertiary-fixed-variant": "#004b73",
+                        "outline": "#6e7979",
+                        "inverse-surface": "#2f3131",
+                        "tertiary-fixed": "#cce5ff",
+                        "on-secondary-fixed-variant": "#6c3a00",
+                        "surface-bright": "#faf9fa",
+                        "on-primary": "#ffffff",
+                        "on-background": "#1a1c1d",
+                        "on-error": "#ffffff",
+                        "on-primary-fixed-variant": "#004f4f",
+                        "surface-container-low": "#f4f3f4",
+                        "on-secondary-container": "#6f3c00",
+                        "secondary": "#8e4e00",
+                        "tertiary-container": "#0e6496",
+                        "on-tertiary-fixed": "#001d31",
+                        "surface-container-high": "#e8e8e9",
+                        "tertiary-fixed-dim": "#93ccff",
+                        "on-primary-fixed": "#002020",
+                        "secondary-container": "#fda54f",
+                        "surface-container-highest": "#e3e2e3",
+                        "primary-container": "#006a6a",
+                        "error-container": "#ffdad6"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.25rem",
+                        "lg": "0.5rem",
+                        "xl": "0.75rem",
+                        "full": "9999px"
+                    },
+                    "fontFamily": {
+                        "headline": ["Plus Jakarta Sans"],
+                        "body": ["Lexend"],
+                        "label": ["Lexend"]
+                    }
+                },
+            },
+        }
+    </script>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-surface text-on-surface min-h-screen flex flex-col relative overflow-x-hidden antialiased">
+<!-- Sticky Glass Header -->
+<header class="sticky top-0 z-40 bg-surface/80 backdrop-blur-xl px-6 py-6">
+<h1 class="font-headline text-3xl md:text-4xl font-bold text-primary tracking-tight">Medications</h1>
+</header>
+<!-- Main Content -->
+<main class="flex-1 px-6 pb-32 max-w-3xl mx-auto w-full">
+<!-- Next Medication Focus Card -->
+<section class="mb-12">
+<h2 class="font-headline text-xl font-semibold text-on-surface mb-6">Up Next</h2>
+<div class="bg-surface-container-lowest rounded-[24px] p-6 shadow-[0_12px_40px_-12px_rgba(26,28,29,0.08)] flex flex-col sm:flex-row gap-8 items-stretch">
+<!-- Pill Image -->
+<div class="w-full sm:w-2/5 aspect-video sm:aspect-square rounded-2xl overflow-hidden bg-surface-container-low shrink-0">
+<img alt="White round pill on clean surface" class="w-full h-full object-cover" data-alt="close up of a single small white round pill on a pristine light grey surface with soft studio lighting and subtle shadows" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCwNBUPKsczA4b9VlxcbNZHF7B_aF_rtGGGh0YTA4kCclo5QPVr26FTDu7cRSn8zP_EYtSN1iK7aoJmO9K8FeaOS9J4dgHevH7m4ZaAHSgCgWOOcY8FyacYAUcsRdl_fIIOuUiWoEG37elMX3oycy5h--UW3pVuerfXgLqwnoP570JFjllb-2-33N9HpEx18nz_1fiYgkoqh9RMyeghTk0utCn61Hzdy5Bek19F_5siTW_tZTCaioNH8vdDk10Ge-qE-ZgOoFHR48Q"/>
+</div>
+<!-- Pill Details & Action -->
+<div class="flex-1 flex flex-col justify-center gap-6">
+<div>
+<h3 class="font-headline text-3xl font-bold text-on-surface leading-tight">Lisinopril</h3>
+<div class="flex items-center gap-3 mt-3 text-secondary">
+<span class="material-symbols-outlined text-[28px]" style="font-variation-settings: 'FILL' 1;">schedule</span>
+<p class="font-body text-xl font-medium">10mg • 8:00 AM</p>
+</div>
+</div>
+<button class="w-full mt-auto bg-gradient-to-r from-primary to-primary-container text-on-primary font-body text-xl font-medium px-8 py-5 rounded-[20px] flex items-center justify-center min-h-[64px] transition-transform active:scale-[0.98] shadow-sm">
+                        Confirm Taken
+                    </button>
+</div>
+</div>
+</section>
+<!-- Medication History -->
+<section>
+<h2 class="font-headline text-xl font-semibold text-on-surface mb-6">History</h2>
+<div class="flex flex-col gap-4">
+<!-- Item: Taken Today -->
+<div class="bg-surface-container-low rounded-[24px] p-5 flex items-center gap-6 min-h-[88px]">
+<div class="w-14 h-14 rounded-full bg-primary-fixed flex items-center justify-center shrink-0 text-on-primary-fixed shadow-[0_4px_12px_-4px_rgba(0,80,80,0.2)]">
+<span class="material-symbols-outlined text-[32px]" style="font-variation-settings: 'FILL' 1;">check_circle</span>
+</div>
+<div class="flex-1">
+<h4 class="font-headline text-lg font-bold text-on-surface">Today, 8:05 AM</h4>
+<p class="font-body text-base text-on-surface-variant mt-1">Taken</p>
+</div>
+</div>
+<!-- Item: Taken Yesterday -->
+<div class="bg-surface-container-low rounded-[24px] p-5 flex items-center gap-6 min-h-[88px]">
+<div class="w-14 h-14 rounded-full bg-primary-fixed flex items-center justify-center shrink-0 text-on-primary-fixed shadow-[0_4px_12px_-4px_rgba(0,80,80,0.2)]">
+<span class="material-symbols-outlined text-[32px]" style="font-variation-settings: 'FILL' 1;">check_circle</span>
+</div>
+<div class="flex-1">
+<h4 class="font-headline text-lg font-bold text-on-surface">Yesterday, 8:10 PM</h4>
+<p class="font-body text-base text-on-surface-variant mt-1">Taken</p>
+</div>
+</div>
+<!-- Item: Missed Yesterday -->
+<div class="bg-error-container rounded-[24px] p-5 flex items-center gap-6 min-h-[88px]">
+<div class="w-14 h-14 rounded-full bg-error flex items-center justify-center shrink-0 text-on-error shadow-[0_4px_12px_-4px_rgba(186,26,26,0.3)]">
+<span class="material-symbols-outlined text-[32px]" style="font-variation-settings: 'FILL' 1;">cancel</span>
+</div>
+<div class="flex-1">
+<h4 class="font-headline text-lg font-bold text-on-error-container">Yesterday, 8:00 AM</h4>
+<p class="font-body text-base text-on-error-container mt-1 font-medium">Missed</p>
+</div>
+</div>
+</div>
+</section>
+</main>
+<!-- Shared Component: BottomNavBar -->
+<div class="fixed bottom-0 w-full z-50 flex gap-2 border-t border-[#e6f4f4] bg-[#f8fcfc] px-4 pb-6 pt-3" style='font-family: "Plus Jakarta Sans", "Noto Sans", sans-serif;'>
+<a class="just flex flex-1 flex-col items-center justify-end gap-1 text-[#45a1a1]" href="#">
+<div class="text-[#45a1a1] flex h-8 items-center justify-center" data-icon="House" data-size="24px" data-weight="regular">
+<span class="material-symbols-outlined">home</span>
+</div>
+<p class="text-[#45a1a1] text-xs font-medium leading-normal tracking-[0.015em]">Home</p>
+</a>
+<a class="just flex flex-1 flex-col items-center justify-end gap-1 rounded-full text-[#0c1d1d]" href="#">
+<div class="text-[#0c1d1d] flex h-8 items-center justify-center" data-icon="Pill" data-size="24px" data-weight="fill">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">medication</span>
+</div>
+<p class="text-[#0c1d1d] text-xs font-bold leading-normal tracking-[0.015em]">Medication</p>
+</a>
+<a class="just flex flex-1 flex-col items-center justify-end gap-1 text-[#45a1a1]" href="#">
+<div class="text-[#45a1a1] flex h-8 items-center justify-center" data-icon="Heart" data-size="24px" data-weight="regular">
+<span class="material-symbols-outlined">monitor_heart</span>
+</div>
+<p class="text-[#45a1a1] text-xs font-medium leading-normal tracking-[0.015em]">Vitals</p>
+</a>
+<a class="just flex flex-1 flex-col items-center justify-end gap-1 text-[#45a1a1]" href="#">
+<div class="text-[#45a1a1] flex h-8 items-center justify-center" data-icon="User" data-size="24px" data-weight="regular">
+<span class="material-symbols-outlined">person</span>
+</div>
+<p class="text-[#45a1a1] text-xs font-medium leading-normal tracking-[0.015em]">Profile</p>
+</a>
+</div>
+</body></html>

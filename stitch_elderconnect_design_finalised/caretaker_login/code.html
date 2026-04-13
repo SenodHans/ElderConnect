@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>ElderConnect - Caretaker Sign In</title>
+<!-- Google Fonts -->
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=Lexend:wght@300;400;500;600&amp;family=Plus+Jakarta+Sans:wght@400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<!-- Material Symbols -->
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<!-- Tailwind CSS -->
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<!-- Tailwind Configuration -->
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            "colors": {
+                    "on-tertiary-fixed": "#001d31",
+                    "tertiary-fixed-dim": "#93ccff",
+                    "surface-variant": "#e3e2e3",
+                    "primary": "#005050",
+                    "on-tertiary": "#ffffff",
+                    "inverse-on-surface": "#f1f0f1",
+                    "on-secondary": "#ffffff",
+                    "on-secondary-fixed": "#2e1500",
+                    "tertiary-fixed": "#cce5ff",
+                    "background": "#faf9fa",
+                    "on-tertiary-container": "#bbddff",
+                    "surface-dim": "#dadadb",
+                    "inverse-surface": "#2f3131",
+                    "on-surface-variant": "#3e4948",
+                    "on-primary": "#ffffff",
+                    "surface-bright": "#faf9fa",
+                    "primary-fixed-dim": "#84d4d3",
+                    "inverse-primary": "#84d4d3",
+                    "secondary-fixed-dim": "#ffb778",
+                    "on-primary-fixed-variant": "#004f4f",
+                    "outline-variant": "#bec9c8",
+                    "secondary-fixed": "#ffdcc1",
+                    "surface-container-highest": "#e3e2e3",
+                    "secondary": "#8e4e00",
+                    "surface-container-low": "#f4f3f4",
+                    "on-background": "#1a1c1d",
+                    "on-secondary-container": "#6f3c00",
+                    "error": "#ba1a1a",
+                    "surface": "#faf9fa",
+                    "surface-container": "#eeeeee",
+                    "on-error-container": "#93000a",
+                    "on-secondary-fixed-variant": "#6c3a00",
+                    "surface-container-high": "#e8e8e9",
+                    "on-error": "#ffffff",
+                    "tertiary-container": "#0e6496",
+                    "tertiary": "#004b74",
+                    "on-surface": "#1a1c1d",
+                    "outline": "#6e7979",
+                    "surface-container-lowest": "#ffffff",
+                    "primary-container": "#006a6a",
+                    "secondary-container": "#fda54f",
+                    "on-primary-fixed": "#002020",
+                    "on-tertiary-fixed-variant": "#004b73",
+                    "primary-fixed": "#a0f0f0",
+                    "surface-tint": "#006a6a",
+                    "error-container": "#ffdad6",
+                    "on-primary-container": "#97e7e6"
+            },
+            "borderRadius": {
+                    "DEFAULT": "0.25rem",
+                    "lg": "0.5rem",
+                    "xl": "0.75rem",
+                    "full": "9999px"
+            },
+            "fontFamily": {
+                    "headline": ["Plus Jakarta Sans", "sans-serif"],
+                    "body": ["Lexend", "sans-serif"],
+                    "label": ["Lexend", "sans-serif"]
+            }
+          }
+        }
+      }
+    </script>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-surface text-on-surface font-body min-h-screen flex flex-col items-center justify-center p-6 antialiased selection:bg-primary-fixed selection:text-on-primary-fixed">
+<main class="w-full max-w-[420px] flex flex-col">
+<!-- Header Section -->
+<div class="flex flex-col items-center mb-10 text-center">
+<div class="h-14 w-14 bg-surface-container-low rounded-full flex items-center justify-center mb-4 text-primary">
+<span class="material-symbols-outlined text-[32px]" data-icon="volunteer_activism" data-weight="fill" style="font-variation-settings: 'FILL' 1;">volunteer_activism</span>
+</div>
+<h1 class="font-headline font-bold text-xl text-primary tracking-tight mb-2">ElderConnect</h1>
+<h2 class="font-headline font-bold text-3xl text-on-surface">Caretaker Sign In</h2>
+</div>
+<!-- Login Form -->
+<form class="flex flex-col gap-6" onsubmit="event.preventDefault();">
+<!-- Email Input Group -->
+<div class="flex flex-col gap-2">
+<label class="font-label text-sm font-medium text-on-surface" for="email">Email address</label>
+<div class="relative">
+<input class="w-full h-14 bg-surface-container-highest border-0 border-b-2 border-transparent focus:border-primary focus:ring-0 rounded-t-lg rounded-b-none px-4 font-body text-base text-on-surface placeholder:text-on-surface-variant transition-colors" id="email" placeholder="name@example.com" required="" type="email"/>
+</div>
+</div>
+<!-- Password Input Group -->
+<div class="flex flex-col gap-2">
+<label class="font-label text-sm font-medium text-on-surface" for="password">Password</label>
+<div class="relative">
+<input class="w-full h-14 bg-surface-container-highest border-0 border-b-2 border-transparent focus:border-primary focus:ring-0 rounded-t-lg rounded-b-none px-4 pr-14 font-body text-base text-on-surface placeholder:text-on-surface-variant transition-colors" id="password" placeholder="Enter your password" required="" type="password"/>
+<button aria-label="Toggle password visibility" class="absolute right-0 top-0 h-14 w-14 flex items-center justify-center text-on-surface-variant hover:text-on-surface focus:outline-none rounded-tr-lg" type="button">
+<span class="material-symbols-outlined" data-icon="visibility">visibility</span>
+</button>
+</div>
+</div>
+<!-- Primary Action -->
+<div class="mt-2 flex flex-col items-center gap-4">
+<button class="w-full h-14 bg-gradient-to-r from-primary to-primary-container text-on-primary font-headline font-bold text-base rounded-xl shadow-[0_4px_32px_rgba(26,28,29,0.06)] hover:opacity-90 transition-opacity flex items-center justify-center" type="submit">
+                    Sign In
+                </button>
+<a class="font-label text-sm font-medium text-primary hover:text-primary-container transition-colors" href="#">
+                    Forgot your password?
+                </a>
+</div>
+</form>
+<!-- Divider -->
+<div class="flex items-center gap-4 my-8">
+<div class="h-px bg-outline-variant opacity-30 flex-1"></div>
+<span class="font-label text-sm text-on-surface-variant">or</span>
+<div class="h-px bg-outline-variant opacity-30 flex-1"></div>
+</div>
+<!-- Secondary Action -->
+<button class="w-full h-14 border border-outline-variant/30 text-primary font-headline font-bold text-base rounded-xl flex items-center justify-center hover:bg-surface-container-low transition-colors" type="button">
+            Create an Account
+        </button>
+</main>
+</body></html>

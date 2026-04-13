@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Game Summary - ElderConnect</title>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@700;800&amp;family=Lexend:wght@300;400;500;600&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            "colors": {
+                    "outline-variant": "#bec9c8",
+                    "secondary-fixed-dim": "#ffb778",
+                    "on-primary-fixed-variant": "#004f4f",
+                    "surface-bright": "#faf9fa",
+                    "error": "#ba1a1a",
+                    "surface-container": "#eeeeee",
+                    "on-primary-fixed": "#002020",
+                    "surface-container-lowest": "#ffffff",
+                    "on-tertiary-fixed": "#001d31",
+                    "on-secondary-fixed": "#2e1500",
+                    "outline": "#6e7979",
+                    "on-error-container": "#93000a",
+                    "on-error": "#ffffff",
+                    "error-container": "#ffdad6",
+                    "secondary": "#8e4e00",
+                    "tertiary-fixed-dim": "#93ccff",
+                    "on-tertiary": "#ffffff",
+                    "primary-container": "#006a6a",
+                    "on-surface-variant": "#3e4948",
+                    "primary-fixed-dim": "#84d4d3",
+                    "on-tertiary-container": "#bbddff",
+                    "on-surface": "#1a1c1d",
+                    "surface-tint": "#006a6a",
+                    "surface-dim": "#dadadb",
+                    "on-background": "#1a1c1d",
+                    "primary-fixed": "#a0f0f0",
+                    "secondary-fixed": "#ffdcc1",
+                    "on-secondary-container": "#6f3c00",
+                    "on-primary": "#ffffff",
+                    "surface-container-high": "#e8e8e9",
+                    "on-primary-container": "#97e7e6",
+                    "surface-container-highest": "#e3e2e3",
+                    "tertiary": "#004b74",
+                    "primary": "#005050",
+                    "surface-variant": "#e3e2e3",
+                    "tertiary-fixed": "#cce5ff",
+                    "on-tertiary-fixed-variant": "#004b73",
+                    "inverse-surface": "#2f3131",
+                    "inverse-primary": "#84d4d3",
+                    "background": "#faf9fa",
+                    "surface-container-low": "#f4f3f4",
+                    "surface": "#faf9fa",
+                    "inverse-on-surface": "#f1f0f1",
+                    "tertiary-container": "#0e6496",
+                    "on-secondary-fixed-variant": "#6c3a00",
+                    "secondary-container": "#fda54f",
+                    "on-secondary": "#ffffff"
+            },
+            "borderRadius": {
+                    "DEFAULT": "0.25rem",
+                    "lg": "0.5rem",
+                    "xl": "0.75rem",
+                    "full": "9999px"
+            },
+            "fontFamily": {
+                    "headline": ["Plus Jakarta Sans"],
+                    "body": ["Lexend"],
+                    "label": ["Lexend"]
+            }
+          },
+        },
+      }
+    </script>
+<style>
+        body { font-family: 'Lexend', sans-serif; }
+        .font-headline { font-family: 'Plus Jakarta Sans', sans-serif; }
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-surface text-on-surface min-h-screen pb-32">
+<!-- Top Navigation Anchor -->
+<header class="fixed top-0 w-full z-50 bg-[#faf9fa]/80 backdrop-blur-md shadow-sm flex items-center justify-between px-6 py-4">
+<div class="flex items-center gap-3">
+<div class="w-10 h-10 rounded-full overflow-hidden">
+<img alt="User Profile" class="w-full h-full object-cover" data-alt="Close-up portrait of a cheerful elderly woman with grey hair and kind eyes in a bright, airy setting" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAYblHerP40V-KCoFm_lxRlO7lxb9peizG_cnUFcBdF3o_ZgxvlkmAp88ir2nhnN0hYi3lFd5Mq7jkxmWMVTWcVW0r379jnsihvdjS_aEww6ld6Wjj9CpeKyhqYrngVjuTmIDdGmHd7CNxNoE5Hf4DXR2QJUCXF8ggR2YxMwZOQv10AK-N856qDl28dMxVOP6KiiELCgS07GmKifJ126OXz23ZXbL2gUHYkYCGRlancrJLGLVlClXAq8XMY6vLVEogpK6OZ1z6z5dE"/>
+</div>
+<h1 class="font-headline font-bold text-2xl tracking-tight text-primary">ElderConnect</h1>
+</div>
+<button class="w-12 h-12 flex items-center justify-center rounded-full hover:bg-surface-container-low transition-colors active:scale-95 duration-200">
+<span class="material-symbols-outlined text-slate-600" data-icon="settings">settings</span>
+</button>
+</header>
+<main class="pt-24 px-6 max-w-2xl mx-auto">
+<!-- Hero Celebration Section -->
+<section class="text-center py-12">
+<div class="relative inline-block mb-6">
+<div class="absolute inset-0 bg-secondary-container opacity-20 blur-3xl rounded-full"></div>
+<span class="material-symbols-outlined text-secondary text-7xl relative" style="font-variation-settings: 'FILL' 1;">stars</span>
+</div>
+<h2 class="font-headline font-extrabold text-display-lg text-5xl md:text-6xl text-primary mb-4 leading-tight">Great Job!</h2>
+<div class="bg-surface-container-lowest rounded-3xl p-8 shadow-sm inline-block w-full max-w-sm">
+<p class="text-on-surface-variant font-medium text-lg mb-1">Your Score</p>
+<p class="font-headline font-extrabold text-5xl text-secondary">1,250 points!</p>
+</div>
+</section>
+<!-- Leaderboard Bento Section -->
+<section class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-12">
+<div class="bg-surface-container-low rounded-[2rem] p-8 flex flex-col justify-center items-center text-center">
+<span class="material-symbols-outlined text-tertiary text-4xl mb-4">emoji_events</span>
+<h3 class="font-headline font-bold text-2xl text-on-surface mb-2">Personal Best</h3>
+<p class="text-on-surface-variant leading-relaxed">You surpassed your previous high score by <span class="text-primary font-bold">150 points</span>!</p>
+</div>
+<div class="bg-surface-container-lowest rounded-[2rem] p-6 shadow-sm">
+<h3 class="font-headline font-bold text-xl text-on-surface mb-6 flex items-center gap-2">
+<span class="material-symbols-outlined text-primary">groups</span>
+                    Family Standings
+                </h3>
+<div class="space-y-4">
+<!-- Leaderboard Item: User (Highlighted) -->
+<div class="flex items-center justify-between p-3 rounded-2xl bg-primary-fixed text-on-primary-fixed">
+<div class="flex items-center gap-3">
+<span class="font-bold w-6">1</span>
+<div class="w-10 h-10 rounded-full border-2 border-primary-container overflow-hidden">
+<img alt="You" class="w-full h-full object-cover" data-alt="Close-up portrait of a cheerful elderly woman" src="https://lh3.googleusercontent.com/aida-public/AB6AXuD3SOW2nJ2hgTRqO8ZesTQho5-Rnv9d27E1uxnqd29H3R-VQB4HrQIqWBTCD_15yM9YuNedtto0ITdbA9ykpmzSoMUT33oplb4pypmRLkUd5Jn7beTz_bQ4vQrTzDfaIiGR-6i4MFlD3Ybb9AUf9iyTWY69DzSVjxXV0sPAy0xC9UHrH6ZUNeGXRPBwac245gCHd3rGx6fcJwZz7MaMtxZ4oWDIOKNDbza9b0LaLayuEmEZ8oePBZtd2A8hWyTtxURFPUL5-fulP5o"/>
+</div>
+<span class="font-semibold">You</span>
+</div>
+<span class="font-bold">1,250</span>
+</div>
+<!-- Leaderboard Item: Family 1 -->
+<div class="flex items-center justify-between p-3 rounded-2xl bg-surface">
+<div class="flex items-center gap-3">
+<span class="font-bold w-6 text-on-surface-variant">2</span>
+<div class="w-10 h-10 rounded-full overflow-hidden">
+<img alt="David" class="w-full h-full object-cover" data-alt="Portrait of a smiling adult man with short hair and casual clothing" src="https://lh3.googleusercontent.com/aida-public/AB6AXuC4S76zte7P-M8jToyveInD3f6MTwX-W3owp19LdwPNO4_-ylcdwmJQZ3NVdNU2-95NA6DH4ZMB0XS6gkpOYG2Tig8_WAJ_suulbAPA8dMmHJlGqGnDlunW1vBVF2R14vmKwANT2c6Mgc4ZKhiTk9wrcBShiYqZTK77FCfTJuZg7wiSazLHc-ZoIDdOLaJUr3U40ipo0V5wMvRI3T_Rq_b6DwttxY-cQoaqo0htsyL5roq-G6BLG_u1voXrN0Pj8q-QifRGK7R3ndA"/>
+</div>
+<span class="font-medium">David (Son)</span>
+</div>
+<span class="font-semibold text-on-surface-variant">1,180</span>
+</div>
+<!-- Leaderboard Item: Family 2 -->
+<div class="flex items-center justify-between p-3 rounded-2xl bg-surface">
+<div class="flex items-center gap-3">
+<span class="font-bold w-6 text-on-surface-variant">3</span>
+<div class="w-10 h-10 rounded-full overflow-hidden">
+<img alt="Sarah" class="w-full h-full object-cover" data-alt="Portrait of a smiling young woman with long hair and bright clothing" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDGkeGVklnyVoTQvrzQkGHvV5lV8tRnLrgqKZkPrTzLY8dqtiBVc-GTxTUgnA71JW5yx_rSKNqc_sqOxW5qBkmlz0Q9u34m0ghr2IIWtPIhCA_srTMD1YTM5uufrbxtkdKfEA_oWaj42geQEBNniISMknqE31DSUxvuj9YMCNcALvLCqSUoO9j4lA3olkK3UGSXHpZ2x_lP4PolvM35ccSL7HSFuVl9lSXcRCQHt2i8PhJ60CSiEdIEkwgBVCQCQ1-9IxCe-xPItXA"/>
+</div>
+<span class="font-medium">Sarah (Granddaughter)</span>
+</div>
+<span class="font-semibold text-on-surface-variant">950</span>
+</div>
+</div>
+</div>
+</section>
+<!-- Action Prompt Section -->
+<section class="bg-tertiary-fixed text-on-tertiary-fixed rounded-[2.5rem] p-10 text-center mb-16 relative overflow-hidden">
+<div class="absolute top-0 right-0 -mr-10 -mt-10 w-40 h-40 bg-tertiary-fixed-dim rounded-full opacity-30"></div>
+<div class="relative z-10">
+<h3 class="font-headline font-bold text-3xl mb-4 leading-tight">Share your success?</h3>
+<p class="text-on-tertiary-fixed-variant text-lg mb-10 max-w-md mx-auto">Let your family know how well you're doing! They'll get a notification with your new score.</p>
+<div class="flex flex-col sm:flex-row gap-4 justify-center">
+<button class="min-h-[72px] min-w-[180px] bg-primary text-on-primary font-bold text-xl px-10 rounded-xl shadow-lg hover:scale-105 active:scale-95 transition-all flex items-center justify-center gap-3">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">share</span>
+                        Yes
+                    </button>
+<button class="min-h-[72px] min-w-[180px] bg-surface-container-highest text-on-surface font-semibold text-xl px-10 rounded-xl hover:bg-surface-container-high active:scale-95 transition-all">
+                        Maybe Later
+                    </button>
+</div>
+</div>
+</section>
+</main>
+<!-- Bottom Navigation Shell -->
+<nav class="fixed bottom-0 left-0 w-full flex justify-around items-center px-4 py-3 pb-safe bg-[#faf9fa] shadow-[0_-4px_20px_rgba(0,0,0,0.05)] rounded-t-[24px] z-50">
+<button class="flex flex-col items-center justify-center text-slate-500 px-6 py-2 hover:text-[#006A6A] active:scale-90 duration-200">
+<span class="material-symbols-outlined mb-1" data-icon="home">home</span>
+<span class="font-['Lexend'] font-medium text-xs">Home</span>
+</button>
+<button class="flex flex-col items-center justify-center text-slate-500 px-6 py-2 hover:text-[#006A6A] active:scale-90 duration-200">
+<span class="material-symbols-outlined mb-1" data-icon="rss_feed">rss_feed</span>
+<span class="font-['Lexend'] font-medium text-xs">Feed</span>
+</button>
+<button class="flex flex-col items-center justify-center bg-[#006A6A] text-white rounded-2xl px-6 py-2 transition-all active:scale-90 duration-200">
+<span class="material-symbols-outlined mb-1" data-icon="videogame_asset" style="font-variation-settings: 'FILL' 1;">videogame_asset</span>
+<span class="font-['Lexend'] font-medium text-xs">Games</span>
+</button>
+<button class="flex flex-col items-center justify-center text-slate-500 px-6 py-2 hover:text-[#006A6A] active:scale-90 duration-200">
+<span class="material-symbols-outlined mb-1" data-icon="medication">medication</span>
+<span class="font-['Lexend'] font-medium text-xs">Medication</span>
+</button>
+</nav>
+</body></html>

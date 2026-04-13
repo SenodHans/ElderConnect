@@ -1,0 +1,301 @@
+<!DOCTYPE html>
+
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>ElderConnect - Caretaker Dashboard</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            "colors": {
+                    "on-tertiary-fixed-variant": "#005047",
+                    "primary": "#00364c",
+                    "secondary-container": "#cae4f1",
+                    "inverse-surface": "#2e3132",
+                    "surface-container-low": "#f2f4f5",
+                    "on-surface": "#191c1d",
+                    "tertiary": "#003932",
+                    "surface-dim": "#d8dadb",
+                    "on-tertiary-container": "#6bc7b7",
+                    "on-error": "#ffffff",
+                    "on-surface-variant": "#41484d",
+                    "primary-fixed": "#c4e7ff",
+                    "tertiary-fixed-dim": "#7ad7c6",
+                    "secondary-fixed-dim": "#b1cad8",
+                    "error-container": "#ffdad6",
+                    "surface": "#f8fafb",
+                    "secondary": "#4a626d",
+                    "background": "#f8fafb",
+                    "secondary-fixed": "#cde6f4",
+                    "surface-variant": "#e1e3e4",
+                    "on-secondary-fixed-variant": "#324a55",
+                    "surface-container-high": "#e6e8e9",
+                    "on-primary-fixed-variant": "#184c65",
+                    "surface-bright": "#f8fafb",
+                    "tertiary-container": "#005248",
+                    "surface-tint": "#34647d",
+                    "on-background": "#191c1d",
+                    "error": "#ba1a1a",
+                    "on-error-container": "#93000a",
+                    "outline": "#71787d",
+                    "on-tertiary-fixed": "#00201b",
+                    "on-primary": "#ffffff",
+                    "tertiary-fixed": "#97f3e2",
+                    "surface-container-lowest": "#ffffff",
+                    "primary-fixed-dim": "#9ecdea",
+                    "inverse-on-surface": "#eff1f2",
+                    "on-tertiary": "#ffffff",
+                    "on-secondary-container": "#4e6672",
+                    "on-primary-container": "#8fbdda",
+                    "on-secondary-fixed": "#041e28",
+                    "surface-container": "#eceeef",
+                    "inverse-primary": "#9ecdea",
+                    "on-secondary": "#ffffff",
+                    "on-primary-fixed": "#001e2d",
+                    "surface-container-highest": "#e1e3e4",
+                    "primary-container": "#1a4d66",
+                    "outline-variant": "#c1c7cd"
+            },
+            "borderRadius": {
+                    "DEFAULT": "0.125rem",
+                    "lg": "0.25rem",
+                    "xl": "0.5rem",
+                    "full": "0.75rem"
+            },
+            "fontFamily": {
+                    "headline": ["Plus Jakarta Sans"],
+                    "body": ["Plus Jakarta Sans"],
+                    "label": ["Plus Jakarta Sans"]
+            }
+          },
+        },
+      }
+    </script>
+<style>
+        body { font-family: 'Plus Jakarta Sans', sans-serif; }
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        .clinical-gradient {
+            background: linear-gradient(135deg, #00364c 0%, #1a4d66 100%);
+        }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-surface text-on-surface min-h-screen pb-24">
+<!-- TopAppBar Shell -->
+<header class="bg-[#f8fafb]/80 dark:bg-slate-950/80 backdrop-blur-md docked full-width top-0 sticky z-50 shadow-[0_2px_15px_-3px_rgba(25,28,29,0.06)] flex justify-between items-center w-full px-6 py-4">
+<div class="flex items-center gap-3">
+<span class="material-symbols-outlined text-[#00364c] dark:text-sky-400" data-icon="medical_services">medical_services</span>
+<h1 class="text-xl font-bold tracking-tighter text-[#00364c] dark:text-sky-100">ElderConnect</h1>
+</div>
+<div class="flex items-center gap-4">
+<nav class="hidden md:flex gap-6 items-center">
+<a class="font-['Plus_Jakarta_Sans'] text-sm tracking-tight font-semibold text-[#00364c] dark:text-sky-200" href="#">Dashboard</a>
+<a class="font-['Plus_Jakarta_Sans'] text-sm tracking-tight font-semibold text-[#41484d] dark:text-slate-400 hover:bg-[#f2f4f5] transition-colors px-3 py-1 rounded-lg" href="#">Elder</a>
+<a class="font-['Plus_Jakarta_Sans'] text-sm tracking-tight font-semibold text-[#41484d] dark:text-slate-400 hover:bg-[#f2f4f5] transition-colors px-3 py-1 rounded-lg" href="#">Mood &amp; Activity</a>
+</nav>
+<div class="w-10 h-10 rounded-full bg-secondary-container flex items-center justify-center overflow-hidden border-2 border-surface-container-lowest">
+<img class="w-full h-full object-cover" data-alt="professional portrait of a healthcare worker in a clean clinic setting with soft focus" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCwdAwUlL2DiObEmgxrqBykGodyBqMQKKVESd1pwctsuPjtb5PJgt8fgHLFk5cM7sWme32IIv1QwEFhAHjs-m_587atwS3HsLz9SmUUj88En4Aq5NqVHK2LGScO3Xq23aO_j_wvNrGWxOWJR82_90ltMjUkBLW1G0En2Oea-F_pEqU7PuH965ygKNDAZSLUFRYj-cUJZzDX3i6d_6A7NHjwkfuBRKQ1RP3OWJ7Ue4vpkmRlSiIIUG16XoTitoDk7CSsVXBtnMkoADg"/>
+</div>
+</div>
+</header>
+<main class="max-w-7xl mx-auto px-6 py-8 space-y-8">
+<!-- Urgent Alert Feed (Pinned) -->
+<section class="space-y-4">
+<div class="flex items-center justify-between">
+<h2 class="text-sm font-semibold tracking-wider text-secondary uppercase">Priority Alerts</h2>
+<span class="text-xs text-on-surface-variant font-medium">3 Active Alerts</span>
+</div>
+<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+<!-- SOS Alert -->
+<div class="bg-error-container p-4 rounded-xl flex items-start gap-4">
+<div class="w-12 h-12 rounded-full bg-error flex items-center justify-center shrink-0">
+<span class="material-symbols-outlined text-on-error" data-icon="sos" style="font-variation-settings: 'FILL' 1;">sos</span>
+</div>
+<div>
+<div class="flex items-center gap-2">
+<h3 class="font-bold text-on-error-container">Margaret S.</h3>
+<span class="text-[10px] bg-error text-on-error px-2 py-0.5 rounded-full uppercase font-bold tracking-widest">SOS</span>
+</div>
+<p class="text-sm text-on-error-container mt-1">Fall detected in Living Room.</p>
+<p class="text-xs text-on-error-container opacity-70 mt-2">2 minutes ago</p>
+</div>
+</div>
+<!-- Missed Meds -->
+<div class="bg-surface-container-low p-4 rounded-xl flex items-start gap-4">
+<div class="w-12 h-12 rounded-full bg-primary-container flex items-center justify-center shrink-0">
+<span class="material-symbols-outlined text-on-primary-container" data-icon="pill">pill</span>
+</div>
+<div>
+<h3 class="font-bold text-primary">Arthur J.</h3>
+<p class="text-sm text-on-surface-variant mt-1">Missed morning Warfarin dose.</p>
+<p class="text-xs text-on-surface-variant opacity-70 mt-2">Scheduled 08:00 AM</p>
+</div>
+</div>
+<!-- Mood Shift -->
+<div class="bg-surface-container-low p-4 rounded-xl flex items-start gap-4">
+<div class="w-12 h-12 rounded-full bg-secondary-container flex items-center justify-center shrink-0">
+<span class="material-symbols-outlined text-secondary" data-icon="psychology">psychology</span>
+</div>
+<div>
+<h3 class="font-bold text-primary">Elena G.</h3>
+<p class="text-sm text-on-surface-variant mt-1">Significant decline in morning mood.</p>
+<p class="text-xs text-on-surface-variant opacity-70 mt-2">Checked 1 hour ago</p>
+</div>
+</div>
+</div>
+</section>
+<!-- Linked Elders Grid -->
+<section class="space-y-6">
+<h2 class="text-headline-sm font-bold tracking-tight text-primary">Linked Elders</h2>
+<div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+<!-- Elder Card 1 -->
+<div class="bg-surface-container-lowest rounded-xl p-6 flex flex-col md:flex-row gap-6 shadow-[0_32px_64px_-12px_rgba(25,28,29,0.04)]">
+<div class="shrink-0">
+<div class="w-24 h-24 rounded-2xl overflow-hidden shadow-inner">
+<img class="w-full h-full object-cover" data-alt="warm portrait of an elderly woman with silver hair smiling gently in soft morning light" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCVxpWlAkpwwEu53oWaB3h4NnAXw0HaFmIW2fk5gla-andQB3biXtmhhzPueBfmx4Z-imzE9NV3A80xkGS7V-lv8xQ2DSeB-cjsy8zGmrXm9AN3rRkvkych5gjX_yw-8tUDixJNYsiCr2ck7hskVSNEZW4oMg_hrMWWMYcRkvmYbO3a-3s_RGkS9S_aSOXBM_EBVjBjeM-dbBH2x4x09fq-7RNlNZSFNPD5iuxeUgdXOT83jYAQ11Cf-eWmKWfhRRiisxiZnyPkOA8"/>
+</div>
+</div>
+<div class="flex-1 space-y-4">
+<div class="flex justify-between items-start">
+<div>
+<h3 class="text-lg font-bold text-primary">Margaret Smith</h3>
+<p class="text-xs text-on-surface-variant font-medium">Last Login: 15m ago</p>
+</div>
+<span class="px-3 py-1 rounded-full bg-tertiary-container text-on-tertiary-container text-[10px] font-bold uppercase tracking-widest">Stable</span>
+</div>
+<div class="grid grid-cols-2 gap-4">
+<div class="bg-surface-container-low p-3 rounded-lg">
+<span class="text-[10px] text-on-surface-variant uppercase font-bold">Mood Check</span>
+<p class="text-sm font-semibold text-primary">Positive (9/10)</p>
+</div>
+<div class="bg-surface-container-low p-3 rounded-lg">
+<span class="text-[10px] text-on-surface-variant uppercase font-bold">Activity</span>
+<p class="text-sm font-semibold text-primary">1,240 steps</p>
+</div>
+</div>
+<div class="flex items-center gap-2 pt-2">
+<button class="clinical-gradient text-white text-xs font-semibold py-2 px-4 rounded-lg flex items-center gap-2 active:scale-95 transition-transform">
+<span class="material-symbols-outlined text-sm" data-icon="visibility">visibility</span>
+                                View Details
+                            </button>
+<button class="bg-surface-container-high text-on-surface text-xs font-semibold py-2 px-4 rounded-lg active:scale-95 transition-transform">
+                                Message
+                            </button>
+</div>
+</div>
+</div>
+<!-- Elder Card 2 -->
+<div class="bg-surface-container-lowest rounded-xl p-6 flex flex-col md:flex-row gap-6 shadow-[0_32px_64px_-12px_rgba(25,28,29,0.04)]">
+<div class="shrink-0">
+<div class="w-24 h-24 rounded-2xl overflow-hidden shadow-inner">
+<img class="w-full h-full object-cover" data-alt="kind-eyed elderly man wearing a knitted sweater in a home setting with warm wooden background" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBsqh5Ghn0YOhZn3f8m4ngW7ZZ_H74gatg2j9iAPSE8rPRkG0kkl3uW4YSwP3FJ9AteZ35_Z3MW-n4WqdIOk3kVxyy6H_xst8lgtWNoAYQeKHPyBwzGiXHuQWHIHFeE3iPGNoU0TUjsuICTnckTG9HsmF96U2uH5jUwFqwB4SI3gevqboXTIplytjMoUO7rMu1CVAOEcOIXdvaxxonRiD2LsOGZLpo85pmuM4TC_iwaFGHptcRKPzcDKWFyPvvHXcI6V9rc1QsOIkY"/>
+</div>
+</div>
+<div class="flex-1 space-y-4">
+<div class="flex justify-between items-start">
+<div>
+<h3 class="text-lg font-bold text-primary">Arthur Jenkins</h3>
+<p class="text-xs text-on-surface-variant font-medium">Last Login: 2h ago</p>
+</div>
+<span class="px-3 py-1 rounded-full bg-error-container text-on-error-container text-[10px] font-bold uppercase tracking-widest">Warning</span>
+</div>
+<div class="grid grid-cols-2 gap-4">
+<div class="bg-surface-container-low p-3 rounded-lg">
+<span class="text-[10px] text-on-surface-variant uppercase font-bold">Mood Check</span>
+<p class="text-sm font-semibold text-primary">Fatigued (4/10)</p>
+</div>
+<div class="bg-surface-container-low p-3 rounded-lg">
+<span class="text-[10px] text-on-surface-variant uppercase font-bold">Activity</span>
+<p class="text-sm font-semibold text-primary">230 steps</p>
+</div>
+</div>
+<div class="flex items-center gap-2 pt-2">
+<button class="clinical-gradient text-white text-xs font-semibold py-2 px-4 rounded-lg flex items-center gap-2 active:scale-95 transition-transform">
+<span class="material-symbols-outlined text-sm" data-icon="visibility">visibility</span>
+                                View Details
+                            </button>
+<button class="bg-surface-container-high text-on-surface text-xs font-semibold py-2 px-4 rounded-lg active:scale-95 transition-transform">
+                                Message
+                            </button>
+</div>
+</div>
+</div>
+</div>
+</section>
+<!-- Medication Snapshot Row -->
+<section class="space-y-4">
+<h2 class="text-sm font-semibold tracking-wider text-secondary uppercase">Medication Snapshot (Next 4 Hours)</h2>
+<div class="bg-surface-container-low rounded-2xl p-6 overflow-hidden">
+<div class="flex overflow-x-auto gap-4 pb-2 no-scrollbar">
+<!-- Med 1 -->
+<div class="bg-surface-container-lowest min-w-[200px] p-4 rounded-xl border-l-4 border-primary">
+<div class="flex items-center justify-between mb-2">
+<span class="text-[10px] font-bold text-on-surface-variant bg-surface-container-low px-2 py-0.5 rounded">12:30 PM</span>
+<span class="material-symbols-outlined text-primary text-lg" data-icon="pill">pill</span>
+</div>
+<p class="text-sm font-bold text-primary">Metformin 500mg</p>
+<p class="text-xs text-on-surface-variant mt-1">Margaret Smith</p>
+</div>
+<!-- Med 2 -->
+<div class="bg-surface-container-lowest min-w-[200px] p-4 rounded-xl border-l-4 border-secondary">
+<div class="flex items-center justify-between mb-2">
+<span class="text-[10px] font-bold text-on-surface-variant bg-surface-container-low px-2 py-0.5 rounded">01:00 PM</span>
+<span class="material-symbols-outlined text-secondary text-lg" data-icon="medication">medication</span>
+</div>
+<p class="text-sm font-bold text-primary">Lisinopril 10mg</p>
+<p class="text-xs text-on-surface-variant mt-1">Arthur Jenkins</p>
+</div>
+<!-- Med 3 -->
+<div class="bg-surface-container-lowest min-w-[200px] p-4 rounded-xl border-l-4 border-tertiary">
+<div class="flex items-center justify-between mb-2">
+<span class="text-[10px] font-bold text-on-surface-variant bg-surface-container-low px-2 py-0.5 rounded">02:15 PM</span>
+<span class="material-symbols-outlined text-tertiary text-lg" data-icon="vaccines">vaccines</span>
+</div>
+<p class="text-sm font-bold text-primary">B12 Injection</p>
+<p class="text-xs text-on-surface-variant mt-1">Elena G.</p>
+</div>
+<!-- Med 4 -->
+<div class="bg-surface-container-lowest min-w-[200px] p-4 rounded-xl border-l-4 border-error opacity-75">
+<div class="flex items-center justify-between mb-2">
+<span class="text-[10px] font-bold text-on-error-container bg-error-container px-2 py-0.5 rounded">OVERDUE</span>
+<span class="material-symbols-outlined text-error text-lg" data-icon="warning">warning</span>
+</div>
+<p class="text-sm font-bold text-error">Warfarin 5mg</p>
+<p class="text-xs text-on-surface-variant mt-1">Arthur Jenkins</p>
+</div>
+</div>
+</div>
+</section>
+</main>
+<!-- BottomNavBar Shell -->
+<nav class="md:hidden fixed bottom-0 left-0 w-full z-50 flex justify-around items-center px-2 pt-2 pb-8 bg-white/90 dark:bg-slate-900/90 backdrop-blur-xl shadow-[0_-8px_32px_rgba(25,28,29,0.06)] rounded-t-lg">
+<div class="flex flex-col items-center justify-center bg-[#f2f4f5] dark:bg-sky-900/30 text-[#00364c] dark:text-sky-200 rounded-xl px-4 py-1.5 active:scale-95 transition-transform duration-150">
+<span class="material-symbols-outlined" data-icon="dashboard" style="font-variation-settings: 'FILL' 1;">dashboard</span>
+<span class="font-['Plus_Jakarta_Sans'] text-[10px] font-medium uppercase tracking-wider mt-1">Dashboard</span>
+</div>
+<div class="flex flex-col items-center justify-center text-[#41484d] dark:text-slate-400 hover:text-[#1a4d66] transition-all active:scale-95 duration-150">
+<span class="material-symbols-outlined" data-icon="elderly">elderly</span>
+<span class="font-['Plus_Jakarta_Sans'] text-[10px] font-medium uppercase tracking-wider mt-1">Elder</span>
+</div>
+<div class="flex flex-col items-center justify-center text-[#41484d] dark:text-slate-400 hover:text-[#1a4d66] transition-all active:scale-95 duration-150">
+<span class="material-symbols-outlined" data-icon="psychology">psychology</span>
+<span class="font-['Plus_Jakarta_Sans'] text-[10px] font-medium uppercase tracking-wider mt-1">Mood</span>
+</div>
+<div class="flex flex-col items-center justify-center text-[#41484d] dark:text-slate-400 hover:text-[#1a4d66] transition-all active:scale-95 duration-150">
+<span class="material-symbols-outlined" data-icon="link">link</span>
+<span class="font-['Plus_Jakarta_Sans'] text-[10px] font-medium uppercase tracking-wider mt-1">Links</span>
+</div>
+</nav>
+</body></html>

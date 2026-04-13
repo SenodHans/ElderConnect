@@ -1,0 +1,247 @@
+<!DOCTYPE html>
+
+<html lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Elder Games - ElderConnect</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700;800&amp;family=Lexend:wght@300;400;500;600&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            "colors": {
+                    "surface-variant": "#e3e2e3",
+                    "primary-fixed": "#a0f0f0",
+                    "surface-container-low": "#f4f3f4",
+                    "on-secondary-fixed-variant": "#6c3a00",
+                    "inverse-on-surface": "#f1f0f1",
+                    "error": "#ba1a1a",
+                    "tertiary": "#004b74",
+                    "tertiary-fixed": "#cce5ff",
+                    "outline": "#6e7979",
+                    "on-tertiary-fixed": "#001d31",
+                    "on-primary": "#ffffff",
+                    "on-background": "#1a1c1d",
+                    "outline-variant": "#bec9c8",
+                    "on-tertiary-container": "#bbddff",
+                    "on-secondary-container": "#6f3c00",
+                    "tertiary-fixed-dim": "#93ccff",
+                    "secondary-container": "#fda54f",
+                    "primary": "#005050",
+                    "secondary-fixed-dim": "#ffb778",
+                    "on-tertiary-fixed-variant": "#004b73",
+                    "on-error-container": "#93000a",
+                    "background": "#faf9fa",
+                    "surface-bright": "#faf9fa",
+                    "on-secondary-fixed": "#2e1500",
+                    "surface-container-lowest": "#ffffff",
+                    "secondary": "#8e4e00",
+                    "on-primary-container": "#97e7e6",
+                    "tertiary-container": "#0e6496",
+                    "on-surface": "#1a1c1d",
+                    "on-tertiary": "#ffffff",
+                    "primary-container": "#006a6a",
+                    "secondary-fixed": "#ffdcc1",
+                    "surface-container-high": "#e8e8e9",
+                    "on-primary-fixed-variant": "#004f4f",
+                    "on-surface-variant": "#3e4948",
+                    "surface": "#faf9fa",
+                    "surface-container": "#eeeeee",
+                    "on-primary-fixed": "#002020",
+                    "surface-container-highest": "#e3e2e3",
+                    "on-secondary": "#ffffff",
+                    "on-error": "#ffffff",
+                    "surface-tint": "#006a6a",
+                    "primary-fixed-dim": "#84d4d3",
+                    "inverse-primary": "#84d4d3",
+                    "inverse-surface": "#2f3131",
+                    "error-container": "#ffdad6",
+                    "surface-dim": "#dadadb"
+            },
+            "borderRadius": {
+                    "DEFAULT": "0.25rem",
+                    "lg": "0.5rem",
+                    "xl": "0.75rem",
+                    "full": "9999px"
+            },
+            "fontFamily": {
+                    "headline": ["Plus Jakarta Sans"],
+                    "body": ["Lexend"],
+                    "label": ["Lexend"]
+            }
+          },
+        },
+      }
+    </script>
+<style>
+      .material-symbols-outlined {
+        font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+      }
+      body {
+        font-family: 'Lexend', sans-serif;
+        -webkit-font-smoothing: antialiased;
+      }
+      h1, h2, h3 {
+        font-family: 'Plus Jakarta Sans', sans-serif;
+      }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-background text-on-background min-h-screen pb-32">
+<!-- TopAppBar -->
+<header class="bg-[#faf9fa]/80 backdrop-blur-md sticky top-0 w-full z-50 shadow-sm">
+<div class="flex justify-between items-center w-full px-6 py-4">
+<div class="flex items-center gap-4">
+<span class="material-symbols-outlined text-primary text-2xl">menu</span>
+<h1 class="text-primary font-['Plus_Jakarta_Sans'] font-bold text-2xl tracking-tight">ElderConnect</h1>
+</div>
+<div class="w-10 h-10 rounded-full overflow-hidden border-2 border-primary-fixed">
+<img alt="User profile photo" data-alt="portrait of a kind smiling elderly woman with silver hair in a soft blue sweater, bright and clean photography style" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBI-9ksz6WIrX0WLhdqWp2AFu0GI_45teUnPmT-tDsSQh-Wf-8gMtxLKx2Jy434Qn7dIgmCcLf7I_Y6P8AuxRnuWSxPgZ1kQ2OI6BVnRHny7tmsQ13_VG3RwA7HToflaehuql9L-JnLva9Bf695y1cHqoFHcfQs92opEEdeVUj64lVsUg09HTXbsKEFDRwLlOFwUkvMbYWp8yphxs6BNBNZhCj7R1izln_leK9zNkx_-i8xdN_rtg8E2UjoN6YdP9xmhyjzoxrTK0c"/>
+</div>
+</div>
+</header>
+<main class="max-w-4xl mx-auto px-6 pt-8">
+<!-- Hero Section -->
+<section class="mb-12">
+<p class="text-primary-container font-semibold tracking-wider mb-2 uppercase text-sm">Daily Wellbeing</p>
+<h2 class="text-display-md text-4xl md:text-5xl font-extrabold text-on-surface leading-tight mb-4">
+                Mind &amp; Spirit Games
+            </h2>
+<p class="text-on-surface-variant text-lg max-w-xl leading-relaxed">
+                Enjoy activities designed to keep your mind sharp and your heart light. Choose a journey below.
+            </p>
+</section>
+<!-- Bento Grid of Games -->
+<div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+<!-- Card 1: Memory Card Flip -->
+<button class="group relative overflow-hidden bg-surface-container-lowest rounded-[2rem] p-8 text-left transition-all duration-300 hover:shadow-xl active:scale-95 flex flex-col justify-between aspect-square md:aspect-auto md:h-80">
+<div class="flex justify-between items-start">
+<div class="w-16 h-16 bg-primary-fixed rounded-2xl flex items-center justify-center text-primary">
+<span class="material-symbols-outlined text-4xl" data-icon="brain">neurology</span>
+</div>
+<div class="bg-primary/5 px-4 py-2 rounded-full flex items-center gap-2">
+<span class="w-2 h-2 rounded-full bg-primary"></span>
+<span class="text-xs font-bold text-primary uppercase tracking-widest">Cognitive</span>
+</div>
+</div>
+<div>
+<h3 class="text-2xl font-bold text-on-surface mb-2">Memory Card Flip</h3>
+<p class="text-on-surface-variant mb-6 leading-snug">Test your memory and match the hidden pairs of cards.</p>
+<div class="flex items-center text-primary font-bold">
+<span>Play Now</span>
+<span class="material-symbols-outlined ml-2 group-hover:translate-x-2 transition-transform">arrow_forward</span>
+</div>
+</div>
+<div class="absolute -right-12 -bottom-12 w-48 h-48 bg-primary/5 rounded-full blur-3xl group-hover:bg-primary/10 transition-colors"></div>
+</button>
+<!-- Card 2: Breathing Exercise -->
+<button class="group relative overflow-hidden bg-surface-container-lowest rounded-[2rem] p-8 text-left transition-all duration-300 hover:shadow-xl active:scale-95 flex flex-col justify-between aspect-square md:aspect-auto md:h-80">
+<div class="flex justify-between items-start">
+<div class="w-16 h-16 bg-tertiary-fixed rounded-2xl flex items-center justify-center text-tertiary">
+<span class="material-symbols-outlined text-4xl" data-icon="waves">waves</span>
+</div>
+<div class="bg-tertiary/5 px-4 py-2 rounded-full flex items-center gap-2">
+<span class="w-2 h-2 rounded-full bg-tertiary"></span>
+<span class="text-xs font-bold text-tertiary uppercase tracking-widest">Wellness</span>
+</div>
+</div>
+<div>
+<h3 class="text-2xl font-bold text-on-surface mb-2">Breathing Exercise</h3>
+<p class="text-on-surface-variant mb-6 leading-snug">Find your calm with guided rhythmic breathing patterns.</p>
+<div class="flex items-center text-tertiary font-bold">
+<span>Start Session</span>
+<span class="material-symbols-outlined ml-2 group-hover:translate-x-2 transition-transform">arrow_forward</span>
+</div>
+</div>
+<div class="absolute -right-12 -bottom-12 w-48 h-48 bg-tertiary/5 rounded-full blur-3xl group-hover:bg-tertiary/10 transition-colors"></div>
+</button>
+<!-- Card 3: Sliding Puzzle -->
+<button class="group relative overflow-hidden bg-surface-container-lowest rounded-[2rem] p-8 text-left transition-all duration-300 hover:shadow-xl active:scale-95 flex flex-col justify-between aspect-square md:aspect-auto md:h-80">
+<div class="flex justify-between items-start">
+<div class="w-16 h-16 bg-secondary-fixed rounded-2xl flex items-center justify-center text-secondary">
+<span class="material-symbols-outlined text-4xl" data-icon="extension">extension</span>
+</div>
+<div class="bg-secondary/5 px-4 py-2 rounded-full flex items-center gap-2">
+<span class="w-2 h-2 rounded-full bg-secondary"></span>
+<span class="text-xs font-bold text-secondary uppercase tracking-widest">Logic</span>
+</div>
+</div>
+<div>
+<h3 class="text-2xl font-bold text-on-surface mb-2">Sliding Puzzle</h3>
+<p class="text-on-surface-variant mb-6 leading-snug">Solve the picture by rearranging the scrambled tiles.</p>
+<div class="flex items-center text-secondary font-bold">
+<span>Solve It</span>
+<span class="material-symbols-outlined ml-2 group-hover:translate-x-2 transition-transform">arrow_forward</span>
+</div>
+</div>
+<div class="absolute -right-12 -bottom-12 w-48 h-48 bg-secondary/5 rounded-full blur-3xl group-hover:bg-secondary/10 transition-colors"></div>
+</button>
+<!-- Card 4: Trivia Quiz -->
+<button class="group relative overflow-hidden bg-surface-container-lowest rounded-[2rem] p-8 text-left transition-all duration-300 hover:shadow-xl active:scale-95 flex flex-col justify-between aspect-square md:aspect-auto md:h-80">
+<div class="flex justify-between items-start">
+<div class="w-16 h-16 bg-error-container rounded-2xl flex items-center justify-center text-error">
+<span class="material-symbols-outlined text-4xl" data-icon="quiz">quiz</span>
+</div>
+<div class="bg-error/5 px-4 py-2 rounded-full flex items-center gap-2">
+<span class="w-2 h-2 rounded-full bg-error"></span>
+<span class="text-xs font-bold text-error uppercase tracking-widest">Knowledge</span>
+</div>
+</div>
+<div>
+<h3 class="text-2xl font-bold text-on-surface mb-2">Trivia Quiz</h3>
+<p class="text-on-surface-variant mb-6 leading-snug">Discover fun facts and challenge your daily knowledge.</p>
+<div class="flex items-center text-error font-bold">
+<span>Begin Quiz</span>
+<span class="material-symbols-outlined ml-2 group-hover:translate-x-2 transition-transform">arrow_forward</span>
+</div>
+</div>
+<div class="absolute -right-12 -bottom-12 w-48 h-48 bg-error/5 rounded-full blur-3xl group-hover:bg-error/10 transition-colors"></div>
+</button>
+</div>
+<!-- Featured Section Asymmetric -->
+<div class="mt-16 mb-8 flex flex-col md:flex-row items-center gap-10 bg-surface-container-low rounded-[2.5rem] p-8 md:p-12 overflow-hidden relative">
+<div class="md:w-1/2 z-10">
+<span class="text-tertiary font-bold tracking-tighter text-lg block mb-2">Weekly Spotlight</span>
+<h3 class="text-3xl font-bold text-on-surface mb-4">Garden Meditation</h3>
+<p class="text-on-surface-variant text-lg mb-8">A new peaceful journey through nature sounds and gentle visualization exercises.</p>
+<button class="bg-primary text-on-primary px-8 py-4 rounded-full font-bold text-lg hover:scale-105 transition-transform">
+                    Explore Now
+                </button>
+</div>
+<div class="md:w-1/2 relative min-h-[300px] w-full">
+<img alt="Garden Meditation" class="rounded-3xl object-cover h-full w-full shadow-2xl rotate-3" data-alt="serene zen garden with smooth pebbles, lush green moss, and a small wooden bridge over a quiet pond, soft natural morning light" src="https://lh3.googleusercontent.com/aida-public/AB6AXuD0iGDBppZUSy7_-wH_wdIi7Fcx67mNiNyZRojgbJObtek_9d-wk1Zdsg_Fcdib6HAMAJf3VL_LXyMpnBMFYXYlSn7YFgIdHR6JfugxVGV6IvHGw1L4GoJKxilsA1pcQTfKxMhsF0YIn2OzWI_YdpLJmDTVYvFPnE3FYAjky5DpJP2Zvi_7K6qoTYgp4Zh6rzkQk6OqRAXI56Kg6Bap3rRMiUFdG_x7UJ3w8uwwJMlgcSZLbk3CTK_-V_TVjTYX_E9AlWyJiBudzOA"/>
+</div>
+</div>
+</main>
+<!-- BottomNavBar -->
+<nav class="fixed bottom-0 left-0 w-full z-50 flex justify-around items-center px-4 pb-6 pt-2 bg-[#faf9fa] shadow-[0_-4px_20px_rgba(0,0,0,0.05)] rounded-t-[32px]">
+<!-- Home -->
+<button class="flex flex-col items-center justify-center text-slate-500 min-w-[56px] min-h-[56px] hover:text-[#005050] transition-colors">
+<span class="material-symbols-outlined" data-icon="home">home</span>
+<span class="font-['Lexend'] font-medium text-sm mt-1">Home</span>
+</button>
+<!-- Feed -->
+<button class="flex flex-col items-center justify-center text-slate-500 min-w-[56px] min-h-[56px] hover:text-[#005050] transition-colors">
+<span class="material-symbols-outlined" data-icon="rss_feed">rss_feed</span>
+<span class="font-['Lexend'] font-medium text-sm mt-1">Feed</span>
+</button>
+<!-- Games (Active) -->
+<button class="flex flex-col items-center justify-center bg-[#006a6a] text-white rounded-full min-w-[64px] min-h-[64px] shadow-lg scale-90">
+<span class="material-symbols-outlined" data-icon="videogame_asset" style="font-variation-settings: 'FILL' 1;">videogame_asset</span>
+<span class="font-['Lexend'] font-medium text-xs mt-1">Games</span>
+</button>
+<!-- Medication -->
+<button class="flex flex-col items-center justify-center text-slate-500 min-w-[56px] min-h-[56px] hover:text-[#005050] transition-colors">
+<span class="material-symbols-outlined" data-icon="medication">medication</span>
+<span class="font-['Lexend'] font-medium text-sm mt-1">Medication</span>
+</button>
+</nav>
+</body></html>

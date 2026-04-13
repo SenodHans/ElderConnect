@@ -1,0 +1,272 @@
+<!DOCTYPE html>
+
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>ElderConnect - Links Management</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            "colors": {
+                    "on-tertiary-fixed-variant": "#005047",
+                    "primary": "#00364c",
+                    "secondary-container": "#cae4f1",
+                    "inverse-surface": "#2e3132",
+                    "surface-container-low": "#f2f4f5",
+                    "on-surface": "#191c1d",
+                    "tertiary": "#003932",
+                    "surface-dim": "#d8dadb",
+                    "on-tertiary-container": "#6bc7b7",
+                    "on-error": "#ffffff",
+                    "on-surface-variant": "#41484d",
+                    "primary-fixed": "#c4e7ff",
+                    "tertiary-fixed-dim": "#7ad7c6",
+                    "secondary-fixed-dim": "#b1cad8",
+                    "error-container": "#ffdad6",
+                    "surface": "#f8fafb",
+                    "secondary": "#4a626d",
+                    "background": "#f8fafb",
+                    "secondary-fixed": "#cde6f4",
+                    "surface-variant": "#e1e3e4",
+                    "on-secondary-fixed-variant": "#324a55",
+                    "surface-container-high": "#e6e8e9",
+                    "on-primary-fixed-variant": "#184c65",
+                    "surface-bright": "#f8fafb",
+                    "tertiary-container": "#005248",
+                    "surface-tint": "#34647d",
+                    "on-background": "#191c1d",
+                    "error": "#ba1a1a",
+                    "on-error-container": "#93000a",
+                    "outline": "#71787d",
+                    "on-tertiary-fixed": "#00201b",
+                    "on-primary": "#ffffff",
+                    "tertiary-fixed": "#97f3e2",
+                    "surface-container-lowest": "#ffffff",
+                    "primary-fixed-dim": "#9ecdea",
+                    "inverse-on-surface": "#eff1f2",
+                    "on-tertiary": "#ffffff",
+                    "on-secondary-container": "#4e6672",
+                    "on-primary-container": "#8fbdda",
+                    "on-secondary-fixed": "#041e28",
+                    "surface-container": "#eceeef",
+                    "inverse-primary": "#9ecdea",
+                    "on-secondary": "#ffffff",
+                    "on-primary-fixed": "#001e2d",
+                    "surface-container-highest": "#e1e3e4",
+                    "primary-container": "#1a4d66",
+                    "outline-variant": "#c1c7cd"
+            },
+            "borderRadius": {
+                    "DEFAULT": "0.125rem",
+                    "lg": "0.25rem",
+                    "xl": "0.5rem",
+                    "full": "0.75rem"
+            },
+            "fontFamily": {
+                    "headline": ["Plus Jakarta Sans"],
+                    "body": ["Plus Jakarta Sans"],
+                    "label": ["Plus Jakarta Sans"]
+            }
+          },
+        },
+      }
+    </script>
+<style>
+        body { font-family: 'Plus Jakarta Sans', sans-serif; }
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        .bg-primary-gradient {
+            background: linear-gradient(135deg, #00364c 0%, #1a4d66 100%);
+        }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-surface text-on-surface min-h-screen pb-24">
+<!-- TopAppBar -->
+<nav class="bg-[#f8fafb]/80 dark:bg-slate-950/80 backdrop-blur-md shadow-[0_2px_15px_-3px_rgba(25,28,29,0.06)] docked full-width top-0 sticky z-50 flex justify-between items-center w-full px-6 py-4">
+<div class="flex items-center gap-3">
+<span class="material-symbols-outlined text-[#00364c] dark:text-sky-400" data-icon="medical_services">medical_services</span>
+<span class="text-xl font-bold tracking-tighter text-[#00364c] dark:text-sky-100">ElderConnect</span>
+</div>
+<div class="flex items-center gap-4">
+<div class="hidden md:flex items-center gap-6 mr-6">
+<a class="text-[#41484d] dark:text-slate-400 font-['Plus_Jakarta_Sans'] text-sm tracking-tight font-semibold hover:bg-[#f2f4f5] px-3 py-1 rounded-xl transition-colors" href="#">Dashboard</a>
+<a class="text-[#41484d] dark:text-slate-400 font-['Plus_Jakarta_Sans'] text-sm tracking-tight font-semibold hover:bg-[#f2f4f5] px-3 py-1 rounded-xl transition-colors" href="#">Elder</a>
+<a class="text-[#41484d] dark:text-slate-400 font-['Plus_Jakarta_Sans'] text-sm tracking-tight font-semibold hover:bg-[#f2f4f5] px-3 py-1 rounded-xl transition-colors" href="#">Mood &amp; Activity</a>
+<a class="text-[#00364c] dark:text-sky-200 font-['Plus_Jakarta_Sans'] text-sm tracking-tight font-semibold" href="#">Links</a>
+</div>
+<img alt="Caretaker profile avatar" class="w-10 h-10 rounded-full border-2 border-primary-fixed shadow-sm" data-alt="close-up portrait of a professional healthcare provider smiling gently in soft interior lighting" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDVTQJXajy7wO5eX3Oybi3PmKVhVf6M3IYXNL1tpdEcB9m7924fbOkzajDjQX9xsj5CRHGOyzbhXw-iHQuGNAYuXiacGc50boV0AvH1hUgtmgKD8n2-SYwe9h6sZe9mFUC9AB7LLDKHulZmqv6sOc-tHoKLk1ir3lBbI1e5KPU7tmXEy6CBTWf5bp3LE1lm--_8t7YGL0ba0elrldReyVCyWpzMDZypa_D0wx6t0fkiQoop90AvqFxFPgC9QgWftid-4uo0SyJG1Wg"/>
+</div>
+</nav>
+<main class="max-w-7xl mx-auto px-4 md:px-8 py-8 space-y-10">
+<!-- Hero & Search Section -->
+<header class="relative overflow-hidden rounded-xl bg-primary-gradient p-8 md:p-12 text-white shadow-lg">
+<div class="relative z-10 max-w-2xl">
+<h1 class="text-3xl md:text-4xl font-extrabold tracking-tight mb-4">Network Management</h1>
+<p class="text-primary-fixed opacity-90 mb-8 leading-relaxed">Securely link with new elders and manage your active caretaker relationships in a clinical-grade environment.</p>
+<div class="relative group">
+<span class="material-symbols-outlined absolute left-4 top-1/2 -translate-y-1/2 text-primary-fixed/60" data-icon="search">search</span>
+<input class="w-full pl-12 pr-4 py-4 bg-white/10 backdrop-blur-md border-none rounded-xl text-white placeholder-primary-fixed/60 focus:ring-2 focus:ring-primary-fixed/50 transition-all" placeholder="Search by Elder Name or ID..." type="text"/>
+</div>
+</div>
+<div class="absolute right-0 bottom-0 opacity-10 pointer-events-none">
+<span class="material-symbols-outlined text-[200px]" data-icon="hub">hub</span>
+</div>
+</header>
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+<!-- Left Column: Active Links -->
+<section class="lg:col-span-2 space-y-6">
+<div class="flex items-center justify-between px-2">
+<h2 class="text-xl font-bold text-primary flex items-center gap-2">
+<span class="material-symbols-outlined" data-icon="verified_user">verified_user</span>
+                        Active Connections
+                    </h2>
+<span class="px-3 py-1 bg-surface-container-high rounded-full text-xs font-bold text-primary">2 TOTAL</span>
+</div>
+<div class="grid grid-cols-1 md:grid-cols-1 gap-4">
+<!-- Connection Card 1 -->
+<div class="bg-surface-container-lowest p-6 rounded-xl shadow-[0_2px_15px_-3px_rgba(25,28,29,0.06)] flex flex-col md:flex-row md:items-center gap-6 group hover:bg-surface-container-low transition-colors duration-200">
+<div class="relative">
+<img alt="Elder Avatar" class="w-16 h-16 rounded-full object-cover bg-secondary-fixed" data-alt="warm portrait of an elderly woman with silver hair and gentle eyes, softly lit from the side" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAyneFQdnsjL5nOvpkJSdiQ9H-iXPFl2E2GnnAoH4SDt5Dh8pBWYpQVG--rsyTTOJNFenvOKfZgradFV1eP7YQH4Y0ky8LaiaeqSeXE1xO3UN28JJLiwLxlQSgljN0F2Q0wrp93UVOmU9lQCy_PJt5Z6w6cfdpX8rCoe5mqF4042y2TiEgq2wDsgUdcE4kEqr92x4ACA_RkckMe_3y6gJlNkECLJPZ206eiabYi5Y54sSWU8BVZmoyE5GSb4V7J9LpeM5vzKg6i2r4"/>
+<div class="absolute bottom-0 right-0 w-4 h-4 bg-tertiary border-2 border-white rounded-full"></div>
+</div>
+<div class="flex-grow">
+<div class="flex items-center gap-2 mb-1">
+<h3 class="font-bold text-lg text-primary">Alice Miller</h3>
+<span class="bg-tertiary-fixed text-on-tertiary-fixed-variant text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-tighter">Primary Care</span>
+</div>
+<p class="text-on-surface-variant text-sm mb-2">@alice_miller_42</p>
+<div class="flex items-center gap-4">
+<span class="flex items-center gap-1 text-xs text-secondary"><span class="material-symbols-outlined text-sm" data-icon="family_history">family_history</span> Daughter</span>
+<span class="flex items-center gap-1 text-xs text-tertiary font-medium"><span class="material-symbols-outlined text-sm" data-icon="fiber_manual_record" style="font-variation-settings: 'FILL' 1;">fiber_manual_record</span> Active Status</span>
+</div>
+</div>
+<div class="flex md:flex-col gap-2">
+<button class="flex items-center justify-center gap-2 px-4 py-2 bg-surface-container-high text-primary rounded-lg text-sm font-semibold hover:bg-primary hover:text-white transition-all">
+<span class="material-symbols-outlined text-sm" data-icon="visibility">visibility</span> View
+                            </button>
+<button class="flex items-center justify-center gap-2 px-4 py-2 text-error rounded-lg text-sm font-semibold hover:bg-error-container transition-all">
+<span class="material-symbols-outlined text-sm" data-icon="link_off">link_off</span> Unlink
+                            </button>
+</div>
+</div>
+<!-- Connection Card 2 -->
+<div class="bg-surface-container-lowest p-6 rounded-xl shadow-[0_2px_15px_-3px_rgba(25,28,29,0.06)] flex flex-col md:flex-row md:items-center gap-6 group hover:bg-surface-container-low transition-colors duration-200">
+<div class="relative">
+<img alt="Elder Avatar" class="w-16 h-16 rounded-full object-cover bg-secondary-fixed" data-alt="friendly portrait of an elderly man with glasses and a kind smile, clean professional studio lighting" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCOQ2ENGmCs3h-NSiPR9Oxoi7xsy_hHLW1UWUBBzvI4p1uGY1-CArW7Ae1rIzIUTWW3x9_-KRKoi_vDA-ZQmMsfV2XpsE0tprAeHL6PvXaRknq4pl-VMJKGQQc3cV-jLPXIt-kkUxcFwmPE-0Mz19fgJj3gPNAXgqogFzqk3GyAJ89p2kQPOWD1x0xqVrhENCzkoM52tpX0KG7v1SqKTmFIDRx8Opz1SgovbEvGsGdzMIQ_SctmgO8nLQcZKlU1JdxVKiau-yuBJPE"/>
+<div class="absolute bottom-0 right-0 w-4 h-4 bg-tertiary border-2 border-white rounded-full"></div>
+</div>
+<div class="flex-grow">
+<div class="flex items-center gap-2 mb-1">
+<h3 class="font-bold text-lg text-primary">Robert Bennett</h3>
+<span class="bg-secondary-fixed text-on-secondary-fixed-variant text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-tighter">Auxiliary Care</span>
+</div>
+<p class="text-on-surface-variant text-sm mb-2">@robert_b_safe</p>
+<div class="flex items-center gap-4">
+<span class="flex items-center gap-1 text-xs text-secondary"><span class="material-symbols-outlined text-sm" data-icon="medical_information">medical_information</span> Nurse</span>
+<span class="flex items-center gap-1 text-xs text-tertiary font-medium"><span class="material-symbols-outlined text-sm" data-icon="fiber_manual_record" style="font-variation-settings: 'FILL' 1;">fiber_manual_record</span> Active Status</span>
+</div>
+</div>
+<div class="flex md:flex-col gap-2">
+<button class="flex items-center justify-center gap-2 px-4 py-2 bg-surface-container-high text-primary rounded-lg text-sm font-semibold hover:bg-primary hover:text-white transition-all">
+<span class="material-symbols-outlined text-sm" data-icon="visibility">visibility</span> View
+                            </button>
+<button class="flex items-center justify-center gap-2 px-4 py-2 text-error rounded-lg text-sm font-semibold hover:bg-error-container transition-all">
+<span class="material-symbols-outlined text-sm" data-icon="link_off">link_off</span> Unlink
+                            </button>
+</div>
+</div>
+</div>
+</section>
+<!-- Right Column: Pending Requests -->
+<aside class="space-y-8">
+<!-- Incoming Section -->
+<div class="space-y-4">
+<h2 class="text-sm font-extrabold uppercase tracking-widest text-secondary flex items-center gap-2 px-2">
+<span class="material-symbols-outlined text-lg" data-icon="inbox">inbox</span>
+                        Incoming Requests
+                    </h2>
+<div class="bg-surface-container-low border border-outline-variant/10 rounded-xl overflow-hidden">
+<div class="p-5 border-b border-outline-variant/10 bg-surface-container-highest/30">
+<div class="flex items-center gap-3 mb-4">
+<img alt="Jane Cooper" class="w-10 h-10 rounded-lg" data-alt="middle-aged woman with a professional administrative appearance, soft daylight background" src="https://lh3.googleusercontent.com/aida-public/AB6AXuC1fTNnpbNhTDJm1fp3AUKjpvtKOb9Z_iF9QCxrKjJO0_Hrt5hjmHsiYhNNaJcw9ns-0EhRucMkKyC24LPPCPuGfwOAi3wP7DnHtzRpmcl46SyQeV3c8DWA5_EZmSTWCnr-0PJp-xbquSYEKrvOZFMGuxw3XbWGMKyiFwG7tFQ7aIwqoG7tdwuQlyyeqjPpkn2mGgcuw0x1DTDe9ctiw5tCfwY1o2X-8Js6dia2j3gYaJMb0LVg13JwVUBEKve4rmabgUocgKSHSPs"/>
+<div>
+<h4 class="font-bold text-primary text-sm">Jane Cooper</h4>
+<p class="text-[10px] text-on-surface-variant uppercase tracking-tighter">Wants to link as: <span class="font-bold">Guardian</span></p>
+</div>
+</div>
+<div class="grid grid-cols-2 gap-2">
+<button class="py-2 bg-primary text-white text-xs font-bold rounded-lg hover:opacity-90 transition-opacity">Accept</button>
+<button class="py-2 bg-surface-container-highest text-on-surface-variant text-xs font-bold rounded-lg hover:bg-error-container hover:text-error transition-all">Decline</button>
+</div>
+</div>
+</div>
+</div>
+<!-- Outgoing Section -->
+<div class="space-y-4">
+<h2 class="text-sm font-extrabold uppercase tracking-widest text-secondary flex items-center gap-2 px-2">
+<span class="material-symbols-outlined text-lg" data-icon="outbox">outbox</span>
+                        Outgoing Pending
+                    </h2>
+<div class="bg-surface-container-lowest shadow-sm rounded-xl p-5 border border-outline-variant/20">
+<div class="flex items-center justify-between mb-4">
+<div class="flex items-center gap-3">
+<div class="w-10 h-10 bg-secondary-container text-primary flex items-center justify-center rounded-full font-bold">SW</div>
+<div>
+<h4 class="font-bold text-primary text-sm">Samuel Wright</h4>
+<p class="text-[10px] text-secondary">Request sent 2h ago</p>
+</div>
+</div>
+<span class="bg-surface-container-high text-on-surface-variant text-[10px] font-bold px-2 py-1 rounded">PENDING</span>
+</div>
+<button class="w-full py-2 border border-outline text-on-surface-variant text-xs font-bold rounded-lg hover:bg-error-container hover:text-error hover:border-error transition-all flex items-center justify-center gap-2">
+<span class="material-symbols-outlined text-sm" data-icon="cancel">cancel</span>
+                            Cancel Request
+                        </button>
+</div>
+</div>
+<!-- Tips / Info Card -->
+<div class="bg-secondary-container/30 p-6 rounded-xl border border-secondary-container relative overflow-hidden">
+<span class="material-symbols-outlined absolute -right-4 -bottom-4 text-7xl text-secondary-container/40" data-icon="security" style="font-variation-settings: 'FILL' 1;">security</span>
+<h3 class="font-bold text-primary mb-2 flex items-center gap-2">
+<span class="material-symbols-outlined text-lg" data-icon="lightbulb">lightbulb</span>
+                        Privacy Tip
+                    </h3>
+<p class="text-xs text-on-secondary-container leading-relaxed relative z-10">
+                        Linking allows full access to health logs and mood tracking. Only accept requests from verified family members or clinical professionals.
+                    </p>
+</div>
+</aside>
+</div>
+</main>
+<!-- BottomNavBar -->
+<footer class="fixed bottom-0 left-0 w-full z-50 flex justify-around items-center px-2 pt-2 pb-6 bg-white/90 dark:bg-slate-900/90 backdrop-blur-xl shadow-[0_-8px_32px_rgba(25,28,29,0.06)] md:hidden">
+<div class="flex flex-col items-center justify-center text-[#41484d] dark:text-slate-400 group transition-all">
+<span class="material-symbols-outlined" data-icon="dashboard">dashboard</span>
+<span class="font-['Plus_Jakarta_Sans'] text-[10px] font-medium uppercase tracking-wider mt-1">Dashboard</span>
+</div>
+<div class="flex flex-col items-center justify-center text-[#41484d] dark:text-slate-400 group transition-all">
+<span class="material-symbols-outlined" data-icon="elderly">elderly</span>
+<span class="font-['Plus_Jakarta_Sans'] text-[10px] font-medium uppercase tracking-wider mt-1">Elder</span>
+</div>
+<div class="flex flex-col items-center justify-center text-[#41484d] dark:text-slate-400 group transition-all">
+<span class="material-symbols-outlined" data-icon="psychology">psychology</span>
+<span class="font-['Plus_Jakarta_Sans'] text-[10px] font-medium uppercase tracking-wider mt-1">Mood &amp; Activity</span>
+</div>
+<div class="flex flex-col items-center justify-center bg-[#f2f4f5] dark:bg-sky-900/30 text-[#00364c] dark:text-sky-200 rounded-xl px-4 py-1.5 active:scale-95 transition-transform duration-150">
+<span class="material-symbols-outlined" data-icon="link" style="font-variation-settings: 'FILL' 1;">link</span>
+<span class="font-['Plus_Jakarta_Sans'] text-[10px] font-medium uppercase tracking-wider mt-1">Links</span>
+</div>
+</footer>
+</body></html>
