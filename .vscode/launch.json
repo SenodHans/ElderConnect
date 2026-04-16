@@ -1,0 +1,15 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "ElderConnect (dev)",
+      "type": "dart",
+      "request": "launch",
+      "program": "lib/main.dart",
+      "args": [
+        "--dart-define=SUPABASE_URL=YOUR_SUPABASE_PROJECT_URL",
+        "--dart-define=SUPABASE_ANON_KEY=YOUR_SUPABASE_ANON_KEY"
+      ]
+    }
+  ]
+}

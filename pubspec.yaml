@@ -43,7 +43,7 @@ dependencies:
   flutter_tts: ^4.2.1
 
   # Talk Button voice input
-  speech_to_text: ^6.6.2
+  speech_to_text: ^7.0.0
 
   # Feed image caching
   cached_network_image: ^3.4.1
@@ -51,7 +51,8 @@ dependencies:
   # Backend
   supabase_flutter: ^2.8.4
 
-  # Push notifications
+  # Firebase (core required by messaging)
+  firebase_core: ^4.6.0
   firebase_messaging: ^16.1.3
 
   # Caretaker mood history chart
@@ -62,6 +63,18 @@ dependencies:
 
   # Navigation / routing
   go_router: ^13.2.0
+
+  # On-device FCM notification display
+  flutter_local_notifications: ^17.2.2
+
+  # Profile photo + feed photo upload
+  image_picker: ^1.1.2
+
+  # Persistent elder session storage (iOS Keychain / Android Keystore)
+  flutter_secure_storage: ^9.2.2
+
+  # PIN hashing before storage
+  bcrypt: ^1.1.3
 
 dev_dependencies:
   flutter_test:

@@ -11,6 +11,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../core/constants/elder_colors.dart';
 import '../../../core/constants/elder_spacing.dart';
 
@@ -79,10 +80,26 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
     );
     _progressController.forward();
 
-    // Auto-navigate after 2.5 s. Mounted guard prevents calling context.go()
-    // on a disposed widget if the user backgrounds the app immediately.
+    // Auto-navigate after 2.5 s.
+    // If a session already exists (returning user), go straight to the portal
+    // so the elder or caretaker never sees the role-selection screen again.
     Timer(const Duration(milliseconds: 2500), () {
-      if (mounted) context.go('/role-selection');
+      if (!mounted) return;
+      final client = Supabase.instance.client;
+      final session = client.auth.currentSession;
+      if (session != null) {
+        final role = client.auth.currentUser?.userMetadata?['role'] as String?;
+        if (role == 'elderly') {
+          context.go('/home/elder');
+        } else if (role == 'caretaker') {
+          context.go('/home/caretaker');
+        } else {
+          // Session exists but role unknown — role-selection will resolve it
+          context.go('/role-selection');
+        }
+      } else {
+        context.go('/role-selection');
+      }
     });
   }
 
@@ -301,7 +318,7 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
                               ),
                               AnimatedBuilder(
                                 animation: _progress,
-                                builder: (_, __) => Text(
+                                builder: (_, _) => Text(
                                   '${(_progress.value * 100).round()}%',
                                   style: GoogleFonts.lexend(
                                     fontSize: 16,
@@ -320,7 +337,7 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
                               height: 12,
                               child: AnimatedBuilder(
                                 animation: _progress,
-                                builder: (_, __) => Stack(
+                                builder: (_, _) => Stack(
                                   children: [
                                     // Background track.
                                     const ColoredBox(

@@ -2,7 +2,7 @@
 ///
 /// Holds the in-memory selection during onboarding. Supabase write is
 /// deferred to the registration completion sprint — only the local
-/// Set<String> is managed here for now.
+/// `Set<String>` is managed here for now.
 library;
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';

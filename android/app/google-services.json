@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "77517160153",
+    "project_id": "elderconnect-97e63",
+    "storage_bucket": "elderconnect-97e63.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:77517160153:android:d9c4ae3add6b8b3234c8c8",
+        "android_client_info": {
+          "package_name": "com.elderconnect.elder_connect"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCzni-sMR1NWGhYWI2GdTvlOdEdA5Hmlow"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

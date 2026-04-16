@@ -10,8 +10,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../core/constants/elder_colors.dart';
 import '../../../core/constants/elder_spacing.dart';
+import '../providers/auth_provider.dart';
 
 class CaretakerRegistrationScreen extends ConsumerStatefulWidget {
   const CaretakerRegistrationScreen({super.key});
@@ -34,6 +36,8 @@ class _CaretakerRegistrationScreenState
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   bool _termsAccepted = false;
+  bool _isLoading = false;
+  String? _errorMessage;
 
   @override
   void initState() {
@@ -53,7 +57,7 @@ class _CaretakerRegistrationScreenState
 
   @override
   void dispose() {
-    for (final a in _anims) a.dispose();
+    for (final a in _anims) { a.dispose(); }
     _anim.dispose();
     _nameController.dispose();
     _phoneController.dispose();
@@ -64,7 +68,7 @@ class _CaretakerRegistrationScreenState
 
   Widget _animated(int i, Widget child) => AnimatedBuilder(
         animation: _anims[i],
-        builder: (_, __) => Opacity(
+        builder: (_, _) => Opacity(
           opacity: _anims[i].value,
           child: Transform.translate(
             offset: Offset(0, 20 * (1 - _anims[i].value)),
@@ -73,9 +77,23 @@ class _CaretakerRegistrationScreenState
         ),
       );
 
-  void _onContinue() {
-    if (_formKey.currentState!.validate() && _termsAccepted) {
-      context.go('/post-registration');
+  Future<void> _onContinue() async {
+    if (!_formKey.currentState!.validate() || !_termsAccepted) return;
+    setState(() { _isLoading = true; _errorMessage = null; });
+    try {
+      await ref.read(authServiceProvider).signUpCaretaker(
+        name: _nameController.text,
+        email: _emailController.text.trim(),
+        phone: _phoneController.text.trim(),
+        password: _passwordController.text,
+      );
+      if (mounted) context.go('/post-registration');
+    } on AuthException catch (e) {
+      setState(() => _errorMessage = e.message);
+    } catch (e) {
+      setState(() => _errorMessage = 'Registration failed. Please try again.');
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
     }
   }
 
@@ -264,15 +282,15 @@ class _CaretakerRegistrationScreenState
 
           const SizedBox(height: ElderSpacing.lg),
 
-          // Continue — gradient, disabled until terms accepted
+          // Continue — gradient, disabled until terms accepted or while loading
           Semantics(
             button: true,
             label: 'Continue',
-            enabled: _termsAccepted,
+            enabled: _termsAccepted && !_isLoading,
             child: GestureDetector(
-              onTap: _termsAccepted ? _onContinue : null,
+              onTap: (_termsAccepted && !_isLoading) ? _onContinue : null,
               child: AnimatedOpacity(
-                opacity: _termsAccepted ? 1.0 : 0.40,
+                opacity: (_termsAccepted && !_isLoading) ? 1.0 : 0.40,
                 duration: const Duration(milliseconds: 200),
                 child: Container(
                   constraints: const BoxConstraints(minHeight: 56),
@@ -285,7 +303,7 @@ class _CaretakerRegistrationScreenState
                       colors: [ElderColors.primary, ElderColors.primaryContainer],
                     ),
                     borderRadius: BorderRadius.circular(12),
-                    boxShadow: _termsAccepted
+                    boxShadow: (_termsAccepted && !_isLoading)
                         ? [
                             BoxShadow(
                               color: ElderColors.primary.withValues(alpha: 0.30),
@@ -307,17 +325,40 @@ class _CaretakerRegistrationScreenState
                         ),
                       ),
                       const SizedBox(width: ElderSpacing.sm),
-                      const Icon(
-                        Icons.arrow_forward_rounded,
-                        color: ElderColors.onPrimary,
-                        size: 20,
-                      ),
+                      if (_isLoading)
+                        const SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: ElderColors.onPrimary,
+                          ),
+                        )
+                      else
+                        const Icon(
+                          Icons.arrow_forward_rounded,
+                          color: ElderColors.onPrimary,
+                          size: 20,
+                        ),
                     ],
                   ),
                 ),
               ),
             ),
           ),
+
+          // Error message — shown on Supabase auth failure
+          if (_errorMessage != null) ...[
+            const SizedBox(height: ElderSpacing.sm),
+            Text(
+              _errorMessage!,
+              style: GoogleFonts.lexend(
+                fontSize: 16,
+                color: ElderColors.error,
+              ),
+              textAlign: TextAlign.center,
+            ),
+          ],
 
           const SizedBox(height: ElderSpacing.md),
 

@@ -9,8 +9,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../core/constants/elder_colors.dart';
 import '../../../core/constants/elder_spacing.dart';
+import '../providers/auth_provider.dart';
 
 // Stitch config: rounded-xl = 0.75rem = 12dp, rounded-lg = 0.5rem = 8dp.
 const double _kButtonRadius = 12.0;
@@ -35,6 +37,8 @@ class _CaretakerLoginScreenState
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   bool _obscurePassword = true;
+  bool _isLoading = false;
+  String? _errorMessage;
 
   @override
   void initState() {
@@ -55,9 +59,21 @@ class _CaretakerLoginScreenState
     super.dispose();
   }
 
-  void _onSignIn() {
-    if (_formKey.currentState!.validate()) {
-      // TODO: context.go('/home/caretaker') — add route to app.dart in Batch 3.
+  Future<void> _onSignIn() async {
+    if (!_formKey.currentState!.validate()) return;
+    setState(() { _isLoading = true; _errorMessage = null; });
+    try {
+      await ref.read(authServiceProvider).signInCaretaker(
+        email: _emailController.text.trim(),
+        password: _passwordController.text,
+      );
+      if (mounted) context.go('/home/caretaker');
+    } on AuthException catch (e) {
+      setState(() => _errorMessage = e.message);
+    } catch (e) {
+      setState(() => _errorMessage = 'Sign-in failed. Please try again.');
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
     }
   }
 
@@ -192,7 +208,7 @@ class _CaretakerLoginScreenState
             button: true,
             label: 'Sign In',
             child: GestureDetector(
-              onTap: _onSignIn,
+              onTap: _isLoading ? null : _onSignIn,
               child: Container(
                 height: 56, // h-14 = 56dp
                 decoration: BoxDecoration(
@@ -209,19 +225,38 @@ class _CaretakerLoginScreenState
                   ],
                 ),
                 child: Center(
-                  child: Text(
-                    'Sign In',
-                    // HTML: text-base (16px) font-bold → raised to 20sp (CLAUDE.md button min)
-                    style: GoogleFonts.plusJakartaSans(
-                      fontSize: 20,
-                      fontWeight: FontWeight.bold,
-                      color: ElderColors.onPrimary,
-                    ),
-                  ),
+                  child: _isLoading
+                      ? const SizedBox(
+                          width: 24,
+                          height: 24,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2.5,
+                            color: ElderColors.onPrimary,
+                          ),
+                        )
+                      : Text(
+                          'Sign In',
+                          // HTML: text-base (16px) font-bold → raised to 20sp (CLAUDE.md button min)
+                          style: GoogleFonts.plusJakartaSans(
+                            fontSize: 20,
+                            fontWeight: FontWeight.bold,
+                            color: ElderColors.onPrimary,
+                          ),
+                        ),
                 ),
               ),
             ),
           ),
+
+          // Error message — shown on Supabase auth failure
+          if (_errorMessage != null) ...[
+            const SizedBox(height: ElderSpacing.sm),
+            Text(
+              _errorMessage!,
+              style: GoogleFonts.lexend(fontSize: 16, color: ElderColors.error),
+              textAlign: TextAlign.center,
+            ),
+          ],
 
           const SizedBox(height: ElderSpacing.md),
 

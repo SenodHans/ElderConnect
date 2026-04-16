@@ -10,9 +10,11 @@ library;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../../core/constants/elder_colors.dart';
 import '../../../core/constants/elder_spacing.dart';
+import '../providers/auth_provider.dart';
 
 // Stitch config: rounded-2xl = 1.25rem = 20dp, rounded-xl = 0.75rem = 12dp.
 const double _kKeyRadius = 20.0;   // rounded-2xl — numpad keys
@@ -40,6 +42,8 @@ class _ElderPinLoginScreenState extends ConsumerState<ElderPinLoginScreen>
   late final CurvedAnimation _fadeIn;
 
   final List<int> _pin = [];
+  bool _isVerifying = false;
+  bool _hasError = false;
 
   @override
   void initState() {
@@ -69,10 +73,43 @@ class _ElderPinLoginScreenState extends ConsumerState<ElderPinLoginScreen>
     setState(() => _pin.removeLast());
   }
 
-  void _onPinComplete() {
-    // TODO(backend-sprint): verify PIN hash against Supabase users.pin_hash.
-    // On match: context.go('/home/elder').
-    // On fail: clear PIN + show error shake.
+  Future<void> _onPinComplete() async {
+    if (_isVerifying) return;
+    setState(() { _isVerifying = true; _hasError = false; });
+
+    final service = ref.read(authServiceProvider);
+    final enteredPin = _pin.join();
+
+    try {
+      // Verify against the locally cached hash — no DB query needed.
+      final storedHash = await service.getStoredPinHash();
+
+      if (storedHash != null && service.verifyPinLocal(enteredPin, storedHash)) {
+        // Hash matches — restore the Supabase session from secure storage.
+        final session = await service.restoreElderSession();
+        if (mounted && session != null) {
+          context.go('/home/elder');
+          return;
+        }
+      }
+
+      // PIN wrong or session restore failed — clear input and show error.
+      if (mounted) {
+        setState(() {
+          _pin.clear();
+          _hasError = true;
+          _isVerifying = false;
+        });
+      }
+    } catch (_) {
+      if (mounted) {
+        setState(() {
+          _pin.clear();
+          _hasError = true;
+          _isVerifying = false;
+        });
+      }
+    }
   }
 
   @override
@@ -208,18 +245,34 @@ class _ElderPinLoginScreenState extends ConsumerState<ElderPinLoginScreen>
 
   /// 4 PIN slot tiles — filled slots show bullet dot with primary bottom border.
   /// Empty slots show a transparent bottom border (invisible at rest).
+  /// Slots turn error colour on incorrect PIN entry.
   Widget _buildPinSlots() {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: List.generate(_kPinLength, (i) {
-        final filled = i < _pin.length;
-        return Padding(
-          padding: EdgeInsets.only(
-            left: i == 0 ? 0 : ElderSpacing.md, // gap-4 = 16dp
+    return Column(
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: List.generate(_kPinLength, (i) {
+            final filled = i < _pin.length;
+            return Padding(
+              padding: EdgeInsets.only(
+                left: i == 0 ? 0 : ElderSpacing.md, // gap-4 = 16dp
+              ),
+              child: _PinSlot(filled: filled, hasError: _hasError),
+            );
+          }),
+        ),
+        // Error message shown below the slots on wrong PIN
+        if (_hasError) ...[
+          const SizedBox(height: ElderSpacing.md),
+          Text(
+            'Incorrect PIN. Please try again.',
+            style: GoogleFonts.lexend(
+              fontSize: 16,
+              color: ElderColors.error,
+            ),
           ),
-          child: _PinSlot(filled: filled),
-        );
-      }),
+        ],
+      ],
     );
   }
 
@@ -279,12 +332,19 @@ class _ElderPinLoginScreenState extends ConsumerState<ElderPinLoginScreen>
 ///
 /// Filled: 3px primary bottom border + bullet dot (text-4xl = 36sp).
 /// Empty: transparent bottom border (visually no border at rest).
+/// Error state: error-colour bottom border + error-colour dot.
 class _PinSlot extends StatelessWidget {
-  const _PinSlot({required this.filled});
+  const _PinSlot({required this.filled, this.hasError = false});
   final bool filled;
+  final bool hasError;
 
   @override
   Widget build(BuildContext context) {
+    final borderColor = hasError
+        ? ElderColors.error
+        : (filled ? ElderColors.primary : Colors.transparent);
+    final dotColor = hasError ? ElderColors.error : ElderColors.onSurface;
+
     return AnimatedContainer(
       duration: const Duration(milliseconds: 150),
       width: _kSlotWidth,
@@ -294,7 +354,7 @@ class _PinSlot extends StatelessWidget {
         borderRadius: BorderRadius.circular(_kSlotRadius),
         border: Border(
           bottom: BorderSide(
-            color: filled ? ElderColors.primary : Colors.transparent,
+            color: borderColor,
             width: 3, // border-b-[3px]
           ),
         ),
@@ -304,9 +364,9 @@ class _PinSlot extends StatelessWidget {
               alignment: const Alignment(0, 0.2), // mb-2 optical baseline
               child: Text(
                 '•',
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 36, // text-4xl
-                  color: ElderColors.onSurface,
+                  color: dotColor,
                   height: 1,
                 ),
               ),

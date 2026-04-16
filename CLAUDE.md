@@ -106,16 +106,21 @@ if (user.role == 'caretaker') → CaretakerShell()
 
 ## Approved Packages (do not use anything outside this list without flagging first)
 ```yaml
-flutter_riverpod: ^2.x        # State management
-google_fonts: ^6.x            # Poppins font
-flutter_tts: ^4.x             # Text-to-speech
-speech_to_text: ^6.x          # Talk Button voice input
-cached_network_image: ^3.x    # Feed images
-supabase_flutter: ^2.x        # Backend
-firebase_messaging: ^16.x    # FCM push notifications
-fl_chart: ^0.x                # Caretaker mood history chart
-intl: ^0.x                    # Date formatting
-go_router: ^13.x              # Navigation/routing
+flutter_riverpod: ^2.x              # State management
+google_fonts: ^6.x                  # Poppins font
+flutter_tts: ^4.x                   # Text-to-speech
+speech_to_text: ^6.x                # Talk Button voice input
+cached_network_image: ^3.x          # Feed images
+supabase_flutter: ^2.x              # Backend
+firebase_core: ^3.x                 # Required by firebase_messaging
+firebase_messaging: ^16.x           # FCM push notifications
+fl_chart: ^0.x                      # Caretaker mood history chart
+intl: ^0.x                          # Date formatting
+go_router: ^13.x                    # Navigation/routing
+flutter_local_notifications: ^17.x  # On-device FCM notification display
+image_picker: ^1.x                  # Profile photo + feed photo upload
+flutter_secure_storage: ^9.x        # Persistent elder session storage
+bcrypt: ^1.x                        # PIN hashing before storage
 ```
 
 ## Installed Skills
@@ -221,17 +226,22 @@ the feature (e.g. "feat: elder home screen UI complete")
 | Platform priority | iOS-first — SafeArea everywhere, respect MediaQuery padding |
 
 ### Elderly Portal Navigation
-**Pattern: Icon Grid Home Screen — NOT a bottom navigation bar.**
+**Pattern: Bottom navigation bar — 3 tabs default, 4th tab conditional.**
 
-Home screen shows 5 large icon tiles in a 2+2+1 grid:
-1. Social (`ElderColors.primaryFixed`) — top left
-2. News (`ElderColors.tertiaryFixed`) — top right
-3. Wellness (`ElderColors.primaryFixed`) — middle left
-4. Health/Meds (`ElderColors.secondaryFixed`) — middle right
-5. Emergency — full width at bottom, always visible (see Emergency Colour Mapping below)
+Tabs (in order):
+1. **Home** — `home` icon (filled when active)
+2. **Feed** — `rss_feed` icon
+3. **Games** — `videogame_asset` icon
+4. **Medication** — `medication` icon — **conditional**: only shown when a caretaker has added at least one medication for this elder. Hidden otherwise.
 
-Each tile: minimum 140x140px, icon 48px, label 18sp bold below icon.
-Navigation uses `Navigator.push()` with fade/slide transition (250ms). No drawer. No tabs.
+Active tab style: filled pill/circle — `ElderColors.primaryContainer` bg, white icon + label, `BoxShape.circle`, 64×64dp, shadow.
+Inactive tab style: 56×56dp min tap target, `ElderColors.onSurfaceVariant` colour.
+
+**Profile access:** Top-right avatar in the app bar — NOT a nav tab. Tapping the avatar navigates to the elder profile screen.
+
+**App bar:** Sticky, `ElderColors.background` with 80% opacity + backdrop blur. Left: menu button (48×48dp circle). Centre: "ElderConnect" wordmark (24sp bold, primary). Right: profile avatar (48×48dp circle, border `ElderColors.primaryContainer`).
+
+Navigation uses GoRouter (`context.go`). No drawer. No `Navigator.push`.
 
 ### Emergency Colour Mapping (Non-Negotiable)
 The old `emergencyRed` token no longer exists. Use these tokens:
@@ -371,14 +381,44 @@ created_at
 
 ## Authentication Flow (Non-Negotiable)
 
-### Elder Auth
-- Registration: name only → stored in Supabase users table
-- Phone number entered by caretaker, OTP confirmed on caretaker's device — elder never sees OTP
-- PIN (4-digit) set by caretaker in Elder tab
-- PIN stored as bcrypt hash in users table (never plain text)
-- Session persists indefinitely on elder's device
-- PIN login screen is fallback only — app deletion or session expiry. Not daily use.
-- If PIN forgotten → caretaker resets from Elder tab
+### Elder Auth — Confirmed Architecture
+
+Registration (caretaker-led, elder is passive throughout):
+1. Caretaker registers elder name during elder profile setup
+2. Caretaker enters elder's phone number
+3. A Supabase Edge Function (create-elder-account) is called using the
+   caretaker's authenticated session. It creates a Supabase Auth account
+   for the elder with:
+   - Email: elder_{phone_number}@elderconnect.internal
+   - Password: system-generated UUID (stored in users table, never
+     exposed to any user)
+   - This gives the elder a real auth.users row — RLS works normally
+4. OTP sent to elder's phone number, confirmed on caretaker's device.
+   Elder never sees or handles OTP.
+5. Caretaker sets a 4-digit PIN for the elder post-linking
+6. PIN is bcrypt-hashed and stored in users.pin_hash — never plain text
+7. Supabase session credentials stored in flutter_secure_storage
+   on elder's device
+
+Why this pattern:
+- Elder UX is PIN-only with persistent session — zero complexity for elder
+- Elder has a real auth.users row — Supabase RLS enforced at DB level
+- No non-standard auth pattern — fully defensible at viva and in IEEE paper
+- System-generated password never touches client code — created server-side
+  via Edge Function using Supabase service role key
+
+Daily elder experience:
+- App opens → flutter_secure_storage restores session → lands on home
+- Elder never sees a login screen in normal daily use
+
+PIN screen (fallback only — triggered by app reinstall or session expiry):
+- Elder enters 4-digit PIN
+- Flutter verifies PIN against bcrypt hash fetched from users table
+- On success, signs back in to Supabase using stored credentials
+- Session restored to flutter_secure_storage
+
+PIN reset:
+- Caretaker resets PIN from Elder tab in caretaker portal
 
 ### Caretaker Auth
 - Registration: full name, email, phone, password
@@ -389,6 +429,9 @@ created_at
 - Never prompt elder for OTP
 - Never prompt elder for email or password
 - Never store PIN as plain text — always bcrypt hash
+- Never store system-generated password in client-side Flutter code
+- Never create elder Supabase Auth account from Flutter client directly —
+  always via Edge Function using service role key
 - Never expire elder session automatically
 
 ---
@@ -396,7 +439,7 @@ created_at
 ## AI Components
 
 ### 1. Mood Detection (Hugging Face)
-- **Model:** `distilbert-base-uncased-finetuned-sst-2-english`
+- **Model:** `j-hartmann/emotion-english-distilroberta-base`
 - **Trigger:** When elderly user submits a post (NOT on voice messages, NOT on keystrokes)
 - **Flow:** Flutter → Supabase Edge Function (proxy) → Hugging Face API → response stored in mood_logs
 - **Response format:**
@@ -420,39 +463,35 @@ created_at
 
 ---
 
-## Sprint Status (as of March 2026)
+## Sprint Status (as of April 2026)
 
 | Sprint | Focus | Status |
 |---|---|---|
-| Sprint 1 | Flutter setup, Supabase integration, voice-guided registration + login | COMPLETED |
-| Sprint 2 | Social feed, post creation, photo upload, Talk Button | COMPLETED |
-| Sprint 3 | Hugging Face API integration, mood detection, mood log storage | IN PROGRESS / DEBUGGING |
-| Sprint 4 | Medication reminders (FCM + Edge Functions), wellness games, emergency contact | COMPLETED |
-| Sprint 5 | Caretaker portal — dashboard, medication management, mood history chart | IN PROGRESS |
-| Sprint 6 | Accessibility pass (running concurrently across all sprints) | ONGOING |
+| UI Layer | All 21 screens translated from Stitch designs to Flutter | ✅ COMPLETE |
+| Backend Sprint | Supabase schema, auth wiring, providers, Edge Functions | 🔄 IN PROGRESS |
 
-**Accessibility is NOT a final phase — apply WCAG 2.1 AA on every screen as it is built.**
+Note: The original six-sprint plan in the Contextual Report was a planning
+document. Actual implementation followed a UI-first approach — all screens
+built as shells first, now being wired to backend in a dedicated backend sprint.
 
-### Confirmed Implemented Screens
-- Social Feed (elderly portal)
-- Dashboard Selector (role selection screen at login)
-- Emergency Contact screen
-- Add Medication screen (caretaker portal)
-- Caretaker Home Page
+---
 
-### Screen Build Priority for Remaining Work
-1. Auth: Splash, Role Selection, Registration (elderly), Registration (caretaker), Login
-2. Elderly Home: Icon grid screen
-3. Social Feed polish
-4. News Feed
-5. Mood Detection UI: loading state, result display
-6. Wellness: memory game, breathing exercise
-7. Medications (elderly): reminder list view
-8. Emergency Contact polish
-9. Caretaker Dashboard
-10. Caretaker Medications management
-11. Caretaker Mood History chart
-12. Settings / Profile
+## Backend Wiring State (as of April 2026)
+
+Current state of backend connectivity — updated as each step completes:
+
+- Supabase client: initialised in main.dart via String.fromEnvironment —
+  credentials not yet configured in .vscode/launch.json
+- GoRouter: no auth guard, no redirect callback, no refreshListenable —
+  all routes currently unguarded
+- Providers: only interest_provider.dart exists (in-memory only,
+  not persisted to Supabase)
+- Auth screens: all submit handlers stubbed with TODO(backend-sprint)
+- Portal screens: all hardcoded/static data, no provider consumption
+- Firebase: firebase_options.dart does not exist, not yet configured
+- Edge Functions: directories exist, all files empty
+- flutter_secure_storage: not yet wired
+- bcrypt: not yet added to pubspec.yaml
 
 ---
 

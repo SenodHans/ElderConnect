@@ -10,6 +10,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../core/constants/elder_colors.dart';
 import '../../../core/constants/elder_spacing.dart';
 import '../providers/interest_provider.dart';
@@ -33,6 +34,9 @@ class _InterestSelectionScreenState
   late final AnimationController _anim;
   late final List<CurvedAnimation> _anims;
 
+  bool _isSaving = false;
+  String? _errorMessage;
+
   @override
   void initState() {
     super.initState();
@@ -53,7 +57,7 @@ class _InterestSelectionScreenState
 
   @override
   void dispose() {
-    for (final a in _anims) a.dispose();
+    for (final a in _anims) { a.dispose(); }
     _anim.dispose();
     super.dispose();
   }
@@ -62,7 +66,7 @@ class _InterestSelectionScreenState
   Widget _animated(int i, Widget child) {
     return AnimatedBuilder(
       animation: _anims[i],
-      builder: (_, __) => Opacity(
+      builder: (_, _) => Opacity(
         opacity: _anims[i].value,
         child: Transform.translate(
           offset: Offset(0, 20 * (1 - _anims[i].value)),
@@ -70,6 +74,31 @@ class _InterestSelectionScreenState
         ),
       ),
     );
+  }
+
+  /// Persists the selected interests to the users table then navigates to
+  /// the elder home screen. Shows an error message on failure so the elder
+  /// (or assisting caretaker) can try again without losing their selection.
+  Future<void> _saveAndNavigate(Set<String> interests) async {
+    setState(() { _isSaving = true; _errorMessage = null; });
+    try {
+      final uid = Supabase.instance.client.auth.currentUser?.id;
+      if (uid == null) throw Exception('No signed-in user found.');
+
+      await Supabase.instance.client
+          .from('users')
+          .update({'interests': interests.toList()})
+          .eq('id', uid);
+
+      if (mounted) context.go('/home/elder');
+    } catch (_) {
+      if (mounted) {
+        setState(() {
+          _isSaving = false;
+          _errorMessage = 'Could not save. Please try again.';
+        });
+      }
+    }
   }
 
   @override
@@ -174,7 +203,7 @@ class _InterestSelectionScreenState
   }
 
   Widget _buildBottomBar(Set<String> selected) {
-    final canProceed = selected.isNotEmpty;
+    final canProceed = selected.isNotEmpty && !_isSaving;
     return SafeArea(
       top: false,
       child: ClipRect(
@@ -199,7 +228,7 @@ class _InterestSelectionScreenState
                   label: 'Get Started',
                   enabled: canProceed,
                   child: GestureDetector(
-                    onTap: canProceed ? () => context.go('/home/elder') : null,
+                    onTap: canProceed ? () => _saveAndNavigate(selected) : null,
                     child: AnimatedOpacity(
                       opacity: canProceed ? 1.0 : 0.40,
                       duration: const Duration(milliseconds: 200),
@@ -238,17 +267,40 @@ class _InterestSelectionScreenState
                               ),
                             ),
                             const SizedBox(width: ElderSpacing.sm),
-                            const Icon(
-                              Icons.arrow_forward_rounded,
-                              color: ElderColors.onPrimary,
-                              size: 22,
-                            ),
+                            if (_isSaving)
+                              const SizedBox(
+                                width: 20,
+                                height: 20,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2.5,
+                                  color: ElderColors.onPrimary,
+                                ),
+                              )
+                            else
+                              const Icon(
+                                Icons.arrow_forward_rounded,
+                                color: ElderColors.onPrimary,
+                                size: 22,
+                              ),
                           ],
                         ),
                       ),
                     ),
                   ),
                 ),
+
+                // Error message — shown if Supabase update fails.
+                if (_errorMessage != null) ...[
+                  const SizedBox(height: ElderSpacing.sm),
+                  Text(
+                    _errorMessage!,
+                    style: GoogleFonts.lexend(
+                      fontSize: 16,
+                      color: ElderColors.error,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                ],
 
                 const SizedBox(height: ElderSpacing.md),
 

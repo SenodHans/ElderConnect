@@ -55,7 +55,7 @@ class _PostRegistrationOptionsScreenState
 
   @override
   void dispose() {
-    for (final a in _anims) a.dispose();
+    for (final a in _anims) { a.dispose(); }
     _anim.dispose();
     super.dispose();
   }
@@ -63,7 +63,7 @@ class _PostRegistrationOptionsScreenState
   Widget _animated(int i, Widget child) {
     return AnimatedBuilder(
       animation: _anims[i],
-      builder: (_, __) => Opacity(
+      builder: (_, _) => Opacity(
         opacity: _anims[i].value,
         child: Transform.translate(
           offset: Offset(0, 20 * (1 - _anims[i].value)),

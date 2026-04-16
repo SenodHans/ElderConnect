@@ -1,138 +1,224 @@
-# ElderConnect — Stitch → Flutter Translation Action Plan
+# ElderConnect — Backend Action Plan
 
 ## What This File Is
-Active working document for the screen-by-screen translation of Stitch HTML designs
-into Flutter Dart files. Read this at the start of any session to resume exactly where
-we left off. Update the status column after each screen is approved and written.
+Active working document for the backend wiring sprint.
+Read this at the start of every Claude Code session to resume exactly
+where we left off. Tick checkboxes as each task is confirmed complete.
 
 ---
 
-## Core Rules (apply to every screen, no exceptions)
+## Open Decisions (must resolve before the relevant step)
 
-| Rule | Requirement |
-|------|-------------|
-| Colours | `ElderColors.*` tokens only — no hardcoded hex |
-| Spacing | `ElderSpacing.*` constants only — no hardcoded numbers |
-| Font size | 16sp minimum everywhere — no exceptions without explicit comment |
-| Border radius | `BoxShape.circle` / `BorderRadius.circular()` matching HTML `rounded-*` |
-| Borders | No 1px content-section borders — tonal shift only |
-| Animations | ≤ 300ms total |
-| Logic/routing | Do NOT touch — visual changes only |
-| Design priority | **Stitch HTML design takes priority over CLAUDE.md** for layout decisions. If they conflict, follow Stitch and flag CLAUDE.md for update. |
-| Prototype chrome | Ignore top app bars and bottom navs that appear on ALL Stitch screens as preview frame — only include if that screen actually owns the nav |
-| Accessibility | Append audit block to every file |
-| Approval | Show diff + proposed code → wait for approval → then write |
-
----
-
-## Workflow (same for every screen)
-
-1. Read `stitch_elderconnect_design_finalised/<folder>/code.html`
-2. View `stitch_elderconnect_design_finalised/<folder>/screen.png` as visual reference
-3. Extract all visual properties from the HTML
-4. Compare against existing Dart file (or plan the full translation if new)
-5. List every visual difference clearly
-6. Show proposed code — **wait for approval**
-7. Write file(s) only after explicit approval
-8. Update status in this file to ✅
-
----
-
-## Key File Paths
-
-| What | Path |
-|------|------|
-| Colour tokens | `lib/core/constants/elder_colors.dart` |
-| Spacing tokens | `lib/core/constants/elder_spacing.dart` |
-| Shared widgets | `lib/shared/widgets/` |
-| Router / routes | `lib/app.dart` |
-| Stitch designs | `stitch_elderconnect_design_finalised/<folder>/code.html + screen.png` |
-
----
-
-## Shared Widget Changes Log
-Track any changes made to shared widgets so their impact is visible.
-
-| Widget | Change | Affected Screens |
-|--------|--------|-----------------|
-| `elder_input.dart` | Added `labelColor` param (default: `onSurface`) | elder_registration uses `primary` |
-
----
-
-## Screen Status
-
-### Batch 1 — Auth Flow
-
-| # | Screen | Stitch Folder | Dart File | Status |
-|---|--------|--------------|-----------|--------|
-| 1 | Splash Screen | `splash_screen` | `auth/screens/splash_screen.dart` | ✅ Done |
-| 2 | Role Selection | `role_selection` | `auth/screens/role_selection_screen.dart` | ✅ Done |
-| 3 | Elder Registration | `elder_registration` | `auth/screens/elder_registration_screen.dart` | ✅ Done |
-| 4 | Interest Selection | `updated_interest_selection` | `auth/screens/interest_selection_screen.dart` | ✅ Done |
-| 5 | Post-Registration Options | `post_registration_options` | `auth/screens/post_registration_options_screen.dart` | ✅ Done |
-| 6 | Caretaker Registration | `caretaker_registration` | `auth/screens/caretaker_registration_screen.dart` | ✅ Done |
-| 7 | Caretaker Login | `caretaker_login` | `auth/screens/caretaker_login_screen.dart` | ✅ Done |
-| 8 | Elder PIN Login | `elder_pin_login_high_visibility` | `auth/screens/elder_pin_login_screen.dart` | ✅ Done |
-
-### Batch 2 — Elder Portal Core
-
-| # | Screen | Stitch Folder | Dart File | Status |
-|---|--------|--------------|-----------|--------|
-| 9 | Elder Home | `elder_home_screen` | `elderly/screens/elder_home_screen.dart` | ⬜ Pending |
-| 10 | Elder Feed | `elder_feed_screen` | `social/screens/elder_feed_screen.dart` | ⬜ Pending |
-| 11 | Elder Medication (list) | `elder_medication_screen_1` | `medications/screens/elder_medication_list_screen.dart` | ⬜ Pending |
-| 12 | Elder Medication (detail) | `elder_medication_screen_2` | `medications/screens/elder_medication_detail_screen.dart` | ⬜ Pending |
-| 13 | Elder Games | `elder_games_screen` | `wellness/screens/elder_games_screen.dart` | ⬜ Pending |
-| 14 | Elder Profile | `elder_profile` | `elderly/screens/elder_profile_screen.dart` | ⬜ Pending |
-
-### Batch 3 — Caretaker Portal
-
-| # | Screen | Stitch Folder | Dart File | Status |
-|---|--------|--------------|-----------|--------|
-| 15 | Caretaker Dashboard | `caretaker_dashboard` | `caretaker/screens/caretaker_dashboard_screen.dart` | ⬜ Pending |
-| 16 | Elder Management | `elder_management` | `caretaker/screens/elder_management_screen.dart` | ⬜ Pending |
-| 17 | Manage Links | `manage_links` | `caretaker/screens/manage_links_screen.dart` | ⬜ Pending |
-| 18 | Search / Link Elder | `search_link_elder` | `caretaker/screens/search_link_elder_screen.dart` | ⬜ Pending |
-| 19 | Mood Activity Logs | `mood_activity_logs` | `caretaker/screens/mood_activity_logs_screen.dart` | ⬜ Pending |
-
-### Batch 4 — Remaining
-
-| # | Screen | Stitch Folder | Dart File | Status |
-|---|--------|--------------|-----------|--------|
-| 20 | Post Game Score | `post_game_score` | `wellness/screens/post_game_score_screen.dart` | ⬜ Pending |
-| 21 | Elder Login Fallback | `elder_login_fallback` | `auth/screens/elder_login_fallback_screen.dart` | ⬜ Pending |
-
----
-
-## Known Design Decisions (overrides / clarifications)
-
-| Decision | Detail |
+| Decision | Status |
 |----------|--------|
-| Elder home nav | Stitch design uses **bottom nav bar with 3 tabs (Home, Feed, Games)** — NOT the 5-tile icon grid in CLAUDE.md. CLAUDE.md must be updated before building this screen. |
-| PIN login variant | Use `elder_pin_login_high_visibility` — most accessible for elderly users. |
-| Interest selection | Use `updated_interest_selection` folder (newer version). |
-| Prototype chrome | Top app bar + bottom nav visible in Stitch previews are the design tool's preview shell — only include if the screen actually owns that nav element. |
-| ElderInput bg | DESIGN.md specifies `surfaceContainerHighest` (grey well). Some Stitch screens use white (`surfaceContainerLowest`). Follow Stitch per design priority rule. |
+| Elder auth: OTP confirmed on caretaker device, PIN set by caretaker | ✅ Confirmed |
+| Elder Supabase account created via Edge Function (service role key) | ✅ Confirmed |
+| Elder session persists via flutter_secure_storage — PIN is fallback only | ✅ Confirmed |
+| Connection requests: both elders and caretakers can initiate | ✅ Confirmed | 
+| Max elders per caretaker: 2 | ✅ Confirmed |
 
 ---
 
-## Router Status (lib/app.dart)
-New screen files need registering here. Confirm with user before touching routes.
+## Missing Packages (add at start of Step 2)
 
-| Route | Screen | Status |
-|-------|--------|--------|
-| `/` | SplashScreen | ✅ Registered |
-| `/role-selection` | RoleSelectionScreen | ✅ Registered |
-| `/register/elder` | ElderRegistrationScreen | ✅ Registered |
-| `/interest-selection` | InterestSelectionScreen | ✅ Registered |
-| `/register/caretaker` | CaretakerRegistrationScreen | ⬜ Placeholder — needs real screen |
-| `/home/elder` | ElderHomeScreen | ⬜ Placeholder — needs real screen |
-| (all others) | — | ⬜ Not yet added |
+- [x] flutter_local_notifications: ^17.2.2
+- [x] image_picker: ^1.1.2
+- [x] flutter_secure_storage: ^9.2.2
+- [x] firebase_core: ^4.6.0  ← NOTE: must be ^4.6.0, NOT ^3.x — firebase_messaging 16.x requires it
+- [x] bcrypt: ^1.1.3
+- [x] speech_to_text upgraded ^6.6.2 → ^7.0.0 to resolve JS version conflict with flutter_secure_storage
 
 ---
 
-## How to Resume After /clear
+## Step 1 — Supabase Schema + Credentials ⚠️ BLOCKS EVERYTHING
+
+- [x] Write supabase/migrations/001_initial_schema.sql
+      Tables required:
+      - users (id, email, role, full_name, date_of_birth, phone,
+        interests text[], tts_enabled, mood_sharing_consent,
+        pin_hash, system_password, created_at)
+      - caretaker_links (id, caretaker_id, elderly_user_id,
+            status CHECK('pending','accepted','rejected'),
+            requested_by uuid FK → users,
+            created_at)
+            + trigger enforcing max 2 accepted links per caretaker
+      - posts (id, user_id, content, photo_url, created_at)
+      - mood_logs (id, user_id, label, score, source_post_id, created_at)
+      - medications (id, elderly_user_id, created_by_caretaker_id,
+        pill_name, pill_colour, dosage, reminder_times time[],
+        is_active, created_at)
+      - medication_logs (id, medication_id, user_id, scheduled_time,
+        taken_at, status)
+      - voice_messages (id, sender_id, audio_url, created_at)
+      Include all RLS policies per CLAUDE.md rules
+- [x] Confirm migration SQL with user before executing — do not apply live
+      without explicit approval
+- [ ] Apply migration to live Supabase instance  ← PENDING explicit user approval
+- [x] Create .vscode/launch.json with run configuration:
+      --dart-define=SUPABASE_URL=<url>
+      --dart-define=SUPABASE_ANON_KEY=<key>
+
+---
+
+## Step 1b — create-elder-account Edge Function ⚠️ BLOCKS ELDER AUTH
+
+Must be deployed before any elder registration flow can be wired.
+
+- [x] Write supabase/functions/create-elder-account/index.ts
+      Input: { phone: string, full_name: string, caretaker_id: string }
+      Logic:
+        1. Generate email: elder_{phone}@elderconnect.internal
+        2. Generate UUID password
+        3. Call supabase.auth.admin.createUser() with generated credentials
+        4. Insert row into users table with role='elderly'
+        5. Store system_password (encrypted) in users table
+        6. Return: { elder_id, email } — never return password to client
+      Auth: service role key only — never anon key
+- [ ] Deploy function to Supabase  ← PENDING user runs: supabase functions deploy create-elder-account
+- [ ] Confirm function is callable from caretaker's authenticated session
+
+---
+
+## Step 2 — Auth Service + Provider (blocks all navigation)
+
+- [x] Add missing packages to pubspec.yaml, run flutter pub get
+- [x] Create lib/features/auth/services/auth_service.dart
+      Methods:
+      - signUpCaretaker(name, email, phone, password)
+      - signInCaretaker(email, password)
+      - signOut()
+      - createElderAccount(phone, fullName) — calls Edge Function
+      - verifyElderPin(elderId, pin) — bcrypt compare against pin_hash
+      - setElderPin(elderId, pin) — bcrypt hash + store in users.pin_hash
+      - persistElderSession(session) — write to flutter_secure_storage
+      - restoreElderSession() — read from flutter_secure_storage
+      - verifyPinLocal(pin, storedHash) — offline BCrypt compare (no DB query)
+- [x] Create lib/features/auth/providers/auth_provider.dart
+      authServiceProvider (Provider) + authStateProvider (StreamProvider)
+- [x] Wire caretaker_registration_screen.dart submit → signUpCaretaker()
+- [x] Wire caretaker_login_screen.dart submit → signInCaretaker()
+- [x] Wire elder PIN login screen → verifyPinLocal() → restoreElderSession()
+- [x] Wire elder session restore on app start → flutter_secure_storage
+      (elder_login_fallback_screen.dart wired: phone check → restoreElderSession)
+- [ ] flutter analyze clean — run and verify before Step 3
+
+---
+
+## Step 3 — GoRouter Auth Guard (blocks correct app flow)
+
+- [x] Add redirect: callback to GoRouter in app.dart
+      Logic:
+        no session + protected route → /role-selection
+        session + login-only route → /home/elder or /home/caretaker
+      Role read from auth.currentUser.userMetadata['role'] (synchronous, no DB query)
+      Role stored in user_metadata during signUpCaretaker + createUser Edge Function
+- [x] Add refreshListenable wired to supabase.auth.onAuthStateChange
+      _AuthRefreshNotifier(ChangeNotifier) wraps the auth stream in app.dart
+- [x] Fix splash_screen.dart — check session state before navigating,
+      role-based redirect if session exists; /role-selection if not
+- [x] flutter analyze clean — 0 issues after Step 3
+
+---
+
+## Step 4 — User Profile Provider (blocks all personalised screens)
+
+- [x] Create lib/shared/models/user_model.dart
+      Maps Supabase users row → UserModel with firstName convenience getter
+- [x] Create lib/features/auth/providers/user_provider.dart
+      StreamProvider backed by Supabase Realtime stream on users table
+- [x] Wire interest selection screen to persist to users.interests on Supabase
+      _saveAndNavigate(): update users SET interests WHERE id=uid, then go('/home/elder')
+- [x] Replace hardcoded name in elder_profile_screen.dart
+      _IdentitySection → ConsumerWidget, reads userProvider, placeholder shimmer while loading
+- [x] Replace hardcoded name in elder_home_screen.dart greeting
+      _GreetingSection → ConsumerWidget, time-of-day greeting + user.firstName
+- [ ] tts_enabled wiring deferred — profile screen has no TTS toggle UI yet (Step 8 scope)
+- [x] flutter analyze clean — 0 issues after Step 4
+
+---
+
+## Step 5 — Firebase Setup (blocks push notifications)
+
+- [x] Run: flutterfire configure in project root
+- [x] Commit generated lib/firebase_options.dart
+- [x] Implement Firebase.initializeApp() in main.dart
+
+---
+
+## Step 6 — Social Feed Provider (blocks live feed)
+
+- [x] Create lib/features/social/providers/posts_provider.dart
+      Query: posts joined with users, ordered by created_at desc
+- [x] Replace two hardcoded _SocialPostCard widgets in
+      elder_feed_screen.dart with provider-driven ListView
+- [x] Add Supabase realtime subscription for live updates
+
+---
+
+## Step 7 — Medications Provider (blocks medication screens)
+
+- [x] Create lib/features/medications/providers/medications_provider.dart
+      Query: medications + medication_logs for current elder user
+- [x] Wire _hasMedication flag in elder_home_screen.dart
+- [x] Wire _hasMedication flag in elder_feed_screen.dart
+- [x] Populate elder_medication_list_screen.dart with real data
+
+---
+
+## Step 8 — Edge Functions + MOSAIC (blocks mood detection + alerts)
+
+- [ ] Write supabase/functions/mood-detection-proxy/index.ts
+      Model: j-hartmann/emotion-english-distilroberta-base
+      Trigger: called when elder submits a post (not on voice messages)
+      Stores result in mood_logs
+      Handle 503 cold start: retry after 20s + return loading state
+- [ ] Write MOSAIC alert computation in Edge Function
+      Four signals: HuggingFace sentiment score, self-report emoji
+      discrepancy delta, social activity count, routine adherence
+      Rolling 7-day window, slope threshold → stable/warning/urgent
+      Output written to alert_states table, FCM triggered on escalation
+- [ ] Write supabase/functions/send-medication-reminder/index.ts
+      Cron job: checks medication_logs for pending reminders,
+      sends FCM via Firebase Admin SDK
+- [ ] Create lib/features/mood/services/mood_service.dart
+      Dart service layer that calls mood-detection-proxy Edge Function
+
+---
+
+## How to Resume After /clear or /compact
 
 1. Open Claude Code in the project directory
-2. Say: **"Read ACTION.md, CLAUDE.md, and DESIGN.md then continue the Stitch translation from where we left off"**
-3. Claude will pick up from the next ⬜ screen in Batch 1
+2. Say: "Read CLAUDE.md and ACTION.md and continue backend wiring
+   from where we left off"
+3. Claude reads both files and picks up from the first unchecked item
+
+---
+
+## Resume Point (updated 2026-04-15)
+
+Steps 1, 1b, 2, 3, 4 are complete. `flutter analyze` is clean (0 issues).
+
+**Step 5 is next: Firebase Setup**
+  1. User runs: `flutterfire configure` in project root (interactive — Claude cannot run this)
+  2. Commit generated lib/firebase_options.dart
+  3. Wire Firebase.initializeApp() in lib/main.dart
+
+**Step 6 follows** — social feed provider + wire elder_feed_screen.dart
+**Step 7 follows** — medications provider + wire portal screens
+
+Resume instruction:
+  "Read CLAUDE.md and ACTION.md and continue backend wiring from where we left off"
+
+---
+
+## Critical Notes
+- flutter analyze must pass clean after every step
+- Confirm schema DDL with user before any live Supabase operation
+- HuggingFace model: j-hartmann/emotion-english-distilroberta-base
+- Elder Supabase account created server-side via Edge Function only —
+  never from Flutter client
+- bcrypt used for PIN hash only — not for Supabase auth password
+- Elder session persists via flutter_secure_storage — PIN screen is
+  fallback only, not daily use
+- Voice messages are NOT processed by mood detection — audio storage only
+- Mood analysis only runs if users.mood_sharing_consent = true
