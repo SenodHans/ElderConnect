@@ -13,6 +13,7 @@ library;
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../../core/constants/elder_colors.dart';
 import '../../../core/constants/elder_spacing.dart';
@@ -153,7 +154,7 @@ class _ElderManagementScreenState
                 const Icon(
                   Icons.medical_services_rounded,
                   size: 24,
-                  color: ElderColors.primary,
+                  color: ElderColors.tertiary,
                 ),
                 const SizedBox(width: ElderSpacing.sm),
                 Text(
@@ -161,7 +162,7 @@ class _ElderManagementScreenState
                   style: GoogleFonts.plusJakartaSans(
                     fontSize: 20,
                     fontWeight: FontWeight.w700,
-                    color: ElderColors.primary,
+                    color: ElderColors.tertiary,
                     letterSpacing: -0.5,
                   ),
                 ),
@@ -199,17 +200,16 @@ class _ElderManagementScreenState
   // ── Elder Selector Toggle ───────────────────────────────────────────────────
 
   Widget _buildElderToggle() {
-    return Center(
-      child: Container(
-        padding: const EdgeInsets.all(6),
-        decoration: BoxDecoration(
-          color: ElderColors.surfaceContainerLow,
-          borderRadius: BorderRadius.circular(999),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            _ElderToggleTab(
+    return Container(
+      padding: const EdgeInsets.all(6),
+      decoration: BoxDecoration(
+        color: ElderColors.surfaceContainerLow,
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Row(
+        children: [
+          Flexible(
+            child: _ElderToggleTab(
               initials: 'AT',
               name: 'Arthur Thompson',
               active: _activeElder == 0,
@@ -217,16 +217,18 @@ class _ElderManagementScreenState
               avatarBg: ElderColors.tertiaryFixed,
               onTap: () => setState(() => _activeElder = 0),
             ),
-            const SizedBox(width: ElderSpacing.xs),
-            _ElderToggleTab(
+          ),
+          const SizedBox(width: ElderSpacing.xs),
+          Flexible(
+            child: _ElderToggleTab(
               initials: 'ER',
               name: 'Eleanor Riggs',
               active: _activeElder == 1,
               avatarBg: ElderColors.surfaceContainerHigh,
               onTap: () => setState(() => _activeElder = 1),
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
@@ -257,7 +259,7 @@ class _ElderManagementScreenState
               const Icon(
                 Icons.person_rounded,
                 size: 22,
-                color: ElderColors.primary,
+                color: ElderColors.tertiary,
               ),
               const SizedBox(width: ElderSpacing.sm),
               Text(
@@ -265,7 +267,7 @@ class _ElderManagementScreenState
                 style: GoogleFonts.plusJakartaSans(
                   fontSize: 20,
                   fontWeight: FontWeight.bold,
-                  color: ElderColors.primary,
+                  color: ElderColors.tertiary,
                 ),
               ),
               const Spacer(),
@@ -286,7 +288,7 @@ class _ElderManagementScreenState
                     child: const Icon(
                       Icons.edit_rounded,
                       size: 20,
-                      color: ElderColors.primary,
+                      color: ElderColors.tertiary,
                     ),
                   ),
                 ),
@@ -425,7 +427,7 @@ class _ElderManagementScreenState
                   child: Row(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      Container(width: 4, color: ElderColors.primaryContainer),
+                      Container(width: 4, color: ElderColors.tertiaryContainer),
                       Expanded(
                         child: Container(
                           color: ElderColors.surfaceContainerLow,
@@ -471,7 +473,7 @@ class _ElderManagementScreenState
               const Icon(
                 Icons.emergency_rounded,
                 size: 22,
-                color: ElderColors.primary,
+                color: ElderColors.tertiary,
               ),
               const SizedBox(width: ElderSpacing.sm),
               Text(
@@ -479,7 +481,7 @@ class _ElderManagementScreenState
                 style: GoogleFonts.plusJakartaSans(
                   fontSize: 20,
                   fontWeight: FontWeight.bold,
-                  color: ElderColors.primary,
+                  color: ElderColors.tertiary,
                 ),
               ),
               const Spacer(),
@@ -496,14 +498,14 @@ class _ElderManagementScreenState
                       const Icon(
                         Icons.add_rounded,
                         size: 18,
-                        color: ElderColors.primary,
+                        color: ElderColors.tertiary,
                       ),
                       Text(
                         'Add',
                         style: GoogleFonts.plusJakartaSans(
                           fontSize: 16,
                           fontWeight: FontWeight.bold,
-                          color: ElderColors.primary,
+                          color: ElderColors.tertiary,
                         ),
                       ),
                     ],
@@ -573,7 +575,7 @@ class _ElderManagementScreenState
                         const Icon(
                           Icons.medication_rounded,
                           size: 22,
-                          color: ElderColors.primary,
+                          color: ElderColors.tertiary,
                         ),
                         const SizedBox(width: ElderSpacing.sm),
                         Text(
@@ -581,7 +583,7 @@ class _ElderManagementScreenState
                           style: GoogleFonts.plusJakartaSans(
                             fontSize: 20,
                             fontWeight: FontWeight.bold,
-                            color: ElderColors.primary,
+                            color: ElderColors.tertiary,
                           ),
                         ),
                       ],
@@ -617,8 +619,8 @@ class _ElderManagementScreenState
                         begin: Alignment.topLeft,
                         end: Alignment.bottomRight,
                         colors: [
-                          ElderColors.primary,
-                          ElderColors.primaryContainer,
+                          ElderColors.tertiary,
+                          ElderColors.tertiaryContainer,
                         ],
                       ),
                       borderRadius: BorderRadius.circular(_kCardRadius),
@@ -629,7 +631,7 @@ class _ElderManagementScreenState
                         const Icon(
                           Icons.add_circle_rounded,
                           size: 18,
-                          color: ElderColors.onPrimary,
+                          color: ElderColors.onTertiary,
                         ),
                         const SizedBox(width: ElderSpacing.xs),
                         Text(
@@ -637,7 +639,7 @@ class _ElderManagementScreenState
                           style: GoogleFonts.plusJakartaSans(
                             fontSize: 16,
                             fontWeight: FontWeight.bold,
-                            color: ElderColors.onPrimary,
+                            color: ElderColors.onTertiary,
                           ),
                         ),
                       ],
@@ -707,9 +709,7 @@ class _ElderManagementScreenState
                 icon: Icons.dashboard_rounded,
                 label: 'Dashboard',
                 active: false,
-                onTap: () {
-                  // TODO: context.go('/home/caretaker') — Batch 3.
-                },
+                onTap: () => context.go('/home/caretaker'),
               ),
               // Elder — active on this screen.
               _NavItem(
@@ -722,17 +722,13 @@ class _ElderManagementScreenState
                 icon: Icons.psychology_rounded,
                 label: 'Mood',
                 active: false,
-                onTap: () {
-                  // TODO: context.go('/mood-logs/caretaker') — Batch 3.
-                },
+                onTap: () => context.go('/mood-logs/caretaker'),
               ),
               _NavItem(
                 icon: Icons.link_rounded,
                 label: 'Links',
                 active: false,
-                onTap: () {
-                  // TODO: context.go('/links/caretaker') — Batch 3.
-                },
+                onTap: () => context.go('/links/caretaker'),
               ),
             ],
           ),
@@ -807,23 +803,27 @@ class _ElderToggleTab extends StatelessWidget {
                       fontSize: 16,
                       fontWeight: FontWeight.bold,
                       color: active
-                          ? ElderColors.primary
+                          ? ElderColors.tertiary
                           : ElderColors.onSurfaceVariant,
                     ),
                   ),
                 ),
               ),
               const SizedBox(width: ElderSpacing.sm),
-              Opacity(
-                opacity: active ? 1.0 : 0.60,
-                child: Text(
-                  name,
-                  style: GoogleFonts.plusJakartaSans(
-                    fontSize: 16,
-                    fontWeight: active ? FontWeight.w600 : FontWeight.w500,
-                    color: active
-                        ? ElderColors.primary
-                        : ElderColors.onSurfaceVariant,
+              Flexible(
+                child: Opacity(
+                  opacity: active ? 1.0 : 0.60,
+                  child: Text(
+                    name,
+                    overflow: TextOverflow.ellipsis,
+                    maxLines: 1,
+                    style: GoogleFonts.plusJakartaSans(
+                      fontSize: 16,
+                      fontWeight: active ? FontWeight.w600 : FontWeight.w500,
+                      color: active
+                          ? ElderColors.tertiary
+                          : ElderColors.onSurfaceVariant,
+                    ),
                   ),
                 ),
               ),
@@ -1022,7 +1022,7 @@ class _MedCard extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             // Left accent border — 4dp primary (always visible on mobile).
-            Container(width: 4, color: ElderColors.primary),
+            Container(width: 4, color: ElderColors.tertiary),
             Expanded(
               child: Container(
                 color: ElderColors.surfaceContainerLow,
@@ -1045,7 +1045,7 @@ class _MedCard extends StatelessWidget {
                           ),
                         ],
                       ),
-                      child: Icon(icon, size: 24, color: ElderColors.primary),
+                      child: Icon(icon, size: 24, color: ElderColors.tertiary),
                     ),
                     const SizedBox(width: ElderSpacing.lg),
                     Expanded(
@@ -1057,7 +1057,7 @@ class _MedCard extends StatelessWidget {
                             style: GoogleFonts.plusJakartaSans(
                               fontSize: 18,
                               fontWeight: FontWeight.bold,
-                              color: ElderColors.primary,
+                              color: ElderColors.tertiary,
                             ),
                           ),
                           Text(
@@ -1206,7 +1206,7 @@ class _NavItem extends StatelessWidget {
                 icon,
                 size: 24,
                 color: active
-                    ? ElderColors.primary
+                    ? ElderColors.tertiary
                     : ElderColors.onSurfaceVariant,
               ),
               const SizedBox(height: 4),
@@ -1217,7 +1217,7 @@ class _NavItem extends StatelessWidget {
                   fontSize: 12,
                   fontWeight: FontWeight.w500,
                   color: active
-                      ? ElderColors.primary
+                      ? ElderColors.tertiary
                       : ElderColors.onSurfaceVariant,
                   letterSpacing: 0.8,
                 ),

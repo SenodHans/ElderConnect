@@ -310,5 +310,5 @@ CREATE POLICY "Users can read own voice messages"
   USING ((SELECT auth.uid()) = sender_id);
 
 CREATE POLICY "Users can insert own voice messages"
-  ON voice_messages INSERT
+  ON voice_messages FOR INSERT
   WITH CHECK ((SELECT auth.uid()) = sender_id);

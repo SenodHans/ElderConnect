@@ -53,7 +53,7 @@ where we left off. Tick checkboxes as each task is confirmed complete.
       Include all RLS policies per CLAUDE.md rules
 - [x] Confirm migration SQL with user before executing — do not apply live
       without explicit approval
-- [ ] Apply migration to live Supabase instance  ← PENDING explicit user approval
+- [x] Apply migration to live Supabase instance  ✅ Applied as 5 chunks: 001a–001d + 002
 - [x] Create .vscode/launch.json with run configuration:
       --dart-define=SUPABASE_URL=<url>
       --dart-define=SUPABASE_ANON_KEY=<key>
@@ -74,7 +74,7 @@ Must be deployed before any elder registration flow can be wired.
         5. Store system_password (encrypted) in users table
         6. Return: { elder_id, email } — never return password to client
       Auth: service role key only — never anon key
-- [ ] Deploy function to Supabase  ← PENDING user runs: supabase functions deploy create-elder-account
+- [x] Deploy function to Supabase  ✅ Deployed via Supabase MCP — ACTIVE
 - [ ] Confirm function is callable from caretaker's authenticated session
 
 ---
@@ -167,21 +167,27 @@ Must be deployed before any elder registration flow can be wired.
 
 ## Step 8 — Edge Functions + MOSAIC (blocks mood detection + alerts)
 
-- [ ] Write supabase/functions/mood-detection-proxy/index.ts
+- [x] Write supabase/functions/mood-detection-proxy/index.ts
       Model: j-hartmann/emotion-english-distilroberta-base
       Trigger: called when elder submits a post (not on voice messages)
       Stores result in mood_logs
       Handle 503 cold start: retry after 20s + return loading state
-- [ ] Write MOSAIC alert computation in Edge Function
-      Four signals: HuggingFace sentiment score, self-report emoji
-      discrepancy delta, social activity count, routine adherence
+      Fire-and-forget call to compute-mood-alert after mood_logs insert
+- [x] Write MOSAIC alert computation in Edge Function
+      supabase/functions/compute-mood-alert/index.ts
+      Four signals: sentiment slope, activity count, routine adherence,
+      score variance (discrepancy_delta proxy)
       Rolling 7-day window, slope threshold → stable/warning/urgent
-      Output written to alert_states table, FCM triggered on escalation
-- [ ] Write supabase/functions/send-medication-reminder/index.ts
-      Cron job: checks medication_logs for pending reminders,
-      sends FCM via Firebase Admin SDK
-- [ ] Create lib/features/mood/services/mood_service.dart
+      Output upserted to alert_states table, FCM fired on escalation
+      New tables: alert_states, fcm_tokens (migration 002_add_alert_states.sql)
+- [x] Write supabase/functions/send-medication-reminder/index.ts
+      Cron job: ±2.5-minute window query on medication_logs (pending),
+      sends FCM to elder device via FCM_SERVER_KEY secret
+      Cron setup instructions in function header comment
+- [x] Create lib/features/mood/services/mood_service.dart
       Dart service layer that calls mood-detection-proxy Edge Function
+      Handles ok / loading / consent_not_given response states
+- [x] Create lib/features/mood/providers/mood_service_provider.dart
 
 ---
 
@@ -194,20 +200,70 @@ Must be deployed before any elder registration flow can be wired.
 
 ---
 
-## Resume Point (updated 2026-04-15)
+## Resume Point (updated 2026-04-20)
 
-Steps 1, 1b, 2, 3, 4 are complete. `flutter analyze` is clean (0 issues).
+Steps 1–8 complete. All Edge Functions deployed. All migrations applied. launch.json configured.
 
-**Step 5 is next: Firebase Setup**
-  1. User runs: `flutterfire configure` in project root (interactive — Claude cannot run this)
-  2. Commit generated lib/firebase_options.dart
-  3. Wire Firebase.initializeApp() in lib/main.dart
+**Flutter code — complete and analyze-clean (0 issues):**
+- [x] PostSubmissionNotifier — inserts post, fires mood analysis fire-and-forget
+- [x] _TextPostComposerSheet — text post compose UI wired to Text button in feed screen
+- [x] FcmTokenService — upserts FCM token to Supabase on signedIn event
+- [x] main.dart — auth state listener calls FcmTokenService.registerToken()
+- [x] app_theme.dart — fixed 18 pre-existing token errors (backgroundWarm/socialBlue etc → current tokens)
+- [x] flutter analyze clean — 0 issues
 
-**Step 6 follows** — social feed provider + wire elder_feed_screen.dart
-**Step 7 follows** — medications provider + wire portal screens
+**Design audit — complete (2026-04-17):**
+- [x] All 21 screens checked against Stitch designs — 20/21 matched
+- [x] Caretaker portal accent colour fixed across 5 screens:
+      ElderColors.primary → ElderColors.tertiary (navy blue per CLAUDE.md + Stitch spec)
+      Files: caretaker_dashboard, elder_management, manage_links,
+             search_link_elder, mood_activity_logs
+
+**Backend deployed — complete (2026-04-17):**
+- [x] Migrations: 001a_extensions_enums_users, 001b_caretaker_links,
+      001c_posts_mood_logs, 001d_medications_voice, 002_add_alert_states
+- [x] Edge Functions: create-elder-account, mood-detection-proxy,
+      compute-mood-alert, send-medication-reminder (all ACTIVE)
+- [x] launch.json: SUPABASE_URL + SUPABASE_ANON_KEY configured
+
+**Completed (2026-04-17):**
+- [x] Apply migration 001_initial_schema.sql ✅ (applied as chunks 001a–001d via Supabase MCP)
+- [x] Apply migration 002_add_alert_states.sql ✅
+- [x] Deploy Edge Functions ✅ (all 4 ACTIVE via Supabase MCP):
+      create-elder-account      → ACTIVE, verify_jwt: true
+      mood-detection-proxy      → ACTIVE, verify_jwt: true
+      compute-mood-alert        → ACTIVE, verify_jwt: false
+      send-medication-reminder  → ACTIVE, verify_jwt: false
+- [x] Configure .vscode/launch.json with real SUPABASE_URL + SUPABASE_ANON_KEY ✅
+- [x] HUGGINGFACE_API_KEY secret set 2026-04-17 ✅
+
+**Pending user actions before device testing:**
+- [ ] Set FCM_SERVER_KEY secret (run in terminal):
+      supabase secrets set FCM_SERVER_KEY=<your-fcm-server-key>
+- [ ] Set up pg_cron for send-medication-reminder (see function header comment)
+- [ ] Verify HUGGINGFACE_API_KEY still active: supabase secrets list
+
+**Device testing — IN PROGRESS (2026-04-20):**
+  Samsung S23 Ultra (R5CWC0CWABR, Android 16 API 36) — authorized and running ✅
+
+  Always run with dart-defines (launch.json only works from VS Code):
+  ```
+  flutter run -d R5CWC0CWABR \
+    --dart-define=SUPABASE_URL=https://etjgxxhvphitvpvxvafl.supabase.co \
+    --dart-define=SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImV0amd4eGh2cGhpdHZwdnh2YWZsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY0NDIxMjQsImV4cCI6MjA5MjAxODEyNH0.MPJo73VNQ7-afhtpsca8kytje4CyQ51IXjZZg2MTPSE
+  ```
+
+  Confirmed working:
+  - [x] Caretaker registration (needed INSERT RLS policy + email confirmation disabled)
+  - [x] Bottom nav wiring on all 4 caretaker screens (was TODO stubs, now context.go())
+
+  Known bugs to fix next session:
+  - [ ] elder_management_screen.dart — _buildElderToggle() overflows right ("Arthur Thompson"/"Eleanor Riggs" pill)
+  - [ ] Second screen overflow (user mentioned 2 screens — second screenshot not yet shared)
+  - NOTE: All fix attempts were reverted. Start fresh — get screenshots of BOTH screens first, then fix all overflows in one pass.
 
 Resume instruction:
-  "Read CLAUDE.md and ACTION.md and continue backend wiring from where we left off"
+  "Read CLAUDE.md and ACTION.md and continue from where we left off"
 
 ---
 

@@ -3,13 +3,14 @@
 /// entries. This is the "Mood" tab (3rd) in the caretaker bottom navigation.
 ///
 /// Colour note: shares the caretaker Tailwind palette (dark-navy primary
-/// #00364c → ElderColors.primary) documented in ACTION.md under
+/// #00364c → ElderColors.tertiary) documented in ACTION.md under
 /// "Caretaker Portal Colour Mappings".
 library;
 
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../../core/constants/elder_colors.dart';
 import '../../../core/constants/elder_spacing.dart';
@@ -167,7 +168,7 @@ class _MoodActivityLogsScreenState
                 const Icon(
                   Icons.medical_services_rounded,
                   size: 24,
-                  color: ElderColors.primary,
+                  color: ElderColors.tertiary,
                 ),
                 const SizedBox(width: ElderSpacing.sm),
                 Text(
@@ -175,7 +176,7 @@ class _MoodActivityLogsScreenState
                   style: GoogleFonts.plusJakartaSans(
                     fontSize: 20,
                     fontWeight: FontWeight.w700,
-                    color: ElderColors.primary,
+                    color: ElderColors.tertiary,
                     letterSpacing: -0.5,
                   ),
                 ),
@@ -237,7 +238,7 @@ class _MoodActivityLogsScreenState
               style: GoogleFonts.plusJakartaSans(
                 fontSize: 28,
                 fontWeight: FontWeight.w700,
-                color: ElderColors.primary,
+                color: ElderColors.tertiary,
                 letterSpacing: -0.5,
                 height: 1.1,
               ),
@@ -307,7 +308,7 @@ class _MoodActivityLogsScreenState
                       style: GoogleFonts.plusJakartaSans(
                         fontSize: 18,
                         fontWeight: FontWeight.w700,
-                        color: ElderColors.primary,
+                        color: ElderColors.tertiary,
                       ),
                     ),
                     Text(
@@ -525,7 +526,7 @@ class _MoodActivityLogsScreenState
               const Icon(
                 Icons.list_alt_rounded,
                 size: 22,
-                color: ElderColors.onPrimaryContainer,
+                color: ElderColors.onTertiaryContainer,
               ),
               const SizedBox(width: ElderSpacing.sm),
               Text(
@@ -533,7 +534,7 @@ class _MoodActivityLogsScreenState
                 style: GoogleFonts.plusJakartaSans(
                   fontSize: 18,
                   fontWeight: FontWeight.w700,
-                  color: ElderColors.primary,
+                  color: ElderColors.tertiary,
                   letterSpacing: -0.3,
                 ),
               ),
@@ -560,7 +561,7 @@ class _MoodActivityLogsScreenState
             label: 'Posts made',
             subtitle: '3 updates shared',
             statusLabel: 'HIGH',
-            statusColor: ElderColors.primary,
+            statusColor: ElderColors.tertiary,
           ),
           const SizedBox(height: ElderSpacing.md),
 
@@ -571,7 +572,7 @@ class _MoodActivityLogsScreenState
             label: 'Games played',
             subtitle: 'Memory Match (15m)',
             statusLabel: 'NORMAL',
-            statusColor: ElderColors.primary,
+            statusColor: ElderColors.tertiary,
           ),
           const SizedBox(height: ElderSpacing.md),
 
@@ -603,7 +604,7 @@ class _MoodActivityLogsScreenState
                 padding: const EdgeInsets.symmetric(vertical: ElderSpacing.sm),
                 decoration: BoxDecoration(
                   border: Border.all(
-                    color: ElderColors.primary.withValues(alpha: 0.10),
+                    color: ElderColors.tertiary.withValues(alpha: 0.10),
                   ),
                   borderRadius: BorderRadius.circular(_kCardRadius),
                 ),
@@ -613,7 +614,7 @@ class _MoodActivityLogsScreenState
                     style: GoogleFonts.plusJakartaSans(
                       fontSize: 16,
                       fontWeight: FontWeight.w700,
-                      color: ElderColors.primary,
+                      color: ElderColors.tertiary,
                       letterSpacing: 1.2,
                     ),
                   ),
@@ -654,7 +655,7 @@ class _MoodActivityLogsScreenState
                 style: GoogleFonts.plusJakartaSans(
                   fontSize: 18,
                   fontWeight: FontWeight.w700,
-                  color: ElderColors.primary,
+                  color: ElderColors.tertiary,
                 ),
               ),
               const Icon(
@@ -744,7 +745,7 @@ class _MoodActivityLogsScreenState
             style: GoogleFonts.plusJakartaSans(
               fontSize: 18,
               fontWeight: FontWeight.w700,
-              color: ElderColors.primary,
+              color: ElderColors.tertiary,
             ),
           ),
           const SizedBox(height: ElderSpacing.md),
@@ -793,7 +794,7 @@ class _MoodActivityLogsScreenState
                 active: _activeTab == _CTab.dashboard,
                 onTap: () {
                   setState(() => _activeTab = _CTab.dashboard);
-                  // TODO: context.go('/home/caretaker') — post backend sprint.
+                  context.go('/home/caretaker');
                 },
               ),
               _NavItem(
@@ -802,7 +803,7 @@ class _MoodActivityLogsScreenState
                 active: _activeTab == _CTab.elder,
                 onTap: () {
                   setState(() => _activeTab = _CTab.elder);
-                  // TODO: context.go('/elders/caretaker') — post backend sprint.
+                  context.go('/elders/caretaker');
                 },
               ),
               _NavItem(
@@ -817,7 +818,7 @@ class _MoodActivityLogsScreenState
                 active: _activeTab == _CTab.links,
                 onTap: () {
                   setState(() => _activeTab = _CTab.links);
-                  // TODO: context.go('/links/caretaker') — post backend sprint.
+                  context.go('/links/caretaker');
                 },
               ),
             ],
@@ -880,7 +881,7 @@ class _FilterPill extends StatelessWidget {
               fontSize: 16,
               fontWeight: FontWeight.w600,
               color: active
-                  ? ElderColors.primary
+                  ? ElderColors.tertiary
                   : ElderColors.onSurfaceVariant,
             ),
           ),
@@ -939,9 +940,9 @@ class _ActivityRow extends StatelessWidget {
   const _ActivityRow({
     required this.icon,
     required this.iconBg,
-    this.iconColor = ElderColors.primary,
+    this.iconColor = ElderColors.tertiary,
     required this.label,
-    this.labelColor = ElderColors.primary,
+    this.labelColor = ElderColors.tertiary,
     required this.subtitle,
     this.subtitleColor = ElderColors.onSurfaceVariant,
     this.subtitleAlpha = 1.0,
@@ -1109,7 +1110,7 @@ class _ProgressBar extends StatelessWidget {
               style: GoogleFonts.plusJakartaSans(
                 fontSize: 16,
                 fontWeight: FontWeight.w700,
-                color: ElderColors.primary,
+                color: ElderColors.tertiary,
               ),
             ),
             Text(
@@ -1134,7 +1135,7 @@ class _ProgressBar extends StatelessWidget {
               child: Container(
                 decoration: const BoxDecoration(
                   gradient: LinearGradient(
-                    colors: [ElderColors.primary, ElderColors.primaryContainer],
+                    colors: [ElderColors.tertiary, ElderColors.tertiaryContainer],
                   ),
                 ),
               ),
@@ -1182,7 +1183,7 @@ class _StatTile extends StatelessWidget {
             style: GoogleFonts.plusJakartaSans(
               fontSize: 20,
               fontWeight: FontWeight.w800,
-              color: ElderColors.primary,
+              color: ElderColors.tertiary,
             ),
           ),
         ],
@@ -1223,7 +1224,7 @@ class _JournalEntry extends StatelessWidget {
                   style: GoogleFonts.plusJakartaSans(
                     fontSize: 16,
                     fontWeight: FontWeight.w700,
-                    color: ElderColors.primary,
+                    color: ElderColors.tertiary,
                   ),
                 ),
               ),
@@ -1312,7 +1313,7 @@ class _NavItem extends StatelessWidget {
                 icon,
                 size: 24,
                 color: active
-                    ? ElderColors.primary
+                    ? ElderColors.tertiary
                     : ElderColors.onSurfaceVariant,
               ),
               const SizedBox(height: ElderSpacing.xs),
@@ -1323,7 +1324,7 @@ class _NavItem extends StatelessWidget {
                   fontSize: 12,
                   fontWeight: FontWeight.w500,
                   color: active
-                      ? ElderColors.primary
+                      ? ElderColors.tertiary
                       : ElderColors.onSurfaceVariant,
                   letterSpacing: 0.8,
                 ),

@@ -5,6 +5,7 @@ import 'package:intl/intl.dart';
 import '../../../core/constants/elder_colors.dart';
 import '../../../core/constants/elder_spacing.dart';
 import '../providers/posts_provider.dart';
+import '../providers/post_submission_provider.dart';
 import '../../medications/providers/medications_provider.dart';
 
 // ── Screen-level constants ────────────────────────────────────────────────────
@@ -159,11 +160,11 @@ class _TopAppBar extends StatelessWidget {
 
 // ── Create Section ────────────────────────────────────────────────────────────
 
-class _CreateSection extends StatelessWidget {
+class _CreateSection extends ConsumerWidget {
   const _CreateSection();
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -184,7 +185,12 @@ class _CreateSection extends StatelessWidget {
                 label: 'Text',
                 circleColor: ElderColors.primaryContainer,
                 iconColor: Colors.white,
-                onTap: () {/* TODO: open text post composer */},
+                onTap: () => showModalBottomSheet<void>(
+                  context: context,
+                  isScrollControlled: true,
+                  backgroundColor: Colors.transparent,
+                  builder: (_) => const _TextPostComposerSheet(),
+                ),
               ),
             ),
             const SizedBox(width: ElderSpacing.md),
@@ -919,6 +925,158 @@ class _NavItem extends StatelessWidget {
               ),
             ],
           ),
+        ),
+      ),
+    );
+  }
+}
+
+// ── Text Post Composer Sheet ──────────────────────────────────────────────────
+
+class _TextPostComposerSheet extends ConsumerStatefulWidget {
+  const _TextPostComposerSheet();
+
+  @override
+  ConsumerState<_TextPostComposerSheet> createState() =>
+      _TextPostComposerSheetState();
+}
+
+class _TextPostComposerSheetState
+    extends ConsumerState<_TextPostComposerSheet> {
+  final _controller = TextEditingController();
+  final _focusNode = FocusNode();
+
+  @override
+  void initState() {
+    super.initState();
+    // Auto-focus so the keyboard opens immediately.
+    WidgetsBinding.instance.addPostFrameCallback((_) => _focusNode.requestFocus());
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    _focusNode.dispose();
+    super.dispose();
+  }
+
+  Future<void> _submit() async {
+    final text = _controller.text.trim();
+    if (text.isEmpty) return;
+    await ref.read(postSubmissionProvider.notifier).submitPost(content: text);
+    if (mounted) Navigator.of(context).pop();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final submitting = ref.watch(postSubmissionProvider).isLoading;
+    final bottomInset = MediaQuery.viewInsetsOf(context).bottom;
+
+    return Container(
+      margin: EdgeInsets.only(bottom: bottomInset),
+      decoration: const BoxDecoration(
+        color: ElderColors.surfaceContainerLowest,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      padding: const EdgeInsets.fromLTRB(
+        ElderSpacing.lg,
+        ElderSpacing.md,
+        ElderSpacing.lg,
+        ElderSpacing.lg,
+      ),
+      child: SafeArea(
+        top: false,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Drag handle
+            Center(
+              child: Container(
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: ElderColors.outline.withValues(alpha: 0.4),
+                  borderRadius: BorderRadius.circular(9999),
+                ),
+              ),
+            ),
+            const SizedBox(height: ElderSpacing.lg),
+            Text(
+              'Share something',
+              style: GoogleFonts.plusJakartaSans(
+                fontSize: 24,
+                fontWeight: FontWeight.w700,
+                color: ElderColors.primary,
+              ),
+            ),
+            const SizedBox(height: ElderSpacing.lg),
+            TextField(
+              controller: _controller,
+              focusNode: _focusNode,
+              maxLines: 5,
+              minLines: 3,
+              style: GoogleFonts.lexend(
+                fontSize: 18,
+                color: ElderColors.onSurface,
+                height: 1.6,
+              ),
+              decoration: InputDecoration(
+                hintText: "What's on your mind?",
+                hintStyle: GoogleFonts.lexend(
+                  fontSize: 18,
+                  color: ElderColors.onSurfaceVariant,
+                ),
+                filled: true,
+                fillColor: ElderColors.surfaceContainerHighest,
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(16),
+                  borderSide: BorderSide.none,
+                ),
+                contentPadding: const EdgeInsets.all(ElderSpacing.lg),
+              ),
+            ),
+            const SizedBox(height: ElderSpacing.lg),
+            SizedBox(
+              width: double.infinity,
+              height: 56,
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  gradient: const LinearGradient(
+                    colors: [ElderColors.primary, ElderColors.primaryContainer],
+                  ),
+                  borderRadius: BorderRadius.circular(24),
+                ),
+                child: Material(
+                  color: Colors.transparent,
+                  borderRadius: BorderRadius.circular(24),
+                  child: InkWell(
+                    borderRadius: BorderRadius.circular(24),
+                    onTap: submitting ? null : _submit,
+                    child: Center(
+                      child: submitting
+                          ? const SizedBox(
+                              width: 24,
+                              height: 24,
+                              child: CircularProgressIndicator(
+                                color: Colors.white,
+                                strokeWidth: 2.5,
+                              ),
+                            )
+                          : Text(
+                              'Post',
+                              style: GoogleFonts.lexend(
+                                fontSize: 20,
+                                fontWeight: FontWeight.w700,
+                                color: Colors.white,
+                              ),
+                            ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ],
         ),
       ),
     );

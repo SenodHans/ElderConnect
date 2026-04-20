@@ -151,7 +151,7 @@ class _SearchLinkElderScreenState
                 const Icon(
                   Icons.medical_services_rounded,
                   size: 24,
-                  color: ElderColors.primary,
+                  color: ElderColors.tertiary,
                 ),
                 const SizedBox(width: ElderSpacing.sm),
                 Text(
@@ -159,7 +159,7 @@ class _SearchLinkElderScreenState
                   style: GoogleFonts.plusJakartaSans(
                     fontSize: 20,
                     fontWeight: FontWeight.w700,
-                    color: ElderColors.primary,
+                    color: ElderColors.tertiary,
                     letterSpacing: -0.5,
                   ),
                 ),
@@ -210,7 +210,7 @@ class _SearchLinkElderScreenState
           style: GoogleFonts.plusJakartaSans(
             fontSize: 36,
             fontWeight: FontWeight.w800,
-            color: ElderColors.primary,
+            color: ElderColors.tertiary,
             height: 1.2,
             letterSpacing: -0.5,
           ),
@@ -413,8 +413,8 @@ class _SearchLinkElderScreenState
                     begin: Alignment.topLeft,
                     end: Alignment.bottomRight,
                     colors: [
-                      ElderColors.primary,
-                      ElderColors.primaryContainer,
+                      ElderColors.tertiary,
+                      ElderColors.tertiaryContainer,
                     ],
                   ),
                   borderRadius: BorderRadius.circular(_kCardRadius),
@@ -427,14 +427,14 @@ class _SearchLinkElderScreenState
                       style: GoogleFonts.plusJakartaSans(
                         fontSize: 18,
                         fontWeight: FontWeight.bold,
-                        color: ElderColors.onPrimary,
+                        color: ElderColors.onTertiary,
                       ),
                     ),
                     const SizedBox(width: ElderSpacing.sm),
                     const Icon(
                       Icons.send_rounded,
                       size: 20,
-                      color: ElderColors.onPrimary,
+                      color: ElderColors.onTertiary,
                     ),
                   ],
                 ),
@@ -456,7 +456,7 @@ class _SearchLinkElderScreenState
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Container(width: 4, color: ElderColors.primary),
+            Container(width: 4, color: ElderColors.tertiary),
             Expanded(
               child: Container(
                 color: ElderColors.surfaceContainerLow,
@@ -469,7 +469,7 @@ class _SearchLinkElderScreenState
                         const Icon(
                           Icons.info_rounded,
                           size: 18,
-                          color: ElderColors.primary,
+                          color: ElderColors.tertiary,
                         ),
                         const SizedBox(width: ElderSpacing.sm),
                         Text(
@@ -477,7 +477,7 @@ class _SearchLinkElderScreenState
                           style: GoogleFonts.plusJakartaSans(
                             fontSize: 16,
                             fontWeight: FontWeight.bold,
-                            color: ElderColors.primary,
+                            color: ElderColors.tertiary,
                           ),
                         ),
                       ],
@@ -524,7 +524,7 @@ class _SearchLinkElderScreenState
                     begin: Alignment.bottomCenter,
                     end: Alignment.topCenter,
                     colors: [
-                      ElderColors.primary.withValues(alpha: 0.80),
+                      ElderColors.tertiary.withValues(alpha: 0.80),
                       Colors.transparent,
                     ],
                   ),
@@ -546,7 +546,7 @@ class _SearchLinkElderScreenState
                       fontSize: 16,
                       fontWeight: FontWeight.bold,
                       // text-primary-fixed → primaryFixed.
-                      color: ElderColors.primaryFixed,
+                      color: ElderColors.tertiaryFixed,
                       letterSpacing: 2.0,
                     ),
                   ),
@@ -556,7 +556,7 @@ class _SearchLinkElderScreenState
                     style: GoogleFonts.plusJakartaSans(
                       fontSize: 16,
                       fontWeight: FontWeight.w500,
-                      color: ElderColors.onPrimary,
+                      color: ElderColors.onTertiary,
                     ),
                   ),
                 ],
@@ -601,11 +601,11 @@ class _SearchLinkElderScreenState
                 // Avatar 1 — tertiary-fixed (#97f3e2 aqua) → primaryFixed.
                 _StackAvatar(
                   left: 0,
-                  bg: ElderColors.primaryFixed,
+                  bg: ElderColors.tertiaryFixed,
                   child: const Icon(
                     Icons.person_rounded,
                     size: 18,
-                    color: ElderColors.onPrimaryFixed,
+                    color: ElderColors.onTertiaryFixed,
                   ),
                 ),
                 // Avatar 2 — secondary-fixed (#cde6f4 light blue) → tertiaryFixed.
@@ -621,13 +621,13 @@ class _SearchLinkElderScreenState
                 // "+2" overflow count — primary-fixed bg.
                 _StackAvatar(
                   left: (_kStackAvatarSize - _kStackAvatarOverlap) * 2,
-                  bg: ElderColors.primaryFixed,
+                  bg: ElderColors.tertiaryFixed,
                   child: Text(
                     '+2',
                     style: GoogleFonts.plusJakartaSans(
                       fontSize: 16,
                       fontWeight: FontWeight.bold,
-                      color: ElderColors.primary,
+                      color: ElderColors.tertiary,
                     ),
                   ),
                 ),
@@ -782,7 +782,7 @@ class _NavItem extends StatelessWidget {
                 icon,
                 size: 24,
                 color: active
-                    ? ElderColors.primary
+                    ? ElderColors.tertiary
                     : ElderColors.onSurfaceVariant,
               ),
               const SizedBox(height: 4),
@@ -793,7 +793,7 @@ class _NavItem extends StatelessWidget {
                   fontSize: 12,
                   fontWeight: FontWeight.w500,
                   color: active
-                      ? ElderColors.primary
+                      ? ElderColors.tertiary
                       : ElderColors.onSurfaceVariant,
                   letterSpacing: 0.8,
                 ),

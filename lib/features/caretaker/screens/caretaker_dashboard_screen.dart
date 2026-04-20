@@ -6,16 +6,17 @@
 /// Batch 3 when those screens are built).
 ///
 /// Colour note: the Stitch caretaker palette uses a dark-navy primary
-/// (#00364c) and blue-grey secondary (#4a626d) that differ from the elder
-/// portal tokens. We map to the nearest ElderColors.* tokens and flag
-/// the divergence — a single token system is intentional for the single-app
-/// dual-portal architecture.
+/// (#00364c). This maps to ElderColors.tertiary (#004B74) — ocean blue.
+/// All caretaker accent colours use tertiary/tertiaryContainer rather than
+/// the elder portal's primary/primaryContainer (teal) to match the Stitch
+/// design and CLAUDE.md caretaker portal accent rule.
 library;
 
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:go_router/go_router.dart';
 import '../../../core/constants/elder_colors.dart';
 import '../../../core/constants/elder_spacing.dart';
 
@@ -150,7 +151,7 @@ class _CaretakerDashboardScreenState
                 const Icon(
                   Icons.medical_services_rounded,
                   size: 24,
-                  color: ElderColors.primary,
+                  color: ElderColors.tertiary,
                 ),
                 const SizedBox(width: ElderSpacing.sm),
                 Text(
@@ -158,7 +159,7 @@ class _CaretakerDashboardScreenState
                   style: GoogleFonts.plusJakartaSans(
                     fontSize: 20,
                     fontWeight: FontWeight.w700,
-                    color: ElderColors.primary,
+                    color: ElderColors.tertiary,
                     letterSpacing: -0.5,
                   ),
                 ),
@@ -244,9 +245,9 @@ class _CaretakerDashboardScreenState
         // Missed Meds — tonal surface, primaryContainer circle.
         _AlertCard(
           bg: ElderColors.surfaceContainerLow,
-          circleColor: ElderColors.primaryContainer,
+          circleColor: ElderColors.tertiaryContainer,
           icon: Icons.medication_rounded,
-          iconColor: ElderColors.onPrimaryContainer,
+          iconColor: ElderColors.onTertiaryContainer,
           name: 'Arthur J.',
           body: 'Missed morning Warfarin dose.',
           timestamp: 'Scheduled 08:00 AM',
@@ -282,7 +283,7 @@ class _CaretakerDashboardScreenState
           style: GoogleFonts.plusJakartaSans(
             fontSize: 24,
             fontWeight: FontWeight.w700,
-            color: ElderColors.primary,
+            color: ElderColors.tertiary,
             letterSpacing: -0.5,
           ),
         ),
@@ -353,7 +354,7 @@ class _CaretakerDashboardScreenState
                 _MedSnapshotCard(
                   timeLabel: '12:30 PM',
                   isOverdue: false,
-                  accentColor: ElderColors.primary,
+                  accentColor: ElderColors.tertiary,
                   icon: Icons.medication_rounded,
                   drugName: 'Metformin 500mg',
                   patientName: 'Margaret Smith',
@@ -428,7 +429,7 @@ class _CaretakerDashboardScreenState
                 active: _activeTab == _CTab.elder,
                 onTap: () {
                   setState(() => _activeTab = _CTab.elder);
-                  // TODO: context.go('/elders/caretaker') — Batch 3.
+                  context.go('/elders/caretaker');
                 },
               ),
               _NavItem(
@@ -437,7 +438,7 @@ class _CaretakerDashboardScreenState
                 active: _activeTab == _CTab.mood,
                 onTap: () {
                   setState(() => _activeTab = _CTab.mood);
-                  // TODO: context.go('/mood-logs/caretaker') — Batch 3.
+                  context.go('/mood-logs/caretaker');
                 },
               ),
               _NavItem(
@@ -446,7 +447,7 @@ class _CaretakerDashboardScreenState
                 active: _activeTab == _CTab.links,
                 onTap: () {
                   setState(() => _activeTab = _CTab.links);
-                  // TODO: context.go('/links/caretaker') — Batch 3.
+                  context.go('/links/caretaker');
                 },
               ),
             ],
@@ -664,7 +665,7 @@ class _ElderCard extends StatelessWidget {
                                   style: GoogleFonts.plusJakartaSans(
                                     fontSize: 18,
                                     fontWeight: FontWeight.bold,
-                                    color: ElderColors.primary,
+                                    color: ElderColors.tertiary,
                                   ),
                                 ),
                                 Text(
@@ -741,8 +742,8 @@ class _ElderCard extends StatelessWidget {
                           begin: Alignment.topLeft,
                           end: Alignment.bottomRight,
                           colors: [
-                            ElderColors.primary,
-                            ElderColors.primaryContainer,
+                            ElderColors.tertiary,
+                            ElderColors.tertiaryContainer,
                           ],
                         ),
                         borderRadius: BorderRadius.circular(_kCardRadius),
@@ -753,7 +754,7 @@ class _ElderCard extends StatelessWidget {
                           const Icon(
                             Icons.visibility_rounded,
                             size: 18,
-                            color: ElderColors.onPrimary,
+                            color: ElderColors.onTertiary,
                           ),
                           const SizedBox(width: ElderSpacing.xs),
                           Text(
@@ -761,7 +762,7 @@ class _ElderCard extends StatelessWidget {
                             style: GoogleFonts.plusJakartaSans(
                               fontSize: 16,
                               fontWeight: FontWeight.w600,
-                              color: ElderColors.onPrimary,
+                              color: ElderColors.onTertiary,
                             ),
                           ),
                         ],
@@ -839,7 +840,7 @@ class _MiniStat extends StatelessWidget {
             style: GoogleFonts.plusJakartaSans(
               fontSize: 16,
               fontWeight: FontWeight.w600,
-              color: ElderColors.primary,
+              color: ElderColors.tertiary,
             ),
           ),
         ],
@@ -926,7 +927,7 @@ class _MedSnapshotCard extends StatelessWidget {
                       style: GoogleFonts.plusJakartaSans(
                         fontSize: 16,
                         fontWeight: FontWeight.bold,
-                        color: isOverdue ? ElderColors.error : ElderColors.primary,
+                        color: isOverdue ? ElderColors.error : ElderColors.tertiary,
                       ),
                     ),
                     const SizedBox(height: 4),
@@ -995,7 +996,7 @@ class _NavItem extends StatelessWidget {
                 icon,
                 size: 24,
                 color: active
-                    ? ElderColors.primary
+                    ? ElderColors.tertiary
                     : ElderColors.onSurfaceVariant,
               ),
               const SizedBox(height: 4),
@@ -1006,7 +1007,7 @@ class _NavItem extends StatelessWidget {
                   fontSize: 12,
                   fontWeight: FontWeight.w500,
                   color: active
-                      ? ElderColors.primary
+                      ? ElderColors.tertiary
                       : ElderColors.onSurfaceVariant,
                   letterSpacing: 0.8,
                 ),

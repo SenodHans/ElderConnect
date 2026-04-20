@@ -16,6 +16,7 @@ library;
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../../core/constants/elder_colors.dart';
 import '../../../core/constants/elder_spacing.dart';
@@ -150,7 +151,7 @@ class _ManageLinksScreenState
                 const Icon(
                   Icons.medical_services_rounded,
                   size: 24,
-                  color: ElderColors.primary,
+                  color: ElderColors.tertiary,
                 ),
                 const SizedBox(width: ElderSpacing.sm),
                 Text(
@@ -158,7 +159,7 @@ class _ManageLinksScreenState
                   style: GoogleFonts.plusJakartaSans(
                     fontSize: 20,
                     fontWeight: FontWeight.w700,
-                    color: ElderColors.primary,
+                    color: ElderColors.tertiary,
                     letterSpacing: -0.5,
                   ),
                 ),
@@ -173,7 +174,7 @@ class _ManageLinksScreenState
                       color: ElderColors.tertiaryFixed,
                       shape: BoxShape.circle,
                       border: Border.all(
-                        color: ElderColors.primaryFixed,
+                        color: ElderColors.tertiaryFixed,
                         width: 2,
                       ),
                     ),
@@ -203,7 +204,7 @@ class _ManageLinksScreenState
             const Icon(
               Icons.verified_user_rounded,
               size: 22,
-              color: ElderColors.primary,
+              color: ElderColors.tertiary,
             ),
             const SizedBox(width: ElderSpacing.sm),
             Text(
@@ -211,7 +212,7 @@ class _ManageLinksScreenState
               style: GoogleFonts.plusJakartaSans(
                 fontSize: 20,
                 fontWeight: FontWeight.bold,
-                color: ElderColors.primary,
+                color: ElderColors.tertiary,
               ),
             ),
             const Spacer(),
@@ -230,7 +231,7 @@ class _ManageLinksScreenState
                 style: GoogleFonts.plusJakartaSans(
                   fontSize: 16,
                   fontWeight: FontWeight.bold,
-                  color: ElderColors.primary,
+                  color: ElderColors.tertiary,
                 ),
               ),
             ),
@@ -242,8 +243,8 @@ class _ManageLinksScreenState
           handle: '@alice_miller_42',
           badgeLabel: 'Primary Care',
           // tertiary-fixed (#97f3e2 aqua) → primaryFixed (#A0F0F0, closest aqua).
-          badgeBg: ElderColors.primaryFixed,
-          badgeFg: ElderColors.onPrimaryFixedVariant,
+          badgeBg: ElderColors.tertiaryFixed,
+          badgeFg: ElderColors.onTertiaryFixedVariant,
           relationship: 'Daughter',
           relationshipIcon: Icons.family_restroom_rounded,
           onView: () {},
@@ -363,25 +364,19 @@ class _ManageLinksScreenState
                 icon: Icons.dashboard_rounded,
                 label: 'Dashboard',
                 active: false,
-                onTap: () {
-                  // TODO: context.go('/home/caretaker') — Batch 3.
-                },
+                onTap: () => context.go('/home/caretaker'),
               ),
               _NavItem(
                 icon: Icons.elderly_rounded,
                 label: 'Elder',
                 active: false,
-                onTap: () {
-                  // TODO: context.go('/elders/caretaker') — Batch 3.
-                },
+                onTap: () => context.go('/elders/caretaker'),
               ),
               _NavItem(
                 icon: Icons.psychology_rounded,
                 label: 'Mood',
                 active: false,
-                onTap: () {
-                  // TODO: context.go('/mood-logs/caretaker') — Batch 3.
-                },
+                onTap: () => context.go('/mood-logs/caretaker'),
               ),
               _NavItem(
                 icon: Icons.link_rounded,
@@ -417,7 +412,7 @@ class _HeroSection extends StatelessWidget {
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
             stops: [0.0, 1.0],
-            colors: [ElderColors.primary, ElderColors.primaryContainer],
+            colors: [ElderColors.tertiary, ElderColors.tertiaryContainer],
           ),
         ),
         child: Stack(
@@ -431,7 +426,7 @@ class _HeroSection extends StatelessWidget {
                 child: Icon(
                   Icons.hub_rounded,
                   size: 160,
-                  color: ElderColors.primaryFixed,
+                  color: ElderColors.tertiaryFixed,
                 ),
               ),
             ),
@@ -445,7 +440,7 @@ class _HeroSection extends StatelessWidget {
                   style: GoogleFonts.plusJakartaSans(
                     fontSize: 36,
                     fontWeight: FontWeight.w800,
-                    color: ElderColors.onPrimary,
+                    color: ElderColors.onTertiary,
                     height: 1.2,
                     letterSpacing: -0.5,
                   ),
@@ -456,7 +451,7 @@ class _HeroSection extends StatelessWidget {
                   'caretaker relationships in a clinical-grade environment.',
                   style: GoogleFonts.plusJakartaSans(
                     fontSize: 16,
-                    color: ElderColors.primaryFixed.withValues(alpha: 0.90),
+                    color: ElderColors.tertiaryFixed.withValues(alpha: 0.90),
                     height: 1.6,
                   ),
                 ),
@@ -477,20 +472,20 @@ class _HeroSection extends StatelessWidget {
                         child: Icon(
                           Icons.search_rounded,
                           size: 22,
-                          color: ElderColors.primaryFixed,
+                          color: ElderColors.tertiaryFixed,
                         ),
                       ),
                       Expanded(
                         child: TextField(
                           style: GoogleFonts.plusJakartaSans(
                             fontSize: 16,
-                            color: ElderColors.onPrimary,
+                            color: ElderColors.onTertiary,
                           ),
                           decoration: InputDecoration(
                             hintText: 'Search by Elder Name or ID...',
                             hintStyle: GoogleFonts.plusJakartaSans(
                               fontSize: 16,
-                              color: ElderColors.primaryFixed
+                              color: ElderColors.tertiaryFixed
                                   .withValues(alpha: 0.60),
                             ),
                             border: InputBorder.none,
@@ -620,7 +615,7 @@ class _ConnectionCard extends StatelessWidget {
                       style: GoogleFonts.plusJakartaSans(
                         fontSize: 18,
                         fontWeight: FontWeight.bold,
-                        color: ElderColors.primary,
+                        color: ElderColors.tertiary,
                       ),
                     ),
                     Container(
@@ -725,7 +720,7 @@ class _ConnectionCard extends StatelessWidget {
                               const Icon(
                                 Icons.visibility_rounded,
                                 size: 16,
-                                color: ElderColors.primary,
+                                color: ElderColors.tertiary,
                               ),
                               const SizedBox(width: ElderSpacing.xs),
                               Text(
@@ -733,7 +728,7 @@ class _ConnectionCard extends StatelessWidget {
                                 style: GoogleFonts.plusJakartaSans(
                                   fontSize: 16,
                                   fontWeight: FontWeight.w600,
-                                  color: ElderColors.primary,
+                                  color: ElderColors.tertiary,
                                 ),
                               ),
                             ],
@@ -842,7 +837,7 @@ class _IncomingRequestCard extends StatelessWidget {
                       style: GoogleFonts.plusJakartaSans(
                         fontSize: 16,
                         fontWeight: FontWeight.bold,
-                        color: ElderColors.primary,
+                        color: ElderColors.tertiary,
                       ),
                     ),
                     Text(
@@ -872,7 +867,7 @@ class _IncomingRequestCard extends StatelessWidget {
                       child: Container(
                         height: 48,
                         decoration: BoxDecoration(
-                          color: ElderColors.primary,
+                          color: ElderColors.tertiary,
                           borderRadius: BorderRadius.circular(_kCardRadius),
                         ),
                         child: Center(
@@ -881,7 +876,7 @@ class _IncomingRequestCard extends StatelessWidget {
                             style: GoogleFonts.plusJakartaSans(
                               fontSize: 16,
                               fontWeight: FontWeight.bold,
-                              color: ElderColors.onPrimary,
+                              color: ElderColors.onTertiary,
                             ),
                           ),
                         ),
@@ -976,7 +971,7 @@ class _OutgoingPendingCard extends StatelessWidget {
                     style: GoogleFonts.plusJakartaSans(
                       fontSize: 16,
                       fontWeight: FontWeight.bold,
-                      color: ElderColors.primary,
+                      color: ElderColors.tertiary,
                     ),
                   ),
                 ),
@@ -991,7 +986,7 @@ class _OutgoingPendingCard extends StatelessWidget {
                       style: GoogleFonts.plusJakartaSans(
                         fontSize: 16,
                         fontWeight: FontWeight.bold,
-                        color: ElderColors.primary,
+                        color: ElderColors.tertiary,
                       ),
                     ),
                     // text-secondary → onSurfaceVariant.
@@ -1115,7 +1110,7 @@ class _PrivacyTipCard extends StatelessWidget {
                     const Icon(
                       Icons.lightbulb_rounded,
                       size: 20,
-                      color: ElderColors.primary,
+                      color: ElderColors.tertiary,
                     ),
                     const SizedBox(width: ElderSpacing.sm),
                     Text(
@@ -1123,7 +1118,7 @@ class _PrivacyTipCard extends StatelessWidget {
                       style: GoogleFonts.plusJakartaSans(
                         fontSize: 16,
                         fontWeight: FontWeight.bold,
-                        color: ElderColors.primary,
+                        color: ElderColors.tertiary,
                       ),
                     ),
                   ],
@@ -1193,7 +1188,7 @@ class _NavItem extends StatelessWidget {
                 icon,
                 size: 24,
                 color: active
-                    ? ElderColors.primary
+                    ? ElderColors.tertiary
                     : ElderColors.onSurfaceVariant,
               ),
               const SizedBox(height: 4),
@@ -1204,7 +1199,7 @@ class _NavItem extends StatelessWidget {
                   fontSize: 12,
                   fontWeight: FontWeight.w500,
                   color: active
-                      ? ElderColors.primary
+                      ? ElderColors.tertiary
                       : ElderColors.onSurfaceVariant,
                   letterSpacing: 0.8,
                 ),

@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'app.dart';
+import 'features/auth/services/fcm_token_service.dart';
 import 'firebase_options.dart';
 
 void main() async {
@@ -26,4 +27,12 @@ void main() async {
       child: ElderConnectApp(),
     ),
   );
+
+  // Register the device FCM token with Supabase on every sign-in event.
+  // Covers caretaker login, elder session restore, and token refresh.
+  Supabase.instance.client.auth.onAuthStateChange.listen((event) {
+    if (event.event == AuthChangeEvent.signedIn) {
+      FcmTokenService.registerToken();
+    }
+  });
 }
