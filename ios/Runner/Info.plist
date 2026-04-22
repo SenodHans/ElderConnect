@@ -46,8 +46,6 @@
 				</dict>
 			</array>
 		</dict>
-	<key>NSMicrophoneUsageDescription</key>
-	<string>ElderConnect needs microphone access to record voice messages for your family.</string>
 	</dict>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
@@ -68,5 +66,7 @@
 		<string>UIInterfaceOrientationLandscapeLeft</string>
 		<string>UIInterfaceOrientationLandscapeRight</string>
 	</array>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>ElderConnect needs microphone access to record voice messages for your family.</string>
 </dict>
 </plist>
