@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../../core/constants/elder_colors.dart';
 import '../../../core/constants/elder_spacing.dart';
+import '../../medications/providers/medications_provider.dart';
+import '../../../shared/widgets/aa_button.dart';
 
 // ── Screen-level constants ────────────────────────────────────────────────────
 /// rounded-[2rem] explicit on game cards → 32dp
@@ -14,105 +17,109 @@ const double _kIconContainerRadius = 16.0;
 const double _kNavTopRadius = 32.0;
 const double _kNavActiveSize = 64.0;
 const double _kNavInactiveSize = 56.0;
-/// 3 degrees in radians — garden meditation image tilt
-const double _kImageRotation = 0.0524;
 
 enum _NavTab { home, feed, games, medication }
 
 /// Elder Games Screen — wellness activities and mind games for elderly users.
 ///
 /// Stitch folder: elder_games_screen.
-/// 4 game cards (Memory Flip, Breathing, Sliding Puzzle, Trivia) + featured spotlight.
+/// 4 game cards (Memory Flip, Breathing, Word Scramble, Trivia) + featured spotlight.
 class ElderGamesScreen extends ConsumerWidget {
   const ElderGamesScreen({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    return Scaffold(
-      backgroundColor: ElderColors.surface,
-      body: Column(
-        children: [
-          const _TopAppBar(),
-          Expanded(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.fromLTRB(
-                ElderSpacing.lg,
-                ElderSpacing.xl,
-                ElderSpacing.lg,
-                ElderSpacing.xl,
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const _HeroSection(),
-                  const SizedBox(height: ElderSpacing.xxl),
-                  // 4 game cards — single column on mobile (aspect-square each)
-                  _GameCard(
-                    icon: Icons.psychology,
-                    iconBgColor: ElderColors.primaryFixed,
-                    iconColor: ElderColors.primary,
-                    badgeLabel: 'Cognitive',
-                    accentColor: ElderColors.primary,
-                    title: 'Memory Card Flip',
-                    description:
-                        'Test your memory and match the hidden pairs of cards.',
-                    ctaLabel: 'Play Now',
-                    onTap: () {/* TODO: navigate to memory card game */},
-                  ),
-                  const SizedBox(height: ElderSpacing.xl),
-                  _GameCard(
-                    icon: Icons.waves,
-                    iconBgColor: ElderColors.tertiaryFixed,
-                    iconColor: ElderColors.tertiary,
-                    badgeLabel: 'Wellness',
-                    accentColor: ElderColors.tertiary,
-                    title: 'Breathing Exercise',
-                    description:
-                        'Find your calm with guided rhythmic breathing patterns.',
-                    ctaLabel: 'Start Session',
-                    onTap: () {/* TODO: navigate to breathing exercise */},
-                  ),
-                  const SizedBox(height: ElderSpacing.xl),
-                  _GameCard(
-                    icon: Icons.extension,
-                    iconBgColor: ElderColors.secondaryFixed,
-                    iconColor: ElderColors.secondary,
-                    badgeLabel: 'Logic',
-                    accentColor: ElderColors.secondary,
-                    title: 'Sliding Puzzle',
-                    description:
-                        'Solve the picture by rearranging the scrambled tiles.',
-                    ctaLabel: 'Solve It',
-                    onTap: () {/* TODO: navigate to sliding puzzle */},
-                  ),
-                  const SizedBox(height: ElderSpacing.xl),
-                  _GameCard(
-                    icon: Icons.quiz,
-                    iconBgColor: ElderColors.errorContainer,
-                    iconColor: ElderColors.error,
-                    badgeLabel: 'Knowledge',
-                    accentColor: ElderColors.error,
-                    title: 'Trivia Quiz',
-                    description:
-                        'Discover fun facts and challenge your daily knowledge.',
-                    ctaLabel: 'Begin Quiz',
-                    onTap: () {/* TODO: navigate to trivia quiz */},
-                  ),
-                  const SizedBox(height: ElderSpacing.xxl),
-                  const _FeaturedSection(),
-                  // Clearance for bottom nav
-                  const SizedBox(height: 120),
-                ],
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, result) {
+        if (!didPop) {
+          context.go('/home/elder');
+        }
+      },
+      child: Scaffold(
+        backgroundColor: ElderColors.surface,
+        body: Column(
+          children: [
+            const _TopAppBar(),
+            Expanded(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.fromLTRB(
+                  ElderSpacing.lg,
+                  ElderSpacing.xl,
+                  ElderSpacing.lg,
+                  ElderSpacing.xl,
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const _HeroSection(),
+                    const SizedBox(height: ElderSpacing.lg),
+                    // Single-column rectangle cards — original style, reduced height
+                    _GameCard(
+                      icon: Icons.psychology,
+                      iconBgColor: ElderColors.primaryFixed,
+                      iconColor: ElderColors.primary,
+                      badgeLabel: 'Cognitive',
+                      accentColor: ElderColors.primary,
+                      title: 'Memory Card Flip',
+                      description: 'Test your memory and match the hidden pairs of cards.',
+                      onTap: () => context.go('/games/memory'),
+                    ),
+                    const SizedBox(height: ElderSpacing.md),
+                    _GameCard(
+                      icon: Icons.waves,
+                      iconBgColor: ElderColors.tertiaryFixed,
+                      iconColor: ElderColors.tertiary,
+                      badgeLabel: 'Wellness',
+                      accentColor: ElderColors.tertiary,
+                      title: 'Breathing Exercise',
+                      description: 'Find your calm with guided rhythmic breathing patterns.',
+                      onTap: () => context.go('/games/breathing'),
+                    ),
+                    const SizedBox(height: ElderSpacing.md),
+                    _GameCard(
+                      icon: Icons.text_fields_rounded,
+                      iconBgColor: ElderColors.secondaryFixed,
+                      iconColor: ElderColors.secondary,
+                      badgeLabel: 'Language',
+                      accentColor: ElderColors.secondary,
+                      title: 'Word Scramble',
+                      description: 'Tap the shuffled letters in the right order to spell the word.',
+                      onTap: () => context.go('/games/scramble'),
+                    ),
+                    const SizedBox(height: ElderSpacing.md),
+                    _GameCard(
+                      icon: Icons.quiz,
+                      iconBgColor: ElderColors.errorContainer,
+                      iconColor: ElderColors.error,
+                      badgeLabel: 'Knowledge',
+                      accentColor: ElderColors.error,
+                      title: 'Trivia Quiz',
+                      description: 'Discover fun facts and challenge your daily knowledge.',
+                      onTap: () => context.go('/games/trivia'),
+                    ),
+                    const SizedBox(height: ElderSpacing.xxl),
+                    const _DailyTipSection(),
+                    // Clearance for bottom nav
+                    const SizedBox(height: 120),
+                  ],
+                ),
               ),
             ),
-          ),
-        ],
-      ),
-      bottomSheet: _BottomNav(
-        activeTab: _NavTab.games,
-        // TODO: drive from provider
-        hasMedication: true,
-        onTabSelected: (_) {/* TODO: navigate via context.go */},
+          ],
+        ),
+        bottomSheet: _BottomNav(
+          activeTab: _NavTab.games,
+          hasMedication: ref.watch(hasMedicationProvider),
+          onTabSelected: (tab) {
+            switch (tab) {
+              case _NavTab.home:       context.go('/home/elder');
+              case _NavTab.feed:       context.go('/feed/elder');
+              case _NavTab.medication: context.go('/medications/elder');
+              case _NavTab.games:      break;
+            }
+          },
+        ),
       ),
     );
   }
@@ -137,46 +144,11 @@ class _TopAppBar extends StatelessWidget {
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Row(
-                children: [
-                  Semantics(
-                    label: 'Open menu',
-                    button: true,
-                    child: Material(
-                      color: Colors.transparent,
-                      shape: const CircleBorder(),
-                      clipBehavior: Clip.antiAlias,
-                      child: InkWell(
-                        onTap: () {/* TODO: open side drawer */},
-                        child: const SizedBox(
-                          width: 48,
-                          height: 48,
-                          child: Icon(
-                            Icons.menu,
-                            color: ElderColors.primary,
-                            size: 24,
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: ElderSpacing.md),
-                  Text(
-                    'ElderConnect',
-                    style: GoogleFonts.plusJakartaSans(
-                      fontSize: 24,
-                      fontWeight: FontWeight.w700,
-                      color: ElderColors.primary,
-                      letterSpacing: -0.5,
-                    ),
-                  ),
-                ],
-              ),
               Semantics(
                 label: 'Your profile photo',
                 button: true,
                 child: GestureDetector(
-                  onTap: () {/* TODO: navigate to elder profile */},
+                  onTap: () => context.go('/profile/elder'),
                   child: Container(
                     width: 48,
                     height: 48,
@@ -198,6 +170,7 @@ class _TopAppBar extends StatelessWidget {
                   ),
                 ),
               ),
+              const AaButton(),
             ],
           ),
         ),
@@ -253,6 +226,143 @@ class _HeroSection extends StatelessWidget {
 
 // ── Game Card ─────────────────────────────────────────────────────────────────
 
+// ── Compact Game Tile (2-column grid) ─────────────────────────────────────────
+
+/// Compact card for the 2-column game grid. Shows icon, badge, and title only.
+/// No description or CTA text — the whole tile is one large tap target.
+class _GameTile extends StatefulWidget {
+  const _GameTile({
+    required this.icon,
+    required this.iconBgColor,
+    required this.iconColor,
+    required this.badgeLabel,
+    required this.accentColor,
+    required this.title,
+    required this.onTap,
+  });
+
+  final IconData icon;
+  final Color iconBgColor;
+  final Color iconColor;
+  final String badgeLabel;
+  final Color accentColor;
+  final String title;
+  final VoidCallback onTap;
+
+  @override
+  State<_GameTile> createState() => _GameTileState();
+}
+
+class _GameTileState extends State<_GameTile> {
+  double _scale = 1.0;
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      label: widget.title.replaceAll('\n', ' '),
+      button: true,
+      child: GestureDetector(
+        onTapDown: (_) => setState(() => _scale = 0.95),
+        onTapUp: (_) {
+          setState(() => _scale = 1.0);
+          widget.onTap();
+        },
+        onTapCancel: () => setState(() => _scale = 1.0),
+        child: AnimatedScale(
+          scale: _scale,
+          duration: const Duration(milliseconds: 180),
+          curve: Curves.easeOut,
+          child: Container(
+            decoration: BoxDecoration(
+              color: ElderColors.surfaceContainerLowest,
+              borderRadius: BorderRadius.circular(24),
+              boxShadow: [
+                BoxShadow(
+                  color: ElderColors.onSurface.withValues(alpha: 0.06),
+                  blurRadius: 12,
+                  offset: const Offset(0, 4),
+                ),
+              ],
+            ),
+            clipBehavior: Clip.antiAlias,
+            child: Stack(
+              children: [
+                // Subtle accent glow in corner
+                Positioned(
+                  right: -24,
+                  bottom: -24,
+                  child: Container(
+                    width: 96,
+                    height: 96,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: widget.accentColor.withValues(alpha: 0.08),
+                    ),
+                  ),
+                ),
+                Padding(
+                  padding: const EdgeInsets.all(ElderSpacing.lg),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // Icon
+                      Container(
+                        width: 52,
+                        height: 52,
+                        decoration: BoxDecoration(
+                          color: widget.iconBgColor,
+                          borderRadius: BorderRadius.circular(14),
+                        ),
+                        child: Icon(widget.icon,
+                            color: widget.iconColor, size: 28),
+                      ),
+                      const Spacer(),
+                      // Title
+                      Text(
+                        widget.title,
+                        style: GoogleFonts.plusJakartaSans(
+                          fontSize: 18,
+                          fontWeight: FontWeight.w700,
+                          color: ElderColors.onSurface,
+                          height: 1.2,
+                        ),
+                      ),
+                      const SizedBox(height: ElderSpacing.xs),
+                      // Badge
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: ElderSpacing.sm,
+                            vertical: 3),
+                        decoration: BoxDecoration(
+                          color: widget.accentColor.withValues(alpha: 0.10),
+                          borderRadius: BorderRadius.circular(999),
+                        ),
+                        child: Text(
+                          widget.badgeLabel.toUpperCase(),
+                          style: GoogleFonts.lexend(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w700,
+                            color: widget.accentColor,
+                            letterSpacing: 0.8,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ── Full-size Game Card (unused by grid, kept for reference) ──────────────────
+
+/// Horizontal rectangle game card — same visual style as original but
+/// landscape-shaped (icon left, text right) so 4 cards fit without excessive scrolling.
 class _GameCard extends StatefulWidget {
   const _GameCard({
     required this.icon,
@@ -262,7 +372,6 @@ class _GameCard extends StatefulWidget {
     required this.accentColor,
     required this.title,
     required this.description,
-    required this.ctaLabel,
     required this.onTap,
   });
 
@@ -273,7 +382,6 @@ class _GameCard extends StatefulWidget {
   final Color accentColor;
   final String title;
   final String description;
-  final String ctaLabel;
   final VoidCallback onTap;
 
   @override
@@ -299,146 +407,113 @@ class _GameCardState extends State<_GameCard> {
           scale: _scale,
           duration: const Duration(milliseconds: 200),
           curve: Curves.easeOut,
-          child: AspectRatio(
-            aspectRatio: 1.0,
-            child: Container(
-              decoration: BoxDecoration(
-                color: ElderColors.surfaceContainerLowest,
-                borderRadius: BorderRadius.circular(_kGameCardRadius),
-                boxShadow: [
-                  BoxShadow(
-                    color: ElderColors.onSurface.withValues(alpha: 0.06),
-                    blurRadius: 20,
-                    offset: const Offset(0, 6),
-                  ),
-                ],
-              ),
-              clipBehavior: Clip.antiAlias,
-              child: Stack(
-                children: [
-                  // Decorative glow circle — bottom-right, clipped at card edge
-                  Positioned(
-                    right: -48,
-                    bottom: -48,
-                    child: Container(
-                      width: 192,
-                      height: 192,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        color: widget.accentColor.withValues(alpha: 0.07),
-                      ),
+          child: Container(
+            constraints: const BoxConstraints(minHeight: 120),
+            decoration: BoxDecoration(
+              color: ElderColors.surfaceContainerLowest,
+              borderRadius: BorderRadius.circular(_kGameCardRadius),
+              boxShadow: [
+                BoxShadow(
+                  color: ElderColors.onSurface.withValues(alpha: 0.06),
+                  blurRadius: 16,
+                  offset: const Offset(0, 4),
+                ),
+              ],
+            ),
+            clipBehavior: Clip.antiAlias,
+            child: Stack(
+              children: [
+                // Decorative glow — right side, matching original style
+                Positioned(
+                  right: -32,
+                  top: -32,
+                  child: Container(
+                    width: 140,
+                    height: 140,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: widget.accentColor.withValues(alpha: 0.07),
                     ),
                   ),
-                  // Card content
-                  Padding(
-                    padding: const EdgeInsets.all(ElderSpacing.xl),
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        // Icon + badge row
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Container(
-                              width: 64,
-                              height: 64,
-                              decoration: BoxDecoration(
-                                color: widget.iconBgColor,
-                                borderRadius:
-                                    BorderRadius.circular(_kIconContainerRadius),
-                              ),
-                              child: Icon(
-                                widget.icon,
-                                color: widget.iconColor,
-                                size: 36,
-                              ),
-                            ),
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: ElderSpacing.md,
-                                vertical: ElderSpacing.sm,
-                              ),
-                              decoration: BoxDecoration(
-                                color: widget.accentColor.withValues(alpha: 0.07),
-                                borderRadius: BorderRadius.circular(999),
-                              ),
-                              child: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Container(
-                                    width: 8,
-                                    height: 8,
-                                    decoration: BoxDecoration(
-                                      shape: BoxShape.circle,
-                                      color: widget.accentColor,
-                                    ),
-                                  ),
-                                  const SizedBox(width: ElderSpacing.sm),
-                                  Text(
-                                    widget.badgeLabel.toUpperCase(),
-                                    // Bumped from text-xs (12sp) to 16sp — font size minimum rule
-                                    style: GoogleFonts.lexend(
-                                      fontSize: 16,
-                                      fontWeight: FontWeight.w700,
-                                      color: widget.accentColor,
-                                      letterSpacing: 1.0,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ],
+                ),
+                // Horizontal layout: icon | text | arrow
+                Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: ElderSpacing.lg,
+                    vertical: ElderSpacing.md,
+                  ),
+                  child: Row(
+                    children: [
+                      // Icon container
+                      Container(
+                        width: 64,
+                        height: 64,
+                        decoration: BoxDecoration(
+                          color: widget.iconBgColor,
+                          borderRadius: BorderRadius.circular(_kIconContainerRadius),
                         ),
-                        // Title, description, CTA
-                        Column(
+                        child: Icon(widget.icon,
+                            color: widget.iconColor, size: 32),
+                      ),
+                      const SizedBox(width: ElderSpacing.lg),
+                      // Title + badge + description
+                      Expanded(
+                        child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            Text(
-                              widget.title,
-                              style: GoogleFonts.plusJakartaSans(
-                                fontSize: 24,
-                                fontWeight: FontWeight.w700,
-                                color: ElderColors.onSurface,
-                              ),
-                            ),
-                            const SizedBox(height: ElderSpacing.sm),
-                            Text(
-                              widget.description,
-                              style: GoogleFonts.lexend(
-                                fontSize: 16,
-                                fontWeight: FontWeight.w400,
-                                color: ElderColors.onSurfaceVariant,
-                                height: 1.4,
-                              ),
-                            ),
-                            const SizedBox(height: ElderSpacing.lg),
                             Row(
                               children: [
-                                Text(
-                                  widget.ctaLabel,
-                                  style: GoogleFonts.lexend(
-                                    fontSize: 16,
-                                    fontWeight: FontWeight.w700,
-                                    color: widget.accentColor,
+                                Expanded(
+                                  child: Text(
+                                    widget.title,
+                                    style: GoogleFonts.plusJakartaSans(
+                                      fontSize: 20,
+                                      fontWeight: FontWeight.w700,
+                                      color: ElderColors.onSurface,
+                                    ),
                                   ),
                                 ),
-                                const SizedBox(width: ElderSpacing.sm),
-                                Icon(
-                                  Icons.arrow_forward,
-                                  color: widget.accentColor,
-                                  size: 20,
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: ElderSpacing.sm, vertical: 3),
+                                  decoration: BoxDecoration(
+                                    color: widget.accentColor.withValues(alpha: 0.10),
+                                    borderRadius: BorderRadius.circular(999),
+                                  ),
+                                  child: Text(
+                                    widget.badgeLabel.toUpperCase(),
+                                    style: GoogleFonts.lexend(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w700,
+                                      color: widget.accentColor,
+                                      letterSpacing: 0.8,
+                                    ),
+                                  ),
                                 ),
                               ],
                             ),
+                            const SizedBox(height: ElderSpacing.xs),
+                            Text(
+                              widget.description,
+                              style: GoogleFonts.lexend(
+                                fontSize: 14,
+                                color: ElderColors.onSurfaceVariant,
+                                height: 1.3,
+                              ),
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                            ),
                           ],
                         ),
-                      ],
-                    ),
+                      ),
+                      const SizedBox(width: ElderSpacing.sm),
+                      Icon(Icons.arrow_forward_ios_rounded,
+                          color: widget.accentColor, size: 18),
+                    ],
                   ),
-                ],
-              ),
+                ),
+              ],
             ),
           ),
         ),
@@ -447,10 +522,83 @@ class _GameCardState extends State<_GameCard> {
   }
 }
 
-// ── Featured Section ──────────────────────────────────────────────────────────
+// ── Daily Tip Section ─────────────────────────────────────────────────────────
 
-class _FeaturedSection extends StatelessWidget {
-  const _FeaturedSection();
+/// One wellness tip per screen open, chosen randomly from a curated pool.
+/// Tips are displayed as a warm card — no backend dependency.
+class _DailyTipSection extends StatefulWidget {
+  const _DailyTipSection();
+
+  @override
+  State<_DailyTipSection> createState() => _DailyTipSectionState();
+}
+
+class _DailyTipSectionState extends State<_DailyTipSection> {
+  static const _tips = [
+    _Tip(
+      icon: Icons.self_improvement,
+      iconBg: ElderColors.tertiaryFixed,
+      iconColor: ElderColors.tertiary,
+      label: 'Mindfulness',
+      body: 'Take 5 slow, deep breaths before any meal to calm your body and settle your mind.',
+    ),
+    _Tip(
+      icon: Icons.wb_sunny_outlined,
+      iconBg: ElderColors.secondaryFixed,
+      iconColor: ElderColors.secondary,
+      label: 'Morning Routine',
+      body: 'Start your day with a glass of water and 5 minutes of gentle stretching to energise your body.',
+    ),
+    _Tip(
+      icon: Icons.directions_walk,
+      iconBg: ElderColors.primaryFixed,
+      iconColor: ElderColors.primary,
+      label: 'Stay Active',
+      body: 'Even a 10-minute walk after lunch improves digestion and lifts your mood.',
+    ),
+    _Tip(
+      icon: Icons.people_outline,
+      iconBg: ElderColors.tertiaryFixed,
+      iconColor: ElderColors.tertiary,
+      label: 'Stay Connected',
+      body: 'Calling a friend or family member today can brighten both your days.',
+    ),
+    _Tip(
+      icon: Icons.nightlight_round,
+      iconBg: ElderColors.primaryFixed,
+      iconColor: ElderColors.primary,
+      label: 'Sleep Well',
+      body: 'Going to bed at the same time each night leads to deeper, more restful sleep.',
+    ),
+    _Tip(
+      icon: Icons.local_florist_outlined,
+      iconBg: ElderColors.secondaryFixed,
+      iconColor: ElderColors.secondary,
+      label: 'Nature Therapy',
+      body: 'Spending a few minutes near plants or outdoors can noticeably lower stress levels.',
+    ),
+    _Tip(
+      icon: Icons.music_note_outlined,
+      iconBg: ElderColors.tertiaryFixed,
+      iconColor: ElderColors.tertiary,
+      label: 'Music & Mood',
+      body: 'Listening to your favourite music for 10 minutes can uplift your spirits and reduce anxiety.',
+    ),
+  ];
+
+  late final _Tip _tip;
+
+  @override
+  void initState() {
+    super.initState();
+    // Pick a tip by day-of-year so it is consistent within a day but
+    // changes daily — no randomness needed, no backend dependency.
+    final dayIndex = DateTime.now()
+        .difference(DateTime(DateTime.now().year))
+        .inDays %
+        _tips.length;
+    _tip = _tips[dayIndex];
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -459,89 +607,78 @@ class _FeaturedSection extends StatelessWidget {
         color: ElderColors.surfaceContainerLow,
         borderRadius: BorderRadius.circular(_kFeaturedRadius),
       ),
-      clipBehavior: Clip.antiAlias,
       padding: const EdgeInsets.all(ElderSpacing.xl),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Text content
+          // Eyebrow label
           Text(
-            'Weekly Spotlight',
+            "TODAY'S WELLNESS TIP",
             style: GoogleFonts.lexend(
-              fontSize: 18,
-              fontWeight: FontWeight.w700,
+              fontSize: 16,
+              fontWeight: FontWeight.w600,
               color: ElderColors.tertiary,
-              letterSpacing: -0.2,
+              letterSpacing: 1.2,
             ),
           ),
-          const SizedBox(height: ElderSpacing.sm),
-          Text(
-            'Garden Meditation',
-            style: GoogleFonts.plusJakartaSans(
-              fontSize: 28,
-              fontWeight: FontWeight.w700,
-              color: ElderColors.onSurface,
-            ),
+          const SizedBox(height: ElderSpacing.lg),
+
+          // Icon + category row
+          Row(
+            children: [
+              Container(
+                width: 56,
+                height: 56,
+                decoration: BoxDecoration(
+                  color: _tip.iconBg,
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                child: Icon(_tip.icon, color: _tip.iconColor, size: 28),
+              ),
+              const SizedBox(width: ElderSpacing.md),
+              Text(
+                _tip.label,
+                style: GoogleFonts.plusJakartaSans(
+                  fontSize: 26,
+                  fontWeight: FontWeight.w700,
+                  color: ElderColors.onSurface,
+                ),
+              ),
+            ],
           ),
-          const SizedBox(height: ElderSpacing.md),
+          const SizedBox(height: ElderSpacing.lg),
+
+          // Tip body
           Text(
-            'A new peaceful journey through nature sounds and gentle visualization exercises.',
+            _tip.body,
             style: GoogleFonts.lexend(
               fontSize: 18,
               fontWeight: FontWeight.w400,
               color: ElderColors.onSurfaceVariant,
-              height: 1.5,
-            ),
-          ),
-          const SizedBox(height: ElderSpacing.xl),
-          Semantics(
-            label: 'Explore Garden Meditation',
-            button: true,
-            child: Material(
-              color: ElderColors.primary,
-              borderRadius: BorderRadius.circular(999),
-              child: InkWell(
-                borderRadius: BorderRadius.circular(999),
-                onTap: () {/* TODO: navigate to garden meditation */},
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: ElderSpacing.xl,
-                    vertical: ElderSpacing.md,
-                  ),
-                  child: Text(
-                    'Explore Now',
-                    style: GoogleFonts.lexend(
-                      fontSize: 18,
-                      fontWeight: FontWeight.w700,
-                      color: ElderColors.onPrimary,
-                    ),
-                  ),
-                ),
-              ),
-            ),
-          ),
-          const SizedBox(height: ElderSpacing.xl),
-          // Garden image — tonal placeholder rotated 3° (CachedNetworkImage deferred)
-          Transform.rotate(
-            angle: _kImageRotation,
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(24),
-              child: Container(
-                width: double.infinity,
-                height: 280,
-                color: ElderColors.surfaceContainerHigh,
-                child: const Icon(
-                  Icons.nature,
-                  color: ElderColors.surfaceContainerHighest,
-                  size: 72,
-                ),
-              ),
+              height: 1.55,
             ),
           ),
         ],
       ),
     );
   }
+}
+
+/// Data record for a single wellness tip.
+class _Tip {
+  const _Tip({
+    required this.icon,
+    required this.iconBg,
+    required this.iconColor,
+    required this.label,
+    required this.body,
+  });
+
+  final IconData icon;
+  final Color iconBg;
+  final Color iconColor;
+  final String label;
+  final String body;
 }
 
 // ── Bottom Navigation Bar ─────────────────────────────────────────────────────
