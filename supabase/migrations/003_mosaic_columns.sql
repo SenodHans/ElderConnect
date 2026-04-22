@@ -25,7 +25,7 @@ COMMENT ON COLUMN mood_logs.composite_score IS
 
 CREATE TABLE IF NOT EXISTS daily_prompt_questions (
   id       SERIAL PRIMARY KEY,
-  question TEXT NOT NULL
+  question TEXT NOT NULL UNIQUE
 );
 
 ALTER TABLE daily_prompt_questions ENABLE ROW LEVEL SECURITY;
@@ -46,4 +46,7 @@ INSERT INTO daily_prompt_questions (question) VALUES
   ('How has your energy been feeling today?'),
   ('What is a happy memory that came to mind recently?'),
   ('Is there anything on your mind you would like to share today?')
-ON CONFLICT DO NOTHING;
+ON CONFLICT (question) DO NOTHING;
+
+-- ── Index: mood_logs user lookup ─────────────────────────────────────────────
+CREATE INDEX IF NOT EXISTS mood_logs_user_id_idx ON mood_logs (user_id);
