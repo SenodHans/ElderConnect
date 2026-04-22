@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'core/theme/app_theme.dart';
+import 'core/providers/font_scale_provider.dart';
 import 'features/auth/screens/splash_screen.dart';
 import 'features/auth/screens/role_selection_screen.dart';
 import 'features/auth/screens/elder_registration_screen.dart';
@@ -23,8 +24,14 @@ import 'features/caretaker/screens/elder_management_screen.dart';
 import 'features/caretaker/screens/manage_links_screen.dart';
 import 'features/caretaker/screens/search_link_elder_screen.dart';
 import 'features/caretaker/screens/mood_activity_logs_screen.dart';
+import 'features/caretaker/screens/caretaker_profile_screen.dart';
 import 'features/wellness/screens/post_game_score_screen.dart';
+import 'features/wellness/screens/memory_card_game_screen.dart';
+import 'features/wellness/screens/breathing_exercise_screen.dart';
+import 'features/wellness/screens/trivia_quiz_screen.dart';
+import 'features/wellness/screens/word_scramble_screen.dart';
 import 'features/auth/screens/elder_login_fallback_screen.dart';
+import 'features/mood/screens/daily_journal_screen.dart';
 
 /// Root application widget.
 /// Role-based routing: elderly → ElderlyShell, caretaker → CaretakerShell
@@ -38,6 +45,18 @@ class ElderConnectApp extends ConsumerWidget {
       debugShowCheckedModeBanner: false,
       theme: AppTheme.light,
       routerConfig: _router,
+      // Applies the elder's chosen text scale across the entire app.
+      builder: (context, child) => Consumer(
+        builder: (context, ref, _) {
+          final scale = ref.watch(fontScaleProvider);
+          return MediaQuery(
+            data: MediaQuery.of(context).copyWith(
+              textScaler: TextScaler.linear(scale),
+            ),
+            child: child!,
+          );
+        },
+      ),
     );
   }
 }
@@ -60,6 +79,7 @@ const _kProtectedPrefixes = [
   '/search/',
   '/mood-logs/',
   '/score/',
+  '/mood/',
 ];
 
 // Routes that are only meaningful when NOT authenticated.
@@ -202,11 +222,37 @@ final GoRouter _router = GoRouter(
     ),
     GoRoute(
       path: '/score/post-game',
-      builder: (context, state) => const PostGameScoreScreen(),
+      builder: (context, state) => PostGameScoreScreen(
+        result: (state.extra as Map<String, dynamic>?) ?? {},
+      ),
+    ),
+    GoRoute(
+      path: '/games/memory',
+      builder: (context, state) => const MemoryCardGameScreen(),
+    ),
+    GoRoute(
+      path: '/games/breathing',
+      builder: (context, state) => const BreathingExerciseScreen(),
+    ),
+    GoRoute(
+      path: '/games/trivia',
+      builder: (context, state) => const TriviaQuizScreen(),
+    ),
+    GoRoute(
+      path: '/games/scramble',
+      builder: (context, state) => const WordScrambleScreen(),
     ),
     GoRoute(
       path: '/login/elder/fallback',
       builder: (context, state) => const ElderLoginFallbackScreen(),
+    ),
+    GoRoute(
+      path: '/mood/journal',
+      builder: (context, state) => const DailyJournalScreen(),
+    ),
+    GoRoute(
+      path: '/profile/caretaker',
+      builder: (context, state) => const CaretakerProfileScreen(),
     ),
   ],
 );
