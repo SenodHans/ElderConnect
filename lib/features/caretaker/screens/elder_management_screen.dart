@@ -170,22 +170,26 @@ class _ElderManagementScreenState
                 // Caretaker avatar — tertiaryFixed tint matches caretaker
                 // secondary-container (#cae4f1 ≈ tertiaryFixed #CCE5FF).
                 Semantics(
+                  button: true,
                   label: 'Caretaker profile',
-                  child: Container(
-                    width: 40,
-                    height: 40,
-                    decoration: BoxDecoration(
-                      color: ElderColors.tertiaryFixed,
-                      shape: BoxShape.circle,
-                      border: Border.all(
-                        color: ElderColors.surfaceContainerLowest,
-                        width: 2,
+                  child: GestureDetector(
+                    onTap: () => context.go('/profile/caretaker'),
+                    child: Container(
+                      width: 40,
+                      height: 40,
+                      decoration: BoxDecoration(
+                        color: ElderColors.tertiaryFixed,
+                        shape: BoxShape.circle,
+                        border: Border.all(
+                          color: ElderColors.surfaceContainerLowest,
+                          width: 2,
+                        ),
                       ),
-                    ),
-                    child: const Icon(
-                      Icons.person_rounded,
-                      size: 22,
-                      color: ElderColors.onTertiaryFixed,
+                      child: const Icon(
+                        Icons.person_rounded,
+                        size: 22,
+                        color: ElderColors.onTertiaryFixed,
+                      ),
                     ),
                   ),
                 ),
@@ -786,7 +790,6 @@ class _ElderToggleTab extends StatelessWidget {
                 : null,
           ),
           child: Row(
-            mainAxisSize: MainAxisSize.min,
             children: [
               // 32×32 avatar circle with initials.
               Container(
