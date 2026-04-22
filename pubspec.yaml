@@ -76,9 +76,18 @@ dependencies:
   # PIN hashing before storage
   bcrypt: ^1.1.3
 
+  # Open article URLs in the system browser (fallback from in-app reader)
+  url_launcher: ^6.3.1
+
+  # Audio recording for voice messages
+  record: ^5.1.2
+
 dev_dependencies:
   flutter_test:
     sdk: flutter
+
+  # Mocking library — no code generation required.
+  mocktail: ^0.3.0
 
   # The "flutter_lints" package below contains a set of recommended lints to
   # encourage good coding practices. The lint set provided by the package is
