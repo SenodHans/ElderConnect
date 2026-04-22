@@ -1,30 +1,25 @@
 // ElderConnect — mood-detection-proxy Edge Function
 //
-// Proxies post text to the HuggingFace Inference API for sentiment analysis.
-// Called by the Flutter client immediately after an elderly user submits a post.
+// Proxies post/journal text to HuggingFace for emotion classification.
+// Handles two sources:
+//   'post'         — called after elder submits a social post (post_id required)
+//   'daily_prompt' — called after elder submits daily journal prompt (no post_id)
 //
-// The HuggingFace API key never leaves the server. The Flutter client sends
-// only post_id + text; this function handles the API call and writes the
-// result to mood_logs.
-//
-// Mood analysis only runs if users.mood_sharing_consent = true.
-// If not, returns { status: "consent_not_given" } — Flutter discards silently.
-//
-// HuggingFace model: j-hartmann/emotion-english-distilroberta-base
-// Cold-start handling: one retry after 20s on 503 → returns { status: "loading" }
-// so Flutter can show a brief "Analysing mood…" state and retry.
+// New in MOSAIC sprint:
+//   - Accepts optional emoji_self_report ('😄'|'🙂'|'😐'|'😔'|'😢')
+//   - Computes discrepancy_flagged when emoji and AI inference disagree
+//   - Writes source, emoji_self_report, discrepancy_flagged to mood_logs
 //
 // Input (JSON body):
-//   { post_id: string, text: string }
+//   { text: string, source: 'post' | 'daily_prompt', post_id?: string, emoji_self_report?: string }
 //
 // Output:
-//   { status: "ok", label: "POSITIVE"|"NEGATIVE"|"NEUTRAL", score: number }
+//   { status: "ok", label: string, score: number, discrepancy_flagged: boolean }
 //   { status: "loading" }
 //   { status: "consent_not_given" }
 //
 // Auth: valid elderly user JWT in Authorization header.
-// Env vars required:
-//   SUPABASE_URL, SUPABASE_ANON_KEY, SUPABASE_SERVICE_ROLE_KEY, HUGGINGFACE_API_KEY
+// Env vars: SUPABASE_URL, SUPABASE_ANON_KEY, SUPABASE_SERVICE_ROLE_KEY, HUGGINGFACE_API_KEY
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
@@ -37,8 +32,8 @@ const corsHeaders = {
 const HF_MODEL = "j-hartmann/emotion-english-distilroberta-base";
 const HF_API_URL = `https://api-inference.huggingface.co/models/${HF_MODEL}`;
 
-// Maps the top HuggingFace emotion label to an ElderConnect mood label.
-// Scores below 0.4 are treated as NEUTRAL (low-confidence default per spec).
+// Maps the highest-scoring HuggingFace emotion to POSITIVE / NEGATIVE / NEUTRAL.
+// Scores below 0.4 default to NEUTRAL (low-confidence).
 function toMoodLabel(hfLabel: string, score: number): string {
   if (score < 0.4) return "NEUTRAL";
   const positive = new Set(["joy", "love", "surprise"]);
@@ -49,8 +44,20 @@ function toMoodLabel(hfLabel: string, score: number): string {
   return "NEUTRAL";
 }
 
-// Calls HuggingFace with one automatic retry on 503 (model cold start).
-// Returns null if still loading after the retry.
+// Discrepancy detection: flagged when the elder's emoji self-report and the
+// HuggingFace inference disagree on positive vs negative valence.
+// Neutral emoji (😐) never triggers a discrepancy.
+function isDiscrepancyFlagged(moodLabel: string, emoji: string | null): boolean {
+  if (!emoji) return false;
+  const positiveEmojis = new Set(["😄", "🙂"]);
+  const negativeEmojis = new Set(["😔", "😢"]);
+  const emojiPositive = positiveEmojis.has(emoji);
+  const emojiNegative = negativeEmojis.has(emoji);
+  return (emojiPositive && moodLabel === "NEGATIVE") ||
+         (emojiNegative && moodLabel === "POSITIVE");
+}
+
+// Calls HuggingFace with one retry on 503 (model cold start).
 async function queryHuggingFace(
   text: string,
   apiKey: string,
@@ -68,7 +75,6 @@ async function queryHuggingFace(
   let res = await call();
 
   if (res.status === 503) {
-    // Model is warming up — wait 20s then retry once.
     await new Promise((r) => setTimeout(r, 20_000));
     res = await call();
     if (res.status === 503) return null;
@@ -76,7 +82,6 @@ async function queryHuggingFace(
 
   if (!res.ok) throw new Error(`HuggingFace error: ${res.status}`);
 
-  // Shape: [[{label, score}, ...]] — return the highest-scoring candidate.
   const json = await res.json() as [[{ label: string; score: number }]];
   const candidates = json[0];
   return candidates.reduce((best, c) => (c.score > best.score ? c : best));
@@ -132,8 +137,9 @@ serve(async (req: Request) => {
       );
     }
 
-    // ── 3. Parse request body ─────────────────────────────────────────────
-    const { post_id, text } = await req.json();
+    // ── 3. Parse and validate request body ───────────────────────────────
+    const body = await req.json();
+    const { text, source = "post", post_id = null, emoji_self_report = null } = body;
 
     if (!text || typeof text !== "string" || text.trim() === "") {
       return new Response(
@@ -141,9 +147,18 @@ serve(async (req: Request) => {
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } },
       );
     }
-    if (!post_id || typeof post_id !== "string") {
+
+    if (!["post", "daily_prompt"].includes(source)) {
       return new Response(
-        JSON.stringify({ error: "post_id is required" }),
+        JSON.stringify({ error: "source must be 'post' or 'daily_prompt'" }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
+    }
+
+    // post_id is required for source='post', optional for 'daily_prompt'
+    if (source === "post" && (!post_id || typeof post_id !== "string")) {
+      return new Response(
+        JSON.stringify({ error: "post_id is required for source='post'" }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } },
       );
     }
@@ -155,7 +170,6 @@ serve(async (req: Request) => {
     );
 
     if (!topEmotion) {
-      // Still loading after retry — Flutter retries after a brief delay.
       return new Response(
         JSON.stringify({ status: "loading" }),
         { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } },
@@ -163,9 +177,9 @@ serve(async (req: Request) => {
     }
 
     const moodLabel = toMoodLabel(topEmotion.label, topEmotion.score);
+    const discrepancyFlagged = isDiscrepancyFlagged(moodLabel, emoji_self_report);
 
     // ── 5. Write to mood_logs ─────────────────────────────────────────────
-    // Uses service role so RLS does not interfere with the server-side write.
     const supabaseAdmin = createClient(
       Deno.env.get("SUPABASE_URL")!,
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
@@ -177,16 +191,17 @@ serve(async (req: Request) => {
         user_id: user.id,
         label: moodLabel,
         score: topEmotion.score,
-        source_post_id: post_id,
+        source_post_id: post_id ?? null,
+        source,
+        emoji_self_report: emoji_self_report ?? null,
+        discrepancy_flagged: discrepancyFlagged,
       });
 
     if (insertError) {
-      // Non-fatal: log the error but don't surface it to the elder — the post
-      // was already submitted. The caretaker simply won't see this log entry.
       console.error("mood_logs insert error:", insertError);
-    } else {
-      // Trigger MOSAIC alert computation in the background.
-      // Fire-and-forget — the elder's post response is not delayed by this call.
+    } else if (source === "post") {
+      // Fire MOSAIC alert recomputation for this elder (fire-and-forget).
+      // Only triggered for posts — the nightly batch handles daily_prompt source.
       fetch(`${Deno.env.get("SUPABASE_URL")}/functions/v1/compute-mood-alert`, {
         method: "POST",
         headers: {
@@ -198,7 +213,12 @@ serve(async (req: Request) => {
     }
 
     return new Response(
-      JSON.stringify({ status: "ok", label: moodLabel, score: topEmotion.score }),
+      JSON.stringify({
+        status: "ok",
+        label: moodLabel,
+        score: topEmotion.score,
+        discrepancy_flagged: discrepancyFlagged,
+      }),
       { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } },
     );
 
