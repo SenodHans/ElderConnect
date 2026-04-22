@@ -43,12 +43,8 @@
 					<string>$(PRODUCT_MODULE_NAME).SceneDelegate</string>
 					<key>UISceneStoryboardFile</key>
 					<string>Main</string>
-	<key>NSMicrophoneUsageDescription</key>
-	<string>ElderConnect needs microphone access to record voice messages for your family.</string>
 				</dict>
 			</array>
-	<key>NSMicrophoneUsageDescription</key>
-	<string>ElderConnect needs microphone access to record voice messages for your family.</string>
 		</dict>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>ElderConnect needs microphone access to record voice messages for your family.</string>
@@ -72,7 +68,5 @@
 		<string>UIInterfaceOrientationLandscapeLeft</string>
 		<string>UIInterfaceOrientationLandscapeRight</string>
 	</array>
-	<key>NSMicrophoneUsageDescription</key>
-	<string>ElderConnect needs microphone access to record voice messages for your family.</string>
 </dict>
 </plist>
