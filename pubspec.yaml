@@ -82,6 +82,9 @@ dependencies:
   # Audio recording for voice messages
   record: ^5.1.2
 
+  # Temporary/app directory access — used by VoiceMessageService
+  path_provider: ^2.1.0
+
 dev_dependencies:
   flutter_test:
     sdk: flutter
