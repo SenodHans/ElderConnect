@@ -1,10 +1,12 @@
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../../core/constants/elder_colors.dart';
 import '../../../core/constants/elder_spacing.dart';
 import '../../auth/providers/user_provider.dart';
+import '../../../shared/widgets/aa_button.dart';
 
 // ── Screen-level constants ────────────────────────────────────────────────────
 /// rounded-xl = 1.5rem in this screen's Tailwind config → 24dp
@@ -13,12 +15,7 @@ const double _kCardRadius = 24.0;
 const double _kAvatarRadius = 48.0;
 /// Edit button overlay: rounded-2xl = 1rem (Tailwind default) = 16dp
 const double _kEditButtonRadius = 16.0;
-/// Profile active nav: rounded-2xl shape (not circle — per Stitch profile screen)
-const double _kNavActiveRadius = 16.0;
-const double _kNavTopRadius = 24.0; // rounded-t-[24px] on profile nav
-const double _kNavInactiveSize = 56.0;
 
-enum _ProfileNavTab { home, feed, games, profile }
 
 /// Elder Profile Screen — user identity, interests, health info, caretakers, settings.
 ///
@@ -32,49 +29,53 @@ class ElderProfileScreen extends ConsumerStatefulWidget {
 }
 
 class _ElderProfileScreenState extends ConsumerState<ElderProfileScreen> {
-  // TODO: drive from Riverpod settings provider
-  bool _largeFontEnabled = true;
+  bool _highContrastEnabled = false;
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: ElderColors.surface,
-      body: Column(
-        children: [
-          const _TopAppBar(),
-          Expanded(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.fromLTRB(
-                ElderSpacing.lg,
-                ElderSpacing.xl,
-                ElderSpacing.lg,
-                ElderSpacing.xl,
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const _IdentitySection(),
-                  const SizedBox(height: ElderSpacing.xxl),
-                  const _InterestsSection(),
-                  const SizedBox(height: ElderSpacing.xxl),
-                  const _HealthSection(),
-                  const SizedBox(height: ElderSpacing.xxl),
-                  const _LinkedCaretakersSection(),
-                  const SizedBox(height: ElderSpacing.xxl),
-                  const _EmergencySection(),
-                  const SizedBox(height: ElderSpacing.xxl),
-                  _AppSettingsSection(
-                    largeFontEnabled: _largeFontEnabled,
-                    onFontToggle: (v) => setState(() => _largeFontEnabled = v),
-                  ),
-                  const SizedBox(height: 120),
-                ],
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, _) {
+        if (!didPop) context.go('/home/elder');
+      },
+      child: Scaffold(
+        backgroundColor: ElderColors.surface,
+        body: Column(
+          children: [
+            const _TopAppBar(),
+            Expanded(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.fromLTRB(
+                  ElderSpacing.lg,
+                  ElderSpacing.xl,
+                  ElderSpacing.lg,
+                  ElderSpacing.xl,
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const _IdentitySection(),
+                    const SizedBox(height: ElderSpacing.xxl),
+                    const _InterestsSection(),
+                    const SizedBox(height: ElderSpacing.xxl),
+                    const _HealthSection(),
+                    const SizedBox(height: ElderSpacing.xxl),
+                    const _LinkedCaretakersSection(),
+                    const SizedBox(height: ElderSpacing.xxl),
+                    const _EmergencySection(),
+                    const SizedBox(height: ElderSpacing.xxl),
+                    _AppSettingsSection(
+                      highContrastEnabled: _highContrastEnabled,
+                      onContrastToggle: (v) => setState(() => _highContrastEnabled = v),
+                    ),
+                    const SizedBox(height: ElderSpacing.xl),
+                  ],
+                ),
               ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
-      bottomSheet: const _BottomNav(activeTab: _ProfileNavTab.profile),
     );
   }
 }
@@ -101,57 +102,28 @@ class _TopAppBar extends StatelessWidget {
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Row(
-                    children: [
-                      // Small profile avatar (top-left on profile screen)
-                      Container(
-                        width: 40,
-                        height: 40,
-                        decoration: const BoxDecoration(
-                          shape: BoxShape.circle,
-                          color: ElderColors.primaryFixed,
-                        ),
-                        child: const ClipOval(
-                          child: Icon(
-                            Icons.person,
-                            color: ElderColors.onPrimaryFixed,
-                            size: 24,
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: ElderSpacing.sm + ElderSpacing.xs),
-                      Text(
-                        'ElderConnect',
-                        style: GoogleFonts.plusJakartaSans(
-                          fontSize: 24,
-                          fontWeight: FontWeight.w700,
-                          color: ElderColors.primary,
-                          letterSpacing: -0.5,
-                        ),
-                      ),
-                    ],
-                  ),
                   Semantics(
-                    label: 'Settings',
+                    label: 'Go back',
                     button: true,
                     child: Material(
-                      color: Colors.transparent,
-                      shape: const CircleBorder(),
-                      clipBehavior: Clip.antiAlias,
+                      color: ElderColors.surfaceContainerLow,
+                      borderRadius: BorderRadius.circular(12),
                       child: InkWell(
-                        onTap: () {/* TODO: navigate to settings */},
+                        borderRadius: BorderRadius.circular(12),
+                        onTap: () => context.go('/home/elder'),
                         child: const SizedBox(
                           width: 48,
                           height: 48,
                           child: Icon(
-                            Icons.settings,
-                            color: ElderColors.onSurfaceVariant,
-                            size: 28,
+                            Icons.arrow_back_rounded,
+                            color: ElderColors.onSurface,
+                            size: 24,
                           ),
                         ),
                       ),
                     ),
                   ),
+                  const AaButton(),
                 ],
               ),
             ),
@@ -297,7 +269,7 @@ class _InterestsSection extends StatelessWidget {
               label: 'Edit interest tiles',
               button: true,
               child: TextButton(
-                onPressed: () {/* TODO: navigate to interest selection */},
+                onPressed: () => context.go('/interest-selection'),
                 style: TextButton.styleFrom(
                   foregroundColor: ElderColors.primary,
                   textStyle: GoogleFonts.lexend(
@@ -790,12 +762,12 @@ class _EmergencyContactRow extends StatelessWidget {
 
 class _AppSettingsSection extends StatelessWidget {
   const _AppSettingsSection({
-    required this.largeFontEnabled,
-    required this.onFontToggle,
+    required this.highContrastEnabled,
+    required this.onContrastToggle,
   });
 
-  final bool largeFontEnabled;
-  final ValueChanged<bool> onFontToggle;
+  final bool highContrastEnabled;
+  final ValueChanged<bool> onContrastToggle;
 
   @override
   Widget build(BuildContext context) {
@@ -825,20 +797,20 @@ class _AppSettingsSection extends StatelessWidget {
           ),
           child: Column(
             children: [
-              // Large Font Size toggle row
+              // High Contrast toggle row
               Padding(
                 padding: const EdgeInsets.all(ElderSpacing.lg),
                 child: Row(
                   children: [
                     const Icon(
-                      Icons.format_size,
+                      Icons.contrast,
                       color: ElderColors.onSurfaceVariant,
                       size: 28,
                     ),
                     const SizedBox(width: ElderSpacing.md),
                     Expanded(
                       child: Text(
-                        'Large Font Size',
+                        'High Contrast',
                         style: GoogleFonts.lexend(
                           fontSize: 20,
                           fontWeight: FontWeight.w600,
@@ -847,11 +819,25 @@ class _AppSettingsSection extends StatelessWidget {
                       ),
                     ),
                     Semantics(
-                      label: 'Large font size toggle',
-                      toggled: largeFontEnabled,
+                      label: 'High contrast toggle',
+                      toggled: highContrastEnabled,
                       child: Switch(
-                        value: largeFontEnabled,
-                        onChanged: onFontToggle,
+                        value: highContrastEnabled,
+                        onChanged: (v) {
+                          onContrastToggle(v);
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text(
+                                v ? 'High contrast enabled' : 'High contrast disabled',
+                                style: GoogleFonts.lexend(fontSize: 16),
+                              ),
+                              behavior: SnackBarBehavior.floating,
+                              shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(12)),
+                            ),
+                          );
+                          // TODO(backend-sprint): persist contrast preference to users table
+                        },
                         activeThumbColor: Colors.white,
                         activeTrackColor: ElderColors.primary,
                         inactiveThumbColor: ElderColors.onSurfaceVariant,
@@ -917,128 +903,6 @@ class _AppSettingsSection extends StatelessWidget {
   }
 }
 
-// ── Bottom Navigation Bar ─────────────────────────────────────────────────────
-// Profile screen uses rounded-rect active tab (rounded-2xl, not circle) — per Stitch design.
-
-class _BottomNav extends StatelessWidget {
-  const _BottomNav({required this.activeTab});
-  final _ProfileNavTab activeTab;
-
-  @override
-  Widget build(BuildContext context) {
-    const tabs = [
-      _NavTabData(tab: _ProfileNavTab.home, icon: Icons.home, label: 'Home'),
-      _NavTabData(tab: _ProfileNavTab.feed, icon: Icons.rss_feed, label: 'Feed'),
-      _NavTabData(tab: _ProfileNavTab.games, icon: Icons.videogame_asset, label: 'Games'),
-      _NavTabData(tab: _ProfileNavTab.profile, icon: Icons.person, label: 'Profile'),
-    ];
-
-    return Container(
-      decoration: BoxDecoration(
-        color: ElderColors.surface,
-        borderRadius: const BorderRadius.vertical(
-          top: Radius.circular(_kNavTopRadius),
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: ElderColors.onSurface.withValues(alpha: 0.05),
-            blurRadius: 20,
-            offset: const Offset(0, -4),
-          ),
-        ],
-      ),
-      child: SafeArea(
-        top: false,
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(
-            ElderSpacing.md,
-            ElderSpacing.sm,
-            ElderSpacing.md,
-            ElderSpacing.md,
-          ),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceAround,
-            children: tabs
-                .map((t) => _NavItem(
-                      data: t,
-                      isActive: t.tab == activeTab,
-                      onTap: () {/* TODO: navigate via context.go */},
-                    ))
-                .toList(),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _NavTabData {
-  const _NavTabData({required this.tab, required this.icon, required this.label});
-  final _ProfileNavTab tab;
-  final IconData icon;
-  final String label;
-}
-
-class _NavItem extends StatelessWidget {
-  const _NavItem({required this.data, required this.isActive, required this.onTap});
-  final _NavTabData data;
-  final bool isActive;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return Semantics(
-      label: isActive ? '${data.label}, selected' : data.label,
-      button: true,
-      child: GestureDetector(
-        onTap: onTap,
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 200),
-          curve: Curves.easeOut,
-          // Active: rounded-rect (rounded-2xl = 16dp) with horizontal padding, per Stitch profile nav
-          // Inactive: unconstrained icon+label column
-          decoration: isActive
-              ? BoxDecoration(
-                  color: ElderColors.primaryContainer,
-                  borderRadius: BorderRadius.circular(_kNavActiveRadius),
-                )
-              : null,
-          padding: isActive
-              ? const EdgeInsets.symmetric(
-                  horizontal: ElderSpacing.lg,
-                  vertical: ElderSpacing.sm,
-                )
-              : const EdgeInsets.symmetric(
-                  horizontal: ElderSpacing.md,
-                  vertical: ElderSpacing.sm,
-                ),
-          constraints: const BoxConstraints(minWidth: _kNavInactiveSize, minHeight: _kNavInactiveSize),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(
-                data.icon,
-                color: isActive ? Colors.white : ElderColors.onSurfaceVariant,
-                size: 24,
-              ),
-              const SizedBox(height: 2),
-              Text(
-                data.label,
-                // 12sp exception: inside constrained nav pill — two-cue rule (icon + label)
-                style: GoogleFonts.lexend(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w500,
-                  color: isActive ? Colors.white : ElderColors.onSurfaceVariant,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
 
 // ── ACCESSIBILITY AUDIT ─────────────────────────────────────────────────────
 // ✅ Tap targets ≥ 48×48 px — edit button 56dp; caretaker action buttons 48dp; settings rows padded
