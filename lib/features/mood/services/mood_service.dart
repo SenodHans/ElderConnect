@@ -69,4 +69,39 @@ class MoodService {
         return const MoodResult(status: MoodStatus.loading);
     }
   }
+
+  /// Sends a daily journal entry for mood analysis.
+  ///
+  /// [emojiSelfReport] is one of 😄 🙂 😐 😔 😢 — discrepancy detection only.
+  Future<MoodResult> analyseJournalEntry({
+    required String text,
+    String? emojiSelfReport,
+  }) async {
+    final response = await _supabase.functions.invoke(
+      'mood-detection-proxy',
+      body: {
+        'source': 'daily_prompt',
+        'text': text,
+        if (emojiSelfReport case final report) 'emoji_self_report': report,
+      },
+    );
+
+    final data = response.data as Map<String, dynamic>;
+    final status = data['status'] as String?;
+
+    switch (status) {
+      case 'ok':
+        return MoodResult(
+          status: MoodStatus.ok,
+          label: data['label'] as String?,
+          score: (data['score'] as num?)?.toDouble(),
+        );
+      case 'loading':
+        return const MoodResult(status: MoodStatus.loading);
+      case 'consent_not_given':
+        return const MoodResult(status: MoodStatus.consentNotGiven);
+      default:
+        return const MoodResult(status: MoodStatus.loading);
+    }
+  }
 }
