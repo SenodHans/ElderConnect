@@ -47,7 +47,7 @@ class VoiceMessageNotifier extends StateNotifier<VoiceMessageState> {
       await _service.sendVoiceMessage(path);
       state = state.copyWith(status: VoiceMessageStatus.sent);
       await Future.delayed(const Duration(seconds: 2));
-      state = const VoiceMessageState();
+      if (mounted) state = const VoiceMessageState();
     } catch (e) {
       state = state.copyWith(
         status: VoiceMessageStatus.error,
@@ -69,6 +69,6 @@ class VoiceMessageNotifier extends StateNotifier<VoiceMessageState> {
 }
 
 final voiceMessageProvider =
-    StateNotifierProvider<VoiceMessageNotifier, VoiceMessageState>(
+    StateNotifierProvider.autoDispose<VoiceMessageNotifier, VoiceMessageState>(
   (_) => VoiceMessageNotifier(),
 );

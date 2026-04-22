@@ -751,7 +751,7 @@ class _ConnectCard extends ConsumerWidget {
                       child: SizedBox(
                         width: double.infinity,
                         child: OutlinedButton.icon(
-                          onPressed: () => _showVoiceRecorder(context, ref),
+                          onPressed: () => _showVoiceRecorder(context),
                           icon: const Icon(Icons.mic, size: 22),
                           label: const Text('Send Voice Message'),
                           style: OutlinedButton.styleFrom(
@@ -782,7 +782,7 @@ class _ConnectCard extends ConsumerWidget {
   }
 }
 
-void _showVoiceRecorder(BuildContext context, WidgetRef ref) {
+void _showVoiceRecorder(BuildContext context) {
   showModalBottomSheet(
     context: context,
     isScrollControlled: true,
