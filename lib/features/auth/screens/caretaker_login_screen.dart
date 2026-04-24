@@ -163,17 +163,29 @@ class _CaretakerLoginScreenState
             controller: _passwordController,
             hint: 'Enter your password',
             obscureText: _obscurePassword,
-            suffixIcon: IconButton(
-              onPressed: () =>
+            // Semantics.onTap places the tap action ON the same node as the
+            // label — required for labeledTapTargetGuideline to pass.
+            suffixIcon: Semantics(
+              label: _obscurePassword ? 'Show password' : 'Hide password',
+              button: true,
+              onTap: () =>
                   setState(() => _obscurePassword = !_obscurePassword),
-              icon: Icon(
-                _obscurePassword
-                    ? Icons.visibility_outlined
-                    : Icons.visibility_off_outlined,
-                color: ElderColors.onSurfaceVariant,
-                size: 22,
+              child: GestureDetector(
+                onTap: () =>
+                    setState(() => _obscurePassword = !_obscurePassword),
+                behavior: HitTestBehavior.opaque,
+                child: SizedBox(
+                  width: 48,
+                  height: 48,
+                  child: Icon(
+                    _obscurePassword
+                        ? Icons.visibility_outlined
+                        : Icons.visibility_off_outlined,
+                    color: ElderColors.onSurfaceVariant,
+                    size: 22,
+                  ),
+                ),
               ),
-              tooltip: _obscurePassword ? 'Show password' : 'Hide password',
             ),
             validator: (v) =>
                 (v == null || v.isEmpty) ? 'Please enter your password' : null,
