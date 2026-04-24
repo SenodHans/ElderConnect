@@ -5,8 +5,11 @@
 ///  - labeledTapTargetGuideline  : all interactive elements have semantic labels
 ///  - textContrastGuideline      : text contrast ratio ≥ WCAG 2.1 AA (4.5:1 / 3:1)
 ///
+/// Requires the test device to have internet access (google_fonts CDN on
+/// first run; subsequent runs use the on-device cache).
+///
 /// Run on a connected device:
-///   flutter test integration_test/accessibility_audit_test.dart -d R5CWC0CWABR \
+///   flutter test integration_test/accessibility_audit_test.dart -d <device_id> \
 ///     --dart-define=SUPABASE_URL=... --dart-define=SUPABASE_ANON_KEY=...
 library;
 
@@ -15,12 +18,11 @@ import 'package:integration_test/integration_test.dart';
 
 import 'package:elder_connect/main.dart' as app;
 
-// Boot timeout — use pump() instead of pumpAndSettle() so that ongoing
-// Supabase realtime subscriptions and periodic timers do not prevent settling.
+// Boot the app using fixed-duration pumps. pumpAndSettle never completes when
+// live Supabase realtime subscriptions or periodic timers are active.
 Future<void> _boot(WidgetTester tester) async {
   app.main();
-  // Give the app 6 seconds of wall-clock time to initialise Supabase and route.
-  for (var i = 0; i < 60; i++) {
+  for (var i = 0; i < 80; i++) {
     await tester.pump(const Duration(milliseconds: 100));
   }
 }
@@ -49,10 +51,12 @@ void main() {
     Future<void> navigateToCaretakerLogin(WidgetTester tester) async {
       await _boot(tester);
       final caretakerCard = find.text('I am a Caretaker');
-      // Skip gracefully when a session is already present on the device.
+      // Skip gracefully when a cached session routes past role-selection.
       if (caretakerCard.evaluate().isEmpty) return;
       await tester.tap(caretakerCard);
-      await tester.pump(const Duration(milliseconds: 500));
+      for (var i = 0; i < 15; i++) {
+        await tester.pump(const Duration(milliseconds: 100));
+      }
     }
 
     testWidgets('Tap targets meet Android minimum', (tester) async {

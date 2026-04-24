@@ -1,7 +1,10 @@
 /// Integration tests — launch and navigation smoke tests.
 ///
+/// Requires the test device to have internet access (google_fonts downloads
+/// PlusJakartaSans, Lexend, and Quicksand from the CDN on first run).
+///
 /// Run on a connected device:
-///   flutter test integration_test/app_test.dart -d R5CWC0CWABR \
+///   flutter test integration_test/app_test.dart -d <device_id> \
 ///     --dart-define=SUPABASE_URL=... --dart-define=SUPABASE_ANON_KEY=...
 library;
 
@@ -11,29 +14,27 @@ import 'package:integration_test/integration_test.dart';
 
 import 'package:elder_connect/main.dart' as app;
 
+// Boot the app using fixed-duration pumps. pumpAndSettle never completes when
+// the app has live Supabase realtime subscriptions or periodic timers.
+Future<void> _boot(WidgetTester tester) async {
+  app.main();
+  for (var i = 0; i < 80; i++) {
+    await tester.pump(const Duration(milliseconds: 100));
+  }
+}
+
 void main() {
   IntegrationTestWidgetsFlutterBinding.ensureInitialized();
 
   group('App smoke tests', () {
-    testWidgets('App launches and shows role-selection or splash screen',
-        (tester) async {
-      app.main();
-      await tester.pumpAndSettle(const Duration(seconds: 5));
-
-      // The app must render at least one screen — either splash (which routes
-      // to role-selection) or role-selection itself (when no session exists).
-      // Either way the MaterialApp scaffold must be present.
+    testWidgets('App launches and shows a screen', (tester) async {
+      await _boot(tester);
       expect(find.byType(MaterialApp), findsOneWidget);
     });
 
     testWidgets('Role selection screen displays both role cards', (tester) async {
-      app.main();
-      // Allow splash → role-selection routing to complete.
-      await tester.pumpAndSettle(const Duration(seconds: 6));
-
-      // If there is no stored session the app should land on role-selection.
-      // Skip gracefully when a session is already present (device has a cached
-      // elder/caretaker session from a prior manual test run).
+      await _boot(tester);
+      // Only verifiable when no cached session exists on the device.
       if (find.text('I am an Elder').evaluate().isNotEmpty) {
         expect(find.text('I am an Elder'), findsOneWidget);
         expect(find.text('I am a Caretaker'), findsOneWidget);
@@ -41,29 +42,25 @@ void main() {
       }
     });
 
-    testWidgets('Caretaker login form validates empty email', (tester) async {
-      app.main();
-      await tester.pumpAndSettle(const Duration(seconds: 6));
-
-      // Navigate to caretaker login only if we are on role-selection.
+    testWidgets('Caretaker login form validates empty fields', (tester) async {
+      await _boot(tester);
       final caretakerCard = find.text('I am a Caretaker');
-      if (caretakerCard.evaluate().isEmpty) return; // session present — skip
+      if (caretakerCard.evaluate().isEmpty) return;
 
       await tester.tap(caretakerCard);
-      await tester.pumpAndSettle();
+      for (var i = 0; i < 15; i++) {
+        await tester.pump(const Duration(milliseconds: 100));
+      }
 
-      // Should now be on caretaker login (may have an intermediate page).
       final loginButton = find.text('Sign In');
       if (loginButton.evaluate().isEmpty) return;
 
-      // Dismiss keyboard then scroll to the button before tapping.
-      await tester.testTextInput.receiveAction(TextInputAction.done);
-      await tester.pumpAndSettle();
       await tester.ensureVisible(loginButton);
       await tester.tap(loginButton, warnIfMissed: false);
-      await tester.pumpAndSettle();
+      for (var i = 0; i < 10; i++) {
+        await tester.pump(const Duration(milliseconds: 100));
+      }
 
-      // At least one validation error must appear.
       expect(
         find.textContaining('email', findRichText: true, skipOffstage: false),
         findsWidgets,
@@ -72,27 +69,30 @@ void main() {
 
     testWidgets('Caretaker login form validates invalid email format',
         (tester) async {
-      app.main();
-      await tester.pumpAndSettle(const Duration(seconds: 6));
-
+      await _boot(tester);
       final caretakerCard = find.text('I am a Caretaker');
       if (caretakerCard.evaluate().isEmpty) return;
 
       await tester.tap(caretakerCard);
-      await tester.pumpAndSettle();
+      for (var i = 0; i < 15; i++) {
+        await tester.pump(const Duration(milliseconds: 100));
+      }
 
       final emailField = find.widgetWithText(TextFormField, 'name@example.com');
       if (emailField.evaluate().isEmpty) return;
 
       await tester.enterText(emailField, 'not-an-email');
-      await tester.testTextInput.receiveAction(TextInputAction.done);
-      await tester.pumpAndSettle();
+      for (var i = 0; i < 5; i++) {
+        await tester.pump(const Duration(milliseconds: 100));
+      }
+
       final signInBtn = find.text('Sign In');
       await tester.ensureVisible(signInBtn);
       await tester.tap(signInBtn, warnIfMissed: false);
-      await tester.pumpAndSettle();
+      for (var i = 0; i < 10; i++) {
+        await tester.pump(const Duration(milliseconds: 100));
+      }
 
-      // Validator should reject the malformed address.
       expect(
         find.textContaining('valid', findRichText: true, skipOffstage: false),
         findsWidgets,
