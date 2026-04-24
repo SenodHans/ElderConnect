@@ -19,6 +19,10 @@ class UserModel {
     this.phone,
     this.dateOfBirth,
     this.pinHash,
+    this.pinPlain,
+    this.avatarUrl,
+    this.emergencyContactName,
+    this.emergencyContactPhone,
   });
 
   final String id;
@@ -44,8 +48,21 @@ class UserModel {
   /// Whether the caretaker is allowed to read this elder's mood logs.
   final bool moodSharingConsent;
 
-  /// bcrypt-hashed 4-digit PIN. Null until set by a caretaker.
+  /// bcrypt-hashed 4-digit PIN. Null until elder creates PIN at registration.
   final String? pinHash;
+
+  /// Plain-text PIN — only readable by a linked caretaker via RLS.
+  /// Stored so caretaker can remind elder of their PIN if forgotten.
+  final String? pinPlain;
+
+  /// Supabase Storage URL for the elder's profile photo.
+  final String? avatarUrl;
+
+  /// Display name of the elder's primary emergency contact.
+  final String? emergencyContactName;
+
+  /// Phone number of the elder's primary emergency contact.
+  final String? emergencyContactPhone;
 
   final DateTime createdAt;
 
@@ -57,6 +74,10 @@ class UserModel {
 
   /// Whether this user is a caretaker portal user.
   bool get isCaretaker => role == 'caretaker';
+
+  /// Whether a primary emergency contact has been set.
+  bool get hasEmergencyContact =>
+      emergencyContactPhone != null && emergencyContactPhone!.isNotEmpty;
 
   factory UserModel.fromJson(Map<String, dynamic> json) {
     return UserModel(
@@ -75,7 +96,35 @@ class UserModel {
       ttsEnabled: json['tts_enabled'] as bool? ?? false,
       moodSharingConsent: json['mood_sharing_consent'] as bool? ?? false,
       pinHash: json['pin_hash'] as String?,
+      pinPlain: json['pin_plain'] as String?,
+      avatarUrl: json['avatar_url'] as String?,
+      emergencyContactName: json['emergency_contact_name'] as String?,
+      emergencyContactPhone: json['emergency_contact_phone'] as String?,
       createdAt: DateTime.parse(json['created_at'] as String),
+    );
+  }
+
+  UserModel copyWith({
+    String? emergencyContactName,
+    String? emergencyContactPhone,
+    String? avatarUrl,
+  }) {
+    return UserModel(
+      id: id,
+      email: email,
+      role: role,
+      fullName: fullName,
+      phone: phone,
+      dateOfBirth: dateOfBirth,
+      interests: interests,
+      ttsEnabled: ttsEnabled,
+      moodSharingConsent: moodSharingConsent,
+      pinHash: pinHash,
+      pinPlain: pinPlain,
+      avatarUrl: avatarUrl ?? this.avatarUrl,
+      emergencyContactName: emergencyContactName ?? this.emergencyContactName,
+      emergencyContactPhone: emergencyContactPhone ?? this.emergencyContactPhone,
+      createdAt: createdAt,
     );
   }
 }

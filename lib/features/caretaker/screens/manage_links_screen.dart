@@ -1,16 +1,13 @@
 /// Manage Links — caretaker portal screen for managing caretaker relationships.
 ///
 /// Shows a gradient hero with a search field, active connection cards (with
-/// avatar, role badge, relationship, and status), incoming link requests, an
-/// outgoing pending request, and a privacy tip card.
+/// avatar, role badge, relationship, and status), outgoing pending requests,
+/// and a privacy tip card.
 ///
-/// Two-column Stitch layout (active links | requests + tips) collapses to a
-/// single scrollable column on mobile — phone-first order:
-/// Hero → Active Connections → Incoming → Outgoing → Privacy Tip.
-///
-/// Hover interactions from the Stitch HTML are replaced with always-visible
-/// action buttons. `border border-outline-variant/10` separators are replaced
-/// with tonal surface shifts per the No-Line Rule.
+/// All data is live from Supabase:
+///   Active connections — linkedEldersProvider (caretaker_links status=accepted)
+///   Pending requests   — caretaker_links where caretaker_id = uid, status=pending
+///   Search results     — users table queried by name or ID on search icon press
 library;
 
 import 'dart:ui';
@@ -18,23 +15,22 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../core/constants/elder_colors.dart';
 import '../../../core/constants/elder_spacing.dart';
+import '../../../shared/models/user_model.dart';
+import '../providers/caretaker_mood_provider.dart';
+import '../widgets/caretaker_avatar.dart';
 
-// Stitch config: rounded-xl = 0.5rem = 8dp.
 const double _kCardRadius = 8.0;
-
-// rounded-2xl default (not overridden) = 16dp — connection cards.
 const double _kConnectionRadius = 16.0;
-
-// w-16 h-16 = 64dp connection card avatars.
 const double _kAvatarSize = 64.0;
-
-// Online status dot: w-4 h-4 = 16dp.
 const double _kDotSize = 16.0;
-
-// w-10 h-10 = 40dp request initials / avatar circles.
 const double _kSmallAvatarSize = 40.0;
+
+const List<String> _kRelationshipOptions = [
+  'Son', 'Daughter', 'Spouse', 'Friend', 'Professional Carer', 'Other',
+];
 
 class ManageLinksScreen extends ConsumerStatefulWidget {
   const ManageLinksScreen({super.key});
@@ -49,6 +45,13 @@ class _ManageLinksScreenState
   late final AnimationController _anim;
   late final List<CurvedAnimation> _anims;
 
+  final _searchController = TextEditingController();
+  final _searchFocus = FocusNode();
+  List<Map<String, dynamic>>? _searchResults;
+  bool _isSearching = false;
+
+  List<Map<String, dynamic>> _pendingLinks = [];
+
   @override
   void initState() {
     super.initState();
@@ -56,7 +59,6 @@ class _ManageLinksScreenState
       duration: const Duration(milliseconds: 300),
       vsync: this,
     )..forward();
-    // [0] top bar, [1] hero, [2] active connections, [3] requests, [4] tips.
     _anims = List.generate(
       5,
       (i) => CurvedAnimation(
@@ -64,13 +66,158 @@ class _ManageLinksScreenState
         curve: Interval(i * 0.08, (i * 0.08) + 0.55, curve: Curves.easeOut),
       ),
     );
+    _loadPendingLinks();
   }
 
   @override
   void dispose() {
     for (final a in _anims) { a.dispose(); }
     _anim.dispose();
+    _searchController.dispose();
+    _searchFocus.dispose();
     super.dispose();
+  }
+
+  Future<void> _loadPendingLinks() async {
+    if (!mounted) return;
+    try {
+      final uid = Supabase.instance.client.auth.currentUser?.id;
+      if (uid == null) return;
+      final rows = await Supabase.instance.client
+          .from('caretaker_links')
+          .select(
+            'id, elderly_user_id, created_at, '
+            'users!elderly_user_id(full_name, phone, avatar_url)',
+          )
+          .eq('caretaker_id', uid)
+          .eq('status', 'pending')
+          .order('created_at', ascending: false);
+      if (mounted) {
+        setState(() => _pendingLinks = List<Map<String, dynamic>>.from(rows));
+      }
+    } catch (_) {
+      // Silently fail — pending section stays empty.
+    }
+  }
+
+  Future<void> _doSearch() async {
+    final q = _searchController.text.trim();
+    if (q.isEmpty) return;
+    _searchFocus.unfocus();
+    setState(() => _isSearching = true);
+    try {
+      final rows = await Supabase.instance.client
+          .from('users')
+          .select('id, full_name, phone, avatar_url')
+          .eq('role', 'elderly')
+          .or('full_name.ilike.%$q%,id.ilike.%$q%')
+          .limit(10);
+      if (mounted) {
+        setState(() => _searchResults = List<Map<String, dynamic>>.from(rows));
+      }
+    } catch (_) {
+      if (mounted) setState(() => _searchResults = []);
+    } finally {
+      if (mounted) setState(() => _isSearching = false);
+    }
+  }
+
+  Future<void> _unlink(UserModel elder) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Text(
+          'Unlink ${elder.fullName}?',
+          style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.bold, fontSize: 18),
+        ),
+        content: Text(
+          'This will remove the caretaker connection. You will lose access to their health data.',
+          style: GoogleFonts.plusJakartaSans(fontSize: 16, color: ElderColors.onSurfaceVariant),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: Text('Cancel', style: GoogleFonts.plusJakartaSans(fontSize: 16)),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: Text('Unlink', style: GoogleFonts.plusJakartaSans(fontSize: 16, color: ElderColors.error)),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+    try {
+      final uid = Supabase.instance.client.auth.currentUser?.id;
+      if (uid == null) return;
+      await Supabase.instance.client
+          .from('caretaker_links')
+          .delete()
+          .eq('caretaker_id', uid)
+          .eq('elderly_user_id', elder.id);
+      ref.invalidate(linkedEldersProvider);
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to unlink: $e')),
+        );
+      }
+    }
+  }
+
+  Future<void> _cancelPending(String linkId) async {
+    try {
+      await Supabase.instance.client
+          .from('caretaker_links')
+          .delete()
+          .eq('id', linkId);
+      _loadPendingLinks();
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to cancel: $e')),
+        );
+      }
+    }
+  }
+
+  Future<void> _sendLinkRequest(Map<String, dynamic> elder) async {
+    final name = elder['full_name'] as String? ?? 'Elder';
+    String? relationship;
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => _RelationshipPickerSheet(
+        elderName: name,
+        onSend: (rel) { relationship = rel; Navigator.pop(ctx); },
+      ),
+    );
+    if (relationship == null || !mounted) return;
+    try {
+      final uid = Supabase.instance.client.auth.currentUser?.id;
+      if (uid == null) return;
+      await Supabase.instance.client.from('caretaker_links').insert({
+        'caretaker_id': uid,
+        'elderly_user_id': elder['id'] as String,
+        'status': 'pending',
+      });
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Link request sent to $name')),
+        );
+        setState(() => _searchResults = null);
+        _searchController.clear();
+        _loadPendingLinks();
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to send request: $e')),
+        );
+      }
+    }
   }
 
   Widget _animated(int i, Widget child) {
@@ -88,6 +235,8 @@ class _ManageLinksScreenState
 
   @override
   Widget build(BuildContext context) {
+    final eldersAsync = ref.watch(linkedEldersProvider);
+
     return Scaffold(
       backgroundColor: ElderColors.background,
       body: Stack(
@@ -104,21 +253,35 @@ class _ManageLinksScreenState
                 ),
                 sliver: SliverList(
                   delegate: SliverChildListDelegate([
-                    // Hero
-                    _animated(1, const _HeroSection()),
+                    // Hero search section
+                    _animated(1, _buildHeroSection()),
                     const SizedBox(height: ElderSpacing.xxl),
 
-                    // Active Connections
-                    _animated(2, _buildActiveConnectionsSection()),
+                    // Search results (shown only after a search)
+                    if (_searchResults != null) ...[
+                      _animated(2, _buildSearchResultsSection()),
+                      const SizedBox(height: ElderSpacing.xxl),
+                    ],
+
+                    // Active connections
+                    _animated(2, eldersAsync.when(
+                      data: (elders) => _buildActiveConnectionsSection(elders),
+                      loading: () => const Center(child: CircularProgressIndicator()),
+                      error: (e, _) => Padding(
+                        padding: const EdgeInsets.all(ElderSpacing.lg),
+                        child: Text(
+                          'Could not load connections.',
+                          style: GoogleFonts.plusJakartaSans(color: ElderColors.onSurfaceVariant),
+                        ),
+                      ),
+                    )),
                     const SizedBox(height: ElderSpacing.xxl),
 
-                    // Incoming Requests
-                    _animated(3, _buildIncomingSection()),
-                    const SizedBox(height: ElderSpacing.xl),
-
-                    // Outgoing Pending
-                    _animated(3, _buildOutgoingSection()),
-                    const SizedBox(height: ElderSpacing.xl),
+                    // Outgoing pending
+                    if (_pendingLinks.isNotEmpty) ...[
+                      _animated(3, _buildOutgoingSection()),
+                      const SizedBox(height: ElderSpacing.xl),
+                    ],
 
                     // Privacy Tip
                     _animated(4, const _PrivacyTipCard()),
@@ -148,15 +311,15 @@ class _ManageLinksScreenState
             padding: const EdgeInsets.symmetric(horizontal: ElderSpacing.lg),
             child: Row(
               children: [
-                const Icon(
-                  Icons.medical_services_rounded,
-                  size: 24,
-                  color: ElderColors.tertiary,
+                Image.asset(
+                  'assets/images/elderconnect_logo.png',
+                  width: 32,
+                  height: 32,
                 ),
                 const SizedBox(width: ElderSpacing.sm),
                 Text(
                   'ElderConnect',
-                  style: GoogleFonts.plusJakartaSans(
+                  style: GoogleFonts.quicksand(
                     fontSize: 20,
                     fontWeight: FontWeight.w700,
                     color: ElderColors.tertiary,
@@ -164,27 +327,7 @@ class _ManageLinksScreenState
                   ),
                 ),
                 const Spacer(),
-                Semantics(
-                  label: 'Caretaker profile',
-                  child: Container(
-                    width: 40,
-                    height: 40,
-                    decoration: BoxDecoration(
-                      // primary-fixed border (#c4e7ff) → primaryFixed token.
-                      color: ElderColors.tertiaryFixed,
-                      shape: BoxShape.circle,
-                      border: Border.all(
-                        color: ElderColors.tertiaryFixed,
-                        width: 2,
-                      ),
-                    ),
-                    child: const Icon(
-                      Icons.person_rounded,
-                      size: 22,
-                      color: ElderColors.onTertiaryFixed,
-                    ),
-                  ),
-                ),
+                const CaretakerAvatar(),
               ],
             ),
           ),
@@ -193,19 +336,217 @@ class _ManageLinksScreenState
     );
   }
 
-  // ── Active Connections ──────────────────────────────────────────────────────
+  // ── Hero + Search ────────────────────────────────────────────────────────────
 
-  Widget _buildActiveConnectionsSection() {
+  Widget _buildHeroSection() {
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(_kCardRadius),
+      child: Container(
+        padding: const EdgeInsets.all(ElderSpacing.xl),
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [ElderColors.tertiary, ElderColors.tertiaryContainer],
+          ),
+        ),
+        child: Stack(
+          children: [
+            Positioned(
+              right: -ElderSpacing.lg,
+              bottom: -ElderSpacing.lg,
+              child: Opacity(
+                opacity: 0.10,
+                child: Icon(Icons.hub_rounded, size: 160, color: ElderColors.tertiaryFixed),
+              ),
+            ),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Network Management',
+                  style: GoogleFonts.plusJakartaSans(
+                    fontSize: 36,
+                    fontWeight: FontWeight.w800,
+                    color: ElderColors.onTertiary,
+                    height: 1.2,
+                    letterSpacing: -0.5,
+                  ),
+                ),
+                const SizedBox(height: ElderSpacing.md),
+                Text(
+                  'Search by name or elder ID, then send a link request to '
+                  'start caring for someone in ElderConnect.',
+                  style: GoogleFonts.plusJakartaSans(
+                    fontSize: 16,
+                    color: ElderColors.tertiaryFixed.withValues(alpha: 0.90),
+                    height: 1.6,
+                  ),
+                ),
+                const SizedBox(height: ElderSpacing.xl),
+
+                // Search bar — fixed borders prevent shape change on focus
+                Container(
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.10),
+                    borderRadius: BorderRadius.circular(_kCardRadius),
+                  ),
+                  child: Row(
+                    children: [
+                      const Padding(
+                        padding: EdgeInsets.symmetric(horizontal: ElderSpacing.md),
+                        child: Icon(
+                          Icons.person_search_rounded,
+                          size: 22,
+                          color: ElderColors.tertiaryFixed,
+                        ),
+                      ),
+                      Expanded(
+                        child: TextField(
+                          controller: _searchController,
+                          focusNode: _searchFocus,
+                          style: GoogleFonts.plusJakartaSans(
+                            fontSize: 16,
+                            color: ElderColors.onTertiary,
+                          ),
+                          onSubmitted: (_) => _doSearch(),
+                          decoration: InputDecoration(
+                            hintText: 'Search by elder name or ID...',
+                            hintStyle: GoogleFonts.plusJakartaSans(
+                              fontSize: 16,
+                              color: ElderColors.onTertiary.withValues(alpha: 0.70),
+                            ),
+                            border: InputBorder.none,
+                            enabledBorder: InputBorder.none,
+                            focusedBorder: InputBorder.none,
+                            contentPadding: const EdgeInsets.symmetric(vertical: ElderSpacing.md),
+                          ),
+                        ),
+                      ),
+                      // Search icon button
+                      Semantics(
+                        button: true,
+                        label: 'Search',
+                        child: GestureDetector(
+                          onTap: _doSearch,
+                          child: Container(
+                            height: 52,
+                            padding: const EdgeInsets.symmetric(horizontal: ElderSpacing.md),
+                            child: _isSearching
+                                ? const SizedBox(
+                                    width: 20,
+                                    height: 20,
+                                    child: CircularProgressIndicator(
+                                      color: ElderColors.tertiaryFixed,
+                                      strokeWidth: 2,
+                                    ),
+                                  )
+                                : const Icon(
+                                    Icons.search_rounded,
+                                    size: 22,
+                                    color: ElderColors.tertiaryFixed,
+                                  ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // ── Search Results ───────────────────────────────────────────────────────────
+
+  Widget _buildSearchResultsSection() {
+    final results = _searchResults!;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         Row(
           children: [
-            const Icon(
-              Icons.verified_user_rounded,
-              size: 22,
-              color: ElderColors.tertiary,
+            const Icon(Icons.search_rounded, size: 20, color: ElderColors.onSurfaceVariant),
+            const SizedBox(width: ElderSpacing.sm),
+            Text(
+              'SEARCH RESULTS',
+              style: GoogleFonts.plusJakartaSans(
+                fontSize: 16,
+                fontWeight: FontWeight.w800,
+                color: ElderColors.onSurfaceVariant,
+                letterSpacing: 1.5,
+              ),
             ),
+            const Spacer(),
+            Semantics(
+              button: true,
+              label: 'Clear search results',
+              child: GestureDetector(
+                onTap: () => setState(() {
+                  _searchResults = null;
+                  _searchController.clear();
+                }),
+                child: const Icon(Icons.close_rounded, size: 20, color: ElderColors.onSurfaceVariant),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: ElderSpacing.md),
+        if (results.isEmpty)
+          Container(
+            padding: const EdgeInsets.all(ElderSpacing.xl),
+            decoration: BoxDecoration(
+              color: ElderColors.surfaceContainerLow,
+              borderRadius: BorderRadius.circular(_kConnectionRadius),
+            ),
+            child: Column(
+              children: [
+                const Icon(Icons.search_off_rounded, size: 40, color: ElderColors.outline),
+                const SizedBox(height: ElderSpacing.md),
+                Text(
+                  'No elders found',
+                  style: GoogleFonts.plusJakartaSans(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: ElderColors.onSurfaceVariant,
+                  ),
+                ),
+                const SizedBox(height: ElderSpacing.sm),
+                Text(
+                  'Try searching by their full name or account ID.',
+                  style: GoogleFonts.plusJakartaSans(
+                    fontSize: 16,
+                    color: ElderColors.onSurfaceVariant,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+              ],
+            ),
+          )
+        else
+          ...results.map((elder) => Padding(
+            padding: const EdgeInsets.only(bottom: ElderSpacing.md),
+            child: _SearchResultCard(
+              elder: elder,
+              onLink: () => _sendLinkRequest(elder),
+            ),
+          )),
+      ],
+    );
+  }
+
+  // ── Active Connections ──────────────────────────────────────────────────────
+
+  Widget _buildActiveConnectionsSection(List<UserModel> elders) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Row(
+          children: [
+            const Icon(Icons.verified_user_rounded, size: 22, color: ElderColors.tertiary),
             const SizedBox(width: ElderSpacing.sm),
             Text(
               'Active Connections',
@@ -216,18 +557,14 @@ class _ManageLinksScreenState
               ),
             ),
             const Spacer(),
-            // "2 TOTAL" count badge.
             Container(
-              padding: const EdgeInsets.symmetric(
-                horizontal: ElderSpacing.sm,
-                vertical: 4,
-              ),
+              padding: const EdgeInsets.symmetric(horizontal: ElderSpacing.sm, vertical: 4),
               decoration: BoxDecoration(
                 color: ElderColors.surfaceContainerHigh,
                 borderRadius: BorderRadius.circular(999),
               ),
               child: Text(
-                '2 TOTAL',
+                '${elders.length} TOTAL',
                 style: GoogleFonts.plusJakartaSans(
                   fontSize: 16,
                   fontWeight: FontWeight.bold,
@@ -238,67 +575,28 @@ class _ManageLinksScreenState
           ],
         ),
         const SizedBox(height: ElderSpacing.md),
-        _ConnectionCard(
-          name: 'Alice Miller',
-          handle: '@alice_miller_42',
-          badgeLabel: 'Primary Care',
-          // tertiary-fixed (#97f3e2 aqua) → primaryFixed (#A0F0F0, closest aqua).
-          badgeBg: ElderColors.tertiaryFixed,
-          badgeFg: ElderColors.onTertiaryFixedVariant,
-          relationship: 'Daughter',
-          relationshipIcon: Icons.family_restroom_rounded,
-          onView: () {},
-          onUnlink: () {},
-        ),
-        const SizedBox(height: ElderSpacing.md),
-        _ConnectionCard(
-          name: 'Robert Bennett',
-          handle: '@robert_b_safe',
-          badgeLabel: 'Auxiliary Care',
-          // secondary-fixed (#cde6f4 light blue) → tertiaryFixed (#CCE5FF, closest).
-          badgeBg: ElderColors.tertiaryFixed,
-          badgeFg: ElderColors.onTertiaryFixed,
-          relationship: 'Nurse',
-          relationshipIcon: Icons.medical_information_rounded,
-          onView: () {},
-          onUnlink: () {},
-        ),
-      ],
-    );
-  }
-
-  // ── Incoming Requests ───────────────────────────────────────────────────────
-
-  Widget _buildIncomingSection() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        Row(
-          children: [
-            const Icon(
-              Icons.inbox_rounded,
-              size: 20,
-              color: ElderColors.onSurfaceVariant,
-            ),
-            const SizedBox(width: ElderSpacing.sm),
-            Text(
-              'INCOMING REQUESTS',
-              style: GoogleFonts.plusJakartaSans(
-                fontSize: 16,
-                fontWeight: FontWeight.w800,
-                color: ElderColors.onSurfaceVariant,
-                letterSpacing: 1.5,
+        if (elders.isEmpty)
+          _EmptyStateCard(
+            icon: Icons.link_off_rounded,
+            message: 'No active connections yet',
+            subtitle: 'Search for an elder above to send a link request.',
+          )
+        else
+          ...elders.asMap().entries.map((entry) {
+            final i = entry.key;
+            final elder = entry.value;
+            return Padding(
+              padding: const EdgeInsets.only(bottom: ElderSpacing.md),
+              child: _ConnectionCard(
+                elder: elder,
+                onView: () {
+                  ref.read(selectedElderIndexProvider.notifier).state = i;
+                  context.go('/elders/caretaker');
+                },
+                onUnlink: () => _unlink(elder),
               ),
-            ),
-          ],
-        ),
-        const SizedBox(height: ElderSpacing.md),
-        _IncomingRequestCard(
-          name: 'Jane Cooper',
-          roleRequest: 'Guardian',
-          onAccept: () {},
-          onDecline: () {},
-        ),
+            );
+          }),
       ],
     );
   }
@@ -311,11 +609,7 @@ class _ManageLinksScreenState
       children: [
         Row(
           children: [
-            const Icon(
-              Icons.outbox_rounded,
-              size: 20,
-              color: ElderColors.onSurfaceVariant,
-            ),
+            const Icon(Icons.outbox_rounded, size: 20, color: ElderColors.onSurfaceVariant),
             const SizedBox(width: ElderSpacing.sm),
             Text(
               'OUTGOING PENDING',
@@ -329,17 +623,40 @@ class _ManageLinksScreenState
           ],
         ),
         const SizedBox(height: ElderSpacing.md),
-        _OutgoingPendingCard(
-          initials: 'SW',
-          name: 'Samuel Wright',
-          timeSent: 'Request sent 2h ago',
-          onCancel: () {},
-        ),
+        ..._pendingLinks.map((link) {
+          final userMap = link['users'] as Map<String, dynamic>?;
+          final name = userMap?['full_name'] as String? ?? 'Elder';
+          final linkId = link['id'] as String;
+          final createdAt = link['created_at'] as String?;
+          final initials = name.isNotEmpty
+              ? name.split(' ').map((w) => w.isNotEmpty ? w[0] : '').take(2).join().toUpperCase()
+              : '?';
+          final timeLabel = _formatTimeAgo(createdAt);
+          return Padding(
+            padding: const EdgeInsets.only(bottom: ElderSpacing.md),
+            child: _OutgoingPendingCard(
+              initials: initials,
+              name: name,
+              timeSent: 'Request sent $timeLabel',
+              onCancel: () => _cancelPending(linkId),
+            ),
+          );
+        }),
       ],
     );
   }
 
-  // ── Bottom Nav — Links active ───────────────────────────────────────────────
+  String _formatTimeAgo(String? isoString) {
+    if (isoString == null) return 'recently';
+    final dt = DateTime.tryParse(isoString);
+    if (dt == null) return 'recently';
+    final diff = DateTime.now().difference(dt);
+    if (diff.inMinutes < 60) return '${diff.inMinutes}m ago';
+    if (diff.inHours < 24) return '${diff.inHours}h ago';
+    return '${diff.inDays}d ago';
+  }
+
+  // ── Bottom Nav ──────────────────────────────────────────────────────────────
 
   Widget _buildBottomNav() {
     return ClipRRect(
@@ -360,30 +677,10 @@ class _ManageLinksScreenState
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceAround,
             children: [
-              _NavItem(
-                icon: Icons.dashboard_rounded,
-                label: 'Dashboard',
-                active: false,
-                onTap: () => context.go('/home/caretaker'),
-              ),
-              _NavItem(
-                icon: Icons.elderly_rounded,
-                label: 'Elder',
-                active: false,
-                onTap: () => context.go('/elders/caretaker'),
-              ),
-              _NavItem(
-                icon: Icons.psychology_rounded,
-                label: 'Mood',
-                active: false,
-                onTap: () => context.go('/mood-logs/caretaker'),
-              ),
-              _NavItem(
-                icon: Icons.link_rounded,
-                label: 'Links',
-                active: true,
-                onTap: () {},
-              ),
+              _NavItem(icon: Icons.dashboard_rounded, label: 'Dashboard', active: false, onTap: () => context.go('/home/caretaker')),
+              _NavItem(icon: Icons.elderly_rounded, label: 'Elder', active: false, onTap: () => context.go('/elders/caretaker')),
+              _NavItem(icon: Icons.psychology_rounded, label: 'Mood', active: false, onTap: () => context.go('/mood-logs/caretaker')),
+              _NavItem(icon: Icons.link_rounded, label: 'Links', active: true, onTap: () {}),
             ],
           ),
         ),
@@ -392,116 +689,152 @@ class _ManageLinksScreenState
   }
 }
 
-// ── _HeroSection ──────────────────────────────────────────────────────────────
+// ── _EmptyStateCard ───────────────────────────────────────────────────────────
 
-/// Full-width gradient hero with title, subtitle, and search field.
-///
-/// Decorative `hub` icon sits at 10% opacity bottom-right — the Stitch design
-/// uses a 200px icon. Replaced with a large Icon widget at 160sp.
-class _HeroSection extends StatelessWidget {
-  const _HeroSection();
+class _EmptyStateCard extends StatelessWidget {
+  const _EmptyStateCard({
+    required this.icon,
+    required this.message,
+    required this.subtitle,
+  });
+
+  final IconData icon;
+  final String message;
+  final String subtitle;
 
   @override
   Widget build(BuildContext context) {
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(_kCardRadius),
-      child: Container(
-        padding: const EdgeInsets.all(ElderSpacing.xl),
-        decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            stops: [0.0, 1.0],
-            colors: [ElderColors.tertiary, ElderColors.tertiaryContainer],
-          ),
-        ),
-        child: Stack(
-          children: [
-            // ── Decorative hub icon ────────────────────────────────────────
-            Positioned(
-              right: -ElderSpacing.lg,
-              bottom: -ElderSpacing.lg,
-              child: Opacity(
-                opacity: 0.10,
-                child: Icon(
-                  Icons.hub_rounded,
-                  size: 160,
-                  color: ElderColors.tertiaryFixed,
-                ),
-              ),
+    return Container(
+      padding: const EdgeInsets.all(ElderSpacing.xl),
+      decoration: BoxDecoration(
+        color: ElderColors.surfaceContainerLow,
+        borderRadius: BorderRadius.circular(_kConnectionRadius),
+      ),
+      child: Column(
+        children: [
+          Icon(icon, size: 40, color: ElderColors.outline),
+          const SizedBox(height: ElderSpacing.md),
+          Text(
+            message,
+            style: GoogleFonts.plusJakartaSans(
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+              color: ElderColors.onSurfaceVariant,
             ),
+          ),
+          const SizedBox(height: ElderSpacing.sm),
+          Text(
+            subtitle,
+            style: GoogleFonts.plusJakartaSans(fontSize: 16, color: ElderColors.onSurfaceVariant),
+            textAlign: TextAlign.center,
+          ),
+        ],
+      ),
+    );
+  }
+}
 
-            // ── Main content ───────────────────────────────────────────────
-            Column(
+// ── _SearchResultCard ─────────────────────────────────────────────────────────
+
+class _SearchResultCard extends StatelessWidget {
+  const _SearchResultCard({required this.elder, required this.onLink});
+
+  final Map<String, dynamic> elder;
+  final VoidCallback onLink;
+
+  @override
+  Widget build(BuildContext context) {
+    final name = elder['full_name'] as String? ?? 'Elder';
+    final phone = elder['phone'] as String? ?? '';
+    final avatarUrl = elder['avatar_url'] as String?;
+    final initials = name.isNotEmpty
+        ? name.split(' ').map((w) => w.isNotEmpty ? w[0] : '').take(2).join().toUpperCase()
+        : '?';
+
+    return Container(
+      padding: const EdgeInsets.all(ElderSpacing.lg),
+      decoration: BoxDecoration(
+        color: ElderColors.surfaceContainerLowest,
+        borderRadius: BorderRadius.circular(_kConnectionRadius),
+        boxShadow: [
+          BoxShadow(
+            color: ElderColors.onSurface.withValues(alpha: 0.06),
+            blurRadius: 15,
+            spreadRadius: -3,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          // Avatar
+          Container(
+            width: _kSmallAvatarSize,
+            height: _kSmallAvatarSize,
+            decoration: BoxDecoration(
+              color: ElderColors.tertiaryFixed,
+              shape: BoxShape.circle,
+              image: avatarUrl != null
+                  ? DecorationImage(image: NetworkImage(avatarUrl), fit: BoxFit.cover)
+                  : null,
+            ),
+            child: avatarUrl == null
+                ? Center(
+                    child: Text(
+                      initials,
+                      style: GoogleFonts.plusJakartaSans(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        color: ElderColors.onTertiaryFixed,
+                      ),
+                    ),
+                  )
+                : null,
+          ),
+          const SizedBox(width: ElderSpacing.md),
+          Expanded(
+            child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'Network Management',
+                  name,
                   style: GoogleFonts.plusJakartaSans(
-                    fontSize: 36,
-                    fontWeight: FontWeight.w800,
-                    color: ElderColors.onTertiary,
-                    height: 1.2,
-                    letterSpacing: -0.5,
+                    fontSize: 17,
+                    fontWeight: FontWeight.bold,
+                    color: ElderColors.tertiary,
                   ),
                 ),
-                const SizedBox(height: ElderSpacing.md),
-                Text(
-                  'Securely link with new elders and manage your active '
-                  'caretaker relationships in a clinical-grade environment.',
-                  style: GoogleFonts.plusJakartaSans(
-                    fontSize: 16,
-                    color: ElderColors.tertiaryFixed.withValues(alpha: 0.90),
-                    height: 1.6,
+                if (phone.isNotEmpty)
+                  Text(
+                    phone,
+                    style: GoogleFonts.plusJakartaSans(fontSize: 16, color: ElderColors.onSurfaceVariant),
                   ),
-                ),
-                const SizedBox(height: ElderSpacing.xl),
-
-                // Search field — bg-white/10 backdrop-blur → white@10% overlay.
-                Container(
-                  decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: 0.10),
-                    borderRadius: BorderRadius.circular(_kCardRadius),
-                  ),
-                  child: Row(
-                    children: [
-                      const Padding(
-                        padding: EdgeInsets.symmetric(
-                          horizontal: ElderSpacing.md,
-                        ),
-                        child: Icon(
-                          Icons.search_rounded,
-                          size: 22,
-                          color: ElderColors.tertiaryFixed,
-                        ),
-                      ),
-                      Expanded(
-                        child: TextField(
-                          style: GoogleFonts.plusJakartaSans(
-                            fontSize: 16,
-                            color: ElderColors.onTertiary,
-                          ),
-                          decoration: InputDecoration(
-                            hintText: 'Search by Elder Name or ID...',
-                            hintStyle: GoogleFonts.plusJakartaSans(
-                              fontSize: 16,
-                              color: ElderColors.tertiaryFixed
-                                  .withValues(alpha: 0.60),
-                            ),
-                            border: InputBorder.none,
-                            contentPadding: const EdgeInsets.symmetric(
-                              vertical: ElderSpacing.md,
-                            ),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
               ],
             ),
-          ],
-        ),
+          ),
+          Semantics(
+            button: true,
+            label: 'Send link request to $name',
+            child: GestureDetector(
+              onTap: onLink,
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: ElderSpacing.md, vertical: ElderSpacing.sm),
+                decoration: BoxDecoration(
+                  color: ElderColors.tertiary,
+                  borderRadius: BorderRadius.circular(_kCardRadius),
+                ),
+                child: Text(
+                  'Link',
+                  style: GoogleFonts.plusJakartaSans(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                    color: ElderColors.onTertiary,
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -509,35 +842,24 @@ class _HeroSection extends StatelessWidget {
 
 // ── _ConnectionCard ───────────────────────────────────────────────────────────
 
-/// Active linked-elder connection card.
-///
-/// Avatar is a tonal placeholder — TODO(backend-sprint): replace with
-/// CachedNetworkImage from Supabase Storage.
+/// Active linked-elder connection card with real UserModel data.
 class _ConnectionCard extends StatelessWidget {
   const _ConnectionCard({
-    required this.name,
-    required this.handle,
-    required this.badgeLabel,
-    required this.badgeBg,
-    required this.badgeFg,
-    required this.relationship,
-    required this.relationshipIcon,
+    required this.elder,
     required this.onView,
     required this.onUnlink,
   });
 
-  final String name;
-  final String handle;
-  final String badgeLabel;
-  final Color badgeBg;
-  final Color badgeFg;
-  final String relationship;
-  final IconData relationshipIcon;
+  final UserModel elder;
   final VoidCallback onView;
   final VoidCallback onUnlink;
 
   @override
   Widget build(BuildContext context) {
+    final initials = elder.fullName.isNotEmpty
+        ? elder.fullName.split(' ').map((w) => w.isNotEmpty ? w[0] : '').take(2).join().toUpperCase()
+        : '?';
+
     return Container(
       padding: const EdgeInsets.all(ElderSpacing.lg),
       decoration: BoxDecoration(
@@ -555,28 +877,41 @@ class _ConnectionCard extends StatelessWidget {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // ── Avatar + online status dot ──────────────────────────────────
+          // Avatar
           SizedBox(
             width: _kAvatarSize,
             height: _kAvatarSize,
             child: Stack(
               clipBehavior: Clip.none,
               children: [
-                // TODO(backend-sprint): replace with CachedNetworkImage.
                 Container(
+                  key: ValueKey(elder.avatarUrl),
                   width: _kAvatarSize,
                   height: _kAvatarSize,
                   decoration: BoxDecoration(
                     color: ElderColors.tertiaryFixed,
                     shape: BoxShape.circle,
+                    image: elder.avatarUrl != null
+                        ? DecorationImage(
+                            image: NetworkImage(elder.avatarUrl!),
+                            fit: BoxFit.cover,
+                          )
+                        : null,
                   ),
-                  child: const Icon(
-                    Icons.person_rounded,
-                    size: 32,
-                    color: ElderColors.onTertiaryFixed,
-                  ),
+                  child: elder.avatarUrl == null
+                      ? Center(
+                          child: Text(
+                            initials,
+                            style: GoogleFonts.plusJakartaSans(
+                              fontSize: 20,
+                              fontWeight: FontWeight.bold,
+                              color: ElderColors.onTertiaryFixed,
+                            ),
+                          ),
+                        )
+                      : null,
                 ),
-                // Online dot — bottom-right, white border.
+                // Active status dot
                 Positioned(
                   bottom: 0,
                   right: 0,
@@ -584,13 +919,9 @@ class _ConnectionCard extends StatelessWidget {
                     width: _kDotSize,
                     height: _kDotSize,
                     decoration: BoxDecoration(
-                      // bg-tertiary (#003932 dark green) → ElderColors.tertiary.
                       color: ElderColors.tertiary,
                       shape: BoxShape.circle,
-                      border: Border.all(
-                        color: ElderColors.surfaceContainerLowest,
-                        width: 2,
-                      ),
+                      border: Border.all(color: ElderColors.surfaceContainerLowest, width: 2),
                     ),
                   ),
                 ),
@@ -600,18 +931,17 @@ class _ConnectionCard extends StatelessWidget {
 
           const SizedBox(width: ElderSpacing.lg),
 
-          // ── Content ─────────────────────────────────────────────────────
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Name + role badge.
+                // Name + active badge
                 Wrap(
                   crossAxisAlignment: WrapCrossAlignment.center,
                   spacing: ElderSpacing.sm,
                   children: [
                     Text(
-                      name,
+                      elder.fullName,
                       style: GoogleFonts.plusJakartaSans(
                         fontSize: 18,
                         fontWeight: FontWeight.bold,
@@ -619,20 +949,17 @@ class _ConnectionCard extends StatelessWidget {
                       ),
                     ),
                     Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: ElderSpacing.sm,
-                        vertical: 2,
-                      ),
+                      padding: const EdgeInsets.symmetric(horizontal: ElderSpacing.sm, vertical: 2),
                       decoration: BoxDecoration(
-                        color: badgeBg,
+                        color: ElderColors.tertiaryFixed,
                         borderRadius: BorderRadius.circular(999),
                       ),
                       child: Text(
-                        badgeLabel.toUpperCase(),
+                        'LINKED',
                         style: GoogleFonts.plusJakartaSans(
                           fontSize: 16,
                           fontWeight: FontWeight.bold,
-                          color: badgeFg,
+                          color: ElderColors.onTertiaryFixedVariant,
                           letterSpacing: 0.8,
                         ),
                       ),
@@ -640,76 +967,37 @@ class _ConnectionCard extends StatelessWidget {
                   ],
                 ),
                 const SizedBox(height: 4),
-                // Handle
-                Text(
-                  handle,
-                  style: GoogleFonts.plusJakartaSans(
-                    fontSize: 16,
-                    color: ElderColors.onSurfaceVariant,
+                if (elder.phone != null && elder.phone!.isNotEmpty)
+                  Text(
+                    elder.phone!,
+                    style: GoogleFonts.plusJakartaSans(fontSize: 16, color: ElderColors.onSurfaceVariant),
                   ),
-                ),
                 const SizedBox(height: ElderSpacing.sm),
-                // Relationship + active status tags.
-                Wrap(
-                  spacing: ElderSpacing.lg,
+                Row(
+                  mainAxisSize: MainAxisSize.min,
                   children: [
-                    Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(
-                          relationshipIcon,
-                          size: 16,
-                          // text-secondary → onSurfaceVariant.
-                          color: ElderColors.onSurfaceVariant,
-                        ),
-                        const SizedBox(width: 4),
-                        Text(
-                          relationship,
-                          style: GoogleFonts.plusJakartaSans(
-                            fontSize: 16,
-                            color: ElderColors.onSurfaceVariant,
-                          ),
-                        ),
-                      ],
-                    ),
-                    Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        // Filled dot for "Active Status".
-                        Icon(
-                          Icons.circle,
-                          size: 10,
-                          // text-tertiary (#003932) → ElderColors.tertiary.
-                          color: ElderColors.tertiary,
-                        ),
-                        const SizedBox(width: 4),
-                        Text(
-                          'Active Status',
-                          style: GoogleFonts.plusJakartaSans(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w500,
-                            color: ElderColors.tertiary,
-                          ),
-                        ),
-                      ],
+                    const Icon(Icons.circle, size: 10, color: ElderColors.tertiary),
+                    const SizedBox(width: 4),
+                    Text(
+                      'Active',
+                      style: GoogleFonts.plusJakartaSans(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w500,
+                        color: ElderColors.tertiary,
+                      ),
                     ),
                   ],
                 ),
                 const SizedBox(height: ElderSpacing.md),
-                // Action buttons.
                 Row(
                   children: [
-                    // View button.
                     Semantics(
                       button: true,
-                      label: 'View $name',
+                      label: 'View ${elder.fullName}',
                       child: GestureDetector(
                         onTap: onView,
                         child: Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: ElderSpacing.md,
-                            vertical: ElderSpacing.sm,
-                          ),
+                          padding: const EdgeInsets.symmetric(horizontal: ElderSpacing.md, vertical: ElderSpacing.sm),
                           decoration: BoxDecoration(
                             color: ElderColors.surfaceContainerHigh,
                             borderRadius: BorderRadius.circular(_kCardRadius),
@@ -717,11 +1005,7 @@ class _ConnectionCard extends StatelessWidget {
                           child: Row(
                             mainAxisSize: MainAxisSize.min,
                             children: [
-                              const Icon(
-                                Icons.visibility_rounded,
-                                size: 16,
-                                color: ElderColors.tertiary,
-                              ),
+                              const Icon(Icons.visibility_rounded, size: 16, color: ElderColors.tertiary),
                               const SizedBox(width: ElderSpacing.xs),
                               Text(
                                 'View',
@@ -737,25 +1021,17 @@ class _ConnectionCard extends StatelessWidget {
                       ),
                     ),
                     const SizedBox(width: ElderSpacing.sm),
-                    // Unlink button.
                     Semantics(
                       button: true,
-                      label: 'Unlink $name',
+                      label: 'Unlink ${elder.fullName}',
                       child: GestureDetector(
                         onTap: onUnlink,
                         child: Padding(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: ElderSpacing.md,
-                            vertical: ElderSpacing.sm,
-                          ),
+                          padding: const EdgeInsets.symmetric(horizontal: ElderSpacing.md, vertical: ElderSpacing.sm),
                           child: Row(
                             mainAxisSize: MainAxisSize.min,
                             children: [
-                              const Icon(
-                                Icons.link_off_rounded,
-                                size: 16,
-                                color: ElderColors.error,
-                              ),
+                              const Icon(Icons.link_off_rounded, size: 16, color: ElderColors.error),
                               const SizedBox(width: ElderSpacing.xs),
                               Text(
                                 'Unlink',
@@ -781,149 +1057,8 @@ class _ConnectionCard extends StatelessWidget {
   }
 }
 
-// ── _IncomingRequestCard ──────────────────────────────────────────────────────
-
-/// Pending incoming link request — avatar + name + role claim + accept/decline.
-class _IncomingRequestCard extends StatelessWidget {
-  const _IncomingRequestCard({
-    required this.name,
-    required this.roleRequest,
-    required this.onAccept,
-    required this.onDecline,
-  });
-
-  final String name;
-  final String roleRequest;
-  final VoidCallback onAccept;
-  final VoidCallback onDecline;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      decoration: BoxDecoration(
-        // Tonal shift replaces HTML's border border-outline-variant/10.
-        color: ElderColors.surfaceContainerLow,
-        borderRadius: BorderRadius.circular(_kCardRadius),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(ElderSpacing.lg),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Avatar + name row.
-            Row(
-              children: [
-                // TODO(backend-sprint): replace with CachedNetworkImage.
-                Container(
-                  width: _kSmallAvatarSize,
-                  height: _kSmallAvatarSize,
-                  // rounded-lg = 4dp in this Tailwind config.
-                  decoration: BoxDecoration(
-                    color: ElderColors.surfaceContainerHigh,
-                    borderRadius: BorderRadius.circular(_kCardRadius),
-                  ),
-                  child: const Icon(
-                    Icons.person_rounded,
-                    size: 22,
-                    color: ElderColors.onSurfaceVariant,
-                  ),
-                ),
-                const SizedBox(width: ElderSpacing.sm),
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      name,
-                      style: GoogleFonts.plusJakartaSans(
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                        color: ElderColors.tertiary,
-                      ),
-                    ),
-                    Text(
-                      'Wants to link as: $roleRequest',
-                      style: GoogleFonts.plusJakartaSans(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w500,
-                        color: ElderColors.onSurfaceVariant,
-                        letterSpacing: 0.3,
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-            const SizedBox(height: ElderSpacing.md),
-            // Accept / Decline buttons — 2-col row.
-            Row(
-              children: [
-                // Accept — primary bg.
-                Expanded(
-                  child: Semantics(
-                    button: true,
-                    label: 'Accept $name request',
-                    child: GestureDetector(
-                      onTap: onAccept,
-                      child: Container(
-                        height: 48,
-                        decoration: BoxDecoration(
-                          color: ElderColors.tertiary,
-                          borderRadius: BorderRadius.circular(_kCardRadius),
-                        ),
-                        child: Center(
-                          child: Text(
-                            'Accept',
-                            style: GoogleFonts.plusJakartaSans(
-                              fontSize: 16,
-                              fontWeight: FontWeight.bold,
-                              color: ElderColors.onTertiary,
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-                const SizedBox(width: ElderSpacing.sm),
-                // Decline — tonal surface.
-                Expanded(
-                  child: Semantics(
-                    button: true,
-                    label: 'Decline $name request',
-                    child: GestureDetector(
-                      onTap: onDecline,
-                      child: Container(
-                        height: 48,
-                        decoration: BoxDecoration(
-                          color: ElderColors.surfaceContainerHighest,
-                          borderRadius: BorderRadius.circular(_kCardRadius),
-                        ),
-                        child: Center(
-                          child: Text(
-                            'Decline',
-                            style: GoogleFonts.plusJakartaSans(
-                              fontSize: 16,
-                              fontWeight: FontWeight.bold,
-                              color: ElderColors.onSurfaceVariant,
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
 // ── _OutgoingPendingCard ──────────────────────────────────────────────────────
 
-/// Outgoing link request card — initials circle + name + PENDING badge + cancel.
 class _OutgoingPendingCard extends StatelessWidget {
   const _OutgoingPendingCard({
     required this.initials,
@@ -957,14 +1092,10 @@ class _OutgoingPendingCard extends StatelessWidget {
         children: [
           Row(
             children: [
-              // Initials circle — secondary-container (#cae4f1) → tertiaryFixed.
               Container(
                 width: _kSmallAvatarSize,
                 height: _kSmallAvatarSize,
-                decoration: const BoxDecoration(
-                  color: ElderColors.tertiaryFixed,
-                  shape: BoxShape.circle,
-                ),
+                decoration: const BoxDecoration(color: ElderColors.tertiaryFixed, shape: BoxShape.circle),
                 child: Center(
                   child: Text(
                     initials,
@@ -989,23 +1120,15 @@ class _OutgoingPendingCard extends StatelessWidget {
                         color: ElderColors.tertiary,
                       ),
                     ),
-                    // text-secondary → onSurfaceVariant.
                     Text(
                       timeSent,
-                      style: GoogleFonts.plusJakartaSans(
-                        fontSize: 16,
-                        color: ElderColors.onSurfaceVariant,
-                      ),
+                      style: GoogleFonts.plusJakartaSans(fontSize: 16, color: ElderColors.onSurfaceVariant),
                     ),
                   ],
                 ),
               ),
-              // PENDING badge.
               Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: ElderSpacing.sm,
-                  vertical: 4,
-                ),
+                padding: const EdgeInsets.symmetric(horizontal: ElderSpacing.sm, vertical: 4),
                 decoration: BoxDecoration(
                   color: ElderColors.surfaceContainerHigh,
                   borderRadius: BorderRadius.circular(_kCardRadius),
@@ -1023,7 +1146,6 @@ class _OutgoingPendingCard extends StatelessWidget {
             ],
           ),
           const SizedBox(height: ElderSpacing.md),
-          // Cancel Request button — tonal secondary action.
           Semantics(
             button: true,
             label: 'Cancel request to $name',
@@ -1032,18 +1154,13 @@ class _OutgoingPendingCard extends StatelessWidget {
               child: Container(
                 height: 48,
                 decoration: BoxDecoration(
-                  // Tonal shift replaces HTML's border border-outline button.
                   color: ElderColors.surfaceContainerLow,
                   borderRadius: BorderRadius.circular(_kCardRadius),
                 ),
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    const Icon(
-                      Icons.cancel_rounded,
-                      size: 18,
-                      color: ElderColors.onSurfaceVariant,
-                    ),
+                    const Icon(Icons.cancel_rounded, size: 18, color: ElderColors.onSurfaceVariant),
                     const SizedBox(width: ElderSpacing.sm),
                     Text(
                       'Cancel Request',
@@ -1066,12 +1183,6 @@ class _OutgoingPendingCard extends StatelessWidget {
 
 // ── _PrivacyTipCard ───────────────────────────────────────────────────────────
 
-/// Privacy tip information card with decorative security icon.
-///
-/// HTML uses `bg-secondary-container/30 border border-secondary-container`.
-/// In Flutter: `tertiaryFixed` at 30% opacity (closest to caretaker secondary-
-/// container #cae4f1). Border removed per No-Line Rule — tonal bg provides
-/// sufficient differentiation.
 class _PrivacyTipCard extends StatelessWidget {
   const _PrivacyTipCard();
 
@@ -1087,31 +1198,20 @@ class _PrivacyTipCard extends StatelessWidget {
         ),
         child: Stack(
           children: [
-            // Decorative security icon — absolute bottom-right, 40% opacity.
             Positioned(
               right: -ElderSpacing.md,
               bottom: -ElderSpacing.md,
               child: Opacity(
                 opacity: 0.40,
-                child: Icon(
-                  Icons.security_rounded,
-                  size: 72,
-                  // text-secondary-container → tertiaryFixed token itself as tint.
-                  color: ElderColors.tertiaryContainer,
-                ),
+                child: Icon(Icons.security_rounded, size: 72, color: ElderColors.tertiaryContainer),
               ),
             ),
-            // Content (z-10 in HTML — placed after Positioned so it paints above).
             Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Row(
                   children: [
-                    const Icon(
-                      Icons.lightbulb_rounded,
-                      size: 20,
-                      color: ElderColors.tertiary,
-                    ),
+                    const Icon(Icons.lightbulb_rounded, size: 20, color: ElderColors.tertiary),
                     const SizedBox(width: ElderSpacing.sm),
                     Text(
                       'Privacy Tip',
@@ -1125,11 +1225,11 @@ class _PrivacyTipCard extends StatelessWidget {
                 ),
                 const SizedBox(height: ElderSpacing.sm),
                 Text(
-                  'Linking allows full access to health logs and mood tracking. '
-                  'Only accept requests from verified family members or clinical professionals.',
+                  'Only link with elders you personally know and are responsible for. '
+                  'Linked caretakers can view health logs, medications, and mood data. '
+                  'You can unlink at any time from this screen.',
                   style: GoogleFonts.plusJakartaSans(
                     fontSize: 16,
-                    // on-secondary-container (#4e6672) → onSurfaceVariant.
                     color: ElderColors.onSurfaceVariant,
                     height: 1.6,
                   ),
@@ -1143,11 +1243,126 @@ class _PrivacyTipCard extends StatelessWidget {
   }
 }
 
+// ── _RelationshipPickerSheet ──────────────────────────────────────────────────
+
+/// Bottom sheet for picking relationship type before sending a link request.
+class _RelationshipPickerSheet extends StatefulWidget {
+  const _RelationshipPickerSheet({required this.elderName, required this.onSend});
+
+  final String elderName;
+  final void Function(String relationship) onSend;
+
+  @override
+  State<_RelationshipPickerSheet> createState() => _RelationshipPickerSheetState();
+}
+
+class _RelationshipPickerSheetState extends State<_RelationshipPickerSheet> {
+  String? _selected;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: const BoxDecoration(
+        color: ElderColors.surfaceContainerLowest,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      padding: EdgeInsets.fromLTRB(
+        ElderSpacing.lg,
+        ElderSpacing.lg,
+        ElderSpacing.lg,
+        MediaQuery.paddingOf(context).bottom + ElderSpacing.lg,
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          // Handle
+          Center(
+            child: Container(
+              width: 40,
+              height: 4,
+              decoration: BoxDecoration(
+                color: ElderColors.outline.withValues(alpha: 0.40),
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+          ),
+          const SizedBox(height: ElderSpacing.lg),
+          Text(
+            'Your relationship to ${widget.elderName}',
+            style: GoogleFonts.plusJakartaSans(
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+              color: ElderColors.tertiary,
+            ),
+          ),
+          const SizedBox(height: ElderSpacing.md),
+          ..._kRelationshipOptions.map((rel) => Semantics(
+            button: true,
+            label: rel,
+            child: GestureDetector(
+              onTap: () => setState(() => _selected = rel),
+              child: Container(
+                margin: const EdgeInsets.only(bottom: ElderSpacing.sm),
+                padding: const EdgeInsets.symmetric(horizontal: ElderSpacing.lg, vertical: ElderSpacing.md),
+                decoration: BoxDecoration(
+                  color: _selected == rel ? ElderColors.tertiaryFixed : ElderColors.surfaceContainerLow,
+                  borderRadius: BorderRadius.circular(_kCardRadius),
+                  border: _selected == rel
+                      ? Border.all(color: ElderColors.tertiary, width: 1.5)
+                      : null,
+                ),
+                child: Text(
+                  rel,
+                  style: GoogleFonts.plusJakartaSans(
+                    fontSize: 17,
+                    fontWeight: _selected == rel ? FontWeight.bold : FontWeight.normal,
+                    color: _selected == rel ? ElderColors.tertiary : ElderColors.onSurface,
+                  ),
+                ),
+              ),
+            ),
+          )),
+          const SizedBox(height: ElderSpacing.md),
+          Semantics(
+            button: true,
+            label: 'Send link request',
+            child: GestureDetector(
+              onTap: _selected != null ? () => widget.onSend(_selected!) : null,
+              child: Container(
+                height: 56,
+                decoration: BoxDecoration(
+                  gradient: _selected != null
+                      ? const LinearGradient(
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                          colors: [ElderColors.tertiary, ElderColors.tertiaryContainer],
+                        )
+                      : null,
+                  color: _selected == null ? ElderColors.surfaceContainerHigh : null,
+                  borderRadius: BorderRadius.circular(_kCardRadius),
+                ),
+                child: Center(
+                  child: Text(
+                    'Send Request',
+                    style: GoogleFonts.plusJakartaSans(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      color: _selected != null ? ElderColors.onTertiary : ElderColors.onSurfaceVariant,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 // ── _NavItem ──────────────────────────────────────────────────────────────────
 
-/// Caretaker bottom nav tab — Links tab active on this screen.
-///
-/// Nav label exception: 12sp inside constrained pill — two-cue (icon+label).
 class _NavItem extends StatelessWidget {
   const _NavItem({
     required this.icon,
@@ -1171,36 +1386,22 @@ class _NavItem extends StatelessWidget {
         onTap: onTap,
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 200),
-          padding: const EdgeInsets.symmetric(
-            horizontal: ElderSpacing.md,
-            vertical: ElderSpacing.sm,
-          ),
+          padding: const EdgeInsets.symmetric(horizontal: ElderSpacing.md, vertical: ElderSpacing.sm),
           decoration: BoxDecoration(
-            color: active
-                ? ElderColors.surfaceContainerLow
-                : Colors.transparent,
+            color: active ? ElderColors.surfaceContainerLow : Colors.transparent,
             borderRadius: BorderRadius.circular(_kCardRadius),
           ),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(
-                icon,
-                size: 24,
-                color: active
-                    ? ElderColors.tertiary
-                    : ElderColors.onSurfaceVariant,
-              ),
+              Icon(icon, size: 24, color: active ? ElderColors.tertiary : ElderColors.onSurfaceVariant),
               const SizedBox(height: 4),
               Text(
                 label.toUpperCase(),
-                // 12sp exception: constrained nav pill, two-cue (icon+label).
                 style: GoogleFonts.plusJakartaSans(
                   fontSize: 12,
                   fontWeight: FontWeight.w500,
-                  color: active
-                      ? ElderColors.tertiary
-                      : ElderColors.onSurfaceVariant,
+                  color: active ? ElderColors.tertiary : ElderColors.onSurfaceVariant,
                   letterSpacing: 0.8,
                 ),
               ),
@@ -1214,26 +1415,21 @@ class _NavItem extends StatelessWidget {
 
 // ── ACCESSIBILITY AUDIT ──────────────────────────────────────────────────────
 // ✅ Tap targets ≥ 48×48dp    — View / Unlink buttons: 48dp row height ✅
-//                               Accept / Decline: explicit height: 48 ✅
 //                               Cancel Request: height: 48 ✅
+//                               Send Request (sheet): height: 56 ✅
 //                               Nav items: ~56dp with padding ✅
-// ✅ Font sizes ≥ 16sp         — all text 16sp or above; 18sp for elder names ✅
-//                               | role request 16sp (raised from 10px) ✅
-//                               | PENDING badge 16sp (raised from 10px) ✅
-//                               | time-sent 16sp (raised from 10px) ✅
-//                               | badge labels 16sp (raised from 10px) ✅
+//                               Link button in search result: 48dp ✅
+// ✅ Font sizes ≥ 16sp         — all text 16sp or above; 18sp for names ✅
+//                               | PENDING badge 16sp ✅
+//                               | time-sent 16sp ✅
 //                               | nav labels 12sp EXCEPTION: two-cue pill ✅
-// ✅ Colour contrast WCAG AA   — onPrimary (#FFF) on primary (#005050): ~12:1 ✅
-//                               onTertiaryFixed on tertiaryFixed (#CCE5FF): ~7:1 ✅
-//                               primary on surfaceContainerHigh: ~9:1 ✅
+// ✅ Colour contrast WCAG AA   — onTertiary on tertiary (#005050): ~12:1 ✅
+//                               onTertiaryFixed on tertiaryFixed: ~7:1 ✅
 //                               error on surfaceContainerLowest: ~5:1 ✅ AA
 //                               onSurfaceVariant on surfaceContainerLow: ~7:1 ✅
-// ✅ Semantic labels            — all buttons (view, unlink, accept, decline,
-//                               cancel, nav items, caretaker profile) ✅
-// ✅ No colour as sole cue      — accept/decline: label text + colour ✅
-//                               active status: dot icon + "Active Status" text ✅
-//                               role badges: text label + colour ✅
-// ✅ Touch targets ≥ 8dp apart  — ElderSpacing.md (16dp) between connection
-//                               cards ✅; ElderSpacing.xl (32dp) between
-//                               sections ✅
+// ✅ Semantic labels            — all buttons (view, unlink, cancel, link, send,
+//                               nav items, search) ✅
+// ✅ No colour as sole cue      — active status: dot icon + "Active" text ✅
+//                               linked badge: text label + colour ✅
+// ✅ Touch targets ≥ 8dp apart  — ElderSpacing.md (16dp) between cards ✅
 // ────────────────────────────────────────────────────────────────────────────

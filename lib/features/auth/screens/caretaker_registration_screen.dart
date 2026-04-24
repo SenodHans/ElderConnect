@@ -14,6 +14,9 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../core/constants/elder_colors.dart';
 import '../../../core/constants/elder_spacing.dart';
 import '../providers/auth_provider.dart';
+import '../widgets/email_verification_modal.dart';
+import 'terms_of_service_screen.dart';
+import 'privacy_policy_screen.dart';
 
 class CaretakerRegistrationScreen extends ConsumerStatefulWidget {
   const CaretakerRegistrationScreen({super.key});
@@ -35,6 +38,9 @@ class _CaretakerRegistrationScreenState
   final _phoneController = TextEditingController();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
+  final _confirmPasswordController = TextEditingController();
+  bool _obscurePassword = true;
+  bool _obscureConfirmPassword = true;
   bool _termsAccepted = false;
   bool _isLoading = false;
   String? _errorMessage;
@@ -63,6 +69,7 @@ class _CaretakerRegistrationScreenState
     _phoneController.dispose();
     _emailController.dispose();
     _passwordController.dispose();
+    _confirmPasswordController.dispose();
     super.dispose();
   }
 
@@ -81,13 +88,38 @@ class _CaretakerRegistrationScreenState
     if (!_formKey.currentState!.validate() || !_termsAccepted) return;
     setState(() { _isLoading = true; _errorMessage = null; });
     try {
-      await ref.read(authServiceProvider).signUpCaretaker(
+      final service = ref.read(authServiceProvider);
+      final email = _emailController.text.trim();
+      final password = _passwordController.text;
+
+      await service.signUpCaretaker(
         name: _nameController.text,
-        email: _emailController.text.trim(),
+        email: email,
         phone: _phoneController.text.trim(),
-        password: _passwordController.text,
+        password: password,
       );
-      if (mounted) context.go('/post-registration');
+
+      if (!mounted) return;
+
+      // If Supabase email confirmation is enabled the session will be null
+      // here — show the verification modal so the caretaker can confirm.
+      // If confirmation is disabled, the session is already active and we
+      // navigate directly (GoRouter redirect handles it).
+      final session = Supabase.instance.client.auth.currentSession;
+      if (session != null) {
+        await service.saveLastRole('caretaker');
+        if (mounted) context.go('/post-registration');
+      } else {
+        // Email confirmation required — show blur+slide verification card.
+        if (mounted) {
+          await showEmailVerificationModal(
+            context,
+            ref,
+            email: email,
+            password: password,
+          );
+        }
+      }
     } on AuthException catch (e) {
       setState(() => _errorMessage = e.message);
     } catch (e) {
@@ -165,7 +197,7 @@ class _CaretakerRegistrationScreenState
         const SizedBox(height: ElderSpacing.xs),
         // HTML: text-sm (14px) → raised to 16sp.
         Text(
-          'Professional and clean registration for medical providers.',
+          'Set up your caretaker account to get started.',
           style: GoogleFonts.plusJakartaSans(
             fontSize: 16,
             color: ElderColors.onSurfaceVariant,
@@ -186,7 +218,7 @@ class _CaretakerRegistrationScreenState
             label: 'Full Name',
             controller: _nameController,
             leadingIcon: Icons.person_outline,
-            hint: 'Dr. Sarah Jenkins',
+            hint: 'Thomas Andorson',
             keyboardType: TextInputType.name,
             validator: (v) => (v == null || v.trim().isEmpty)
                 ? 'Please enter your full name'
@@ -197,7 +229,7 @@ class _CaretakerRegistrationScreenState
             label: 'Phone Number',
             controller: _phoneController,
             leadingIcon: Icons.call_outlined,
-            hint: '+1 (555) 000-0000',
+            hint: '+94(00) 000 - 0000',
             keyboardType: TextInputType.phone,
             validator: (v) => (v == null || v.trim().isEmpty)
                 ? 'Please enter your phone number'
@@ -208,7 +240,7 @@ class _CaretakerRegistrationScreenState
             label: 'Email Address',
             controller: _emailController,
             leadingIcon: Icons.mail_outline,
-            hint: 'sarah.j@elderconnect.care',
+            hint: 'thomas@email.com',
             keyboardType: TextInputType.emailAddress,
             validator: (v) {
               if (v == null || v.trim().isEmpty) return 'Please enter your email';
@@ -221,11 +253,38 @@ class _CaretakerRegistrationScreenState
             label: 'Password',
             controller: _passwordController,
             leadingIcon: Icons.lock_outline,
-            hint: '••••••••',
-            obscureText: true,
+            hint: 'Create a password',
+            obscureText: _obscurePassword,
+            suffixIcon: IconButton(
+              icon: Icon(
+                _obscurePassword ? Icons.visibility_outlined : Icons.visibility_off_outlined,
+                color: ElderColors.onSurfaceVariant,
+              ),
+              onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
+            ),
             validator: (v) {
               if (v == null || v.isEmpty) return 'Please enter a password';
               if (v.length < 8) return 'Password must be at least 8 characters';
+              return null;
+            },
+          ),
+          const SizedBox(height: ElderSpacing.lg),
+          _CaretakerInput(
+            label: 'Confirm Password',
+            controller: _confirmPasswordController,
+            leadingIcon: Icons.lock_outline,
+            hint: 'Re-enter your password',
+            obscureText: _obscureConfirmPassword,
+            suffixIcon: IconButton(
+              icon: Icon(
+                _obscureConfirmPassword ? Icons.visibility_outlined : Icons.visibility_off_outlined,
+                color: ElderColors.onSurfaceVariant,
+              ),
+              onPressed: () => setState(() => _obscureConfirmPassword = !_obscureConfirmPassword),
+            ),
+            validator: (v) {
+              if (v == null || v.isEmpty) return 'Please confirm your password';
+              if (v != _passwordController.text) return 'Passwords do not match';
               return null;
             },
           ),
@@ -254,24 +313,38 @@ class _CaretakerRegistrationScreenState
                       ),
                       children: [
                         const TextSpan(text: 'I agree to the '),
-                        TextSpan(
-                          text: 'Terms of Service',
-                          style: GoogleFonts.plusJakartaSans(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w600,
-                            color: ElderColors.primary,
+                        WidgetSpan(
+                          alignment: PlaceholderAlignment.baseline,
+                          baseline: TextBaseline.alphabetic,
+                          child: GestureDetector(
+                            onTap: _showTermsDialog,
+                            child: Text(
+                              'Terms of Service',
+                              style: GoogleFonts.plusJakartaSans(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w600,
+                                color: ElderColors.primary,
+                              ),
+                            ),
                           ),
                         ),
                         const TextSpan(text: ' and acknowledge the '),
-                        TextSpan(
-                          text: 'Privacy Policy',
-                          style: GoogleFonts.plusJakartaSans(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w600,
-                            color: ElderColors.primary,
+                        WidgetSpan(
+                          alignment: PlaceholderAlignment.baseline,
+                          baseline: TextBaseline.alphabetic,
+                          child: GestureDetector(
+                            onTap: _showPrivacyDialog,
+                            child: Text(
+                              'Privacy Policy',
+                              style: GoogleFonts.plusJakartaSans(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w600,
+                                color: ElderColors.primary,
+                              ),
+                            ),
                           ),
                         ),
-                        const TextSpan(text: ' regarding clinical data handling.'),
+                        const TextSpan(text: ' regarding data handling.'),
                       ],
                     ),
                   ),
@@ -296,7 +369,7 @@ class _CaretakerRegistrationScreenState
                   constraints: const BoxConstraints(minHeight: 56),
                   padding: const EdgeInsets.symmetric(vertical: 14), // py-3.5
                   decoration: BoxDecoration(
-                    // clinical-gradient: #00364c → #1a4d66 ≈ primary → primaryContainer
+                    // primary → primaryContainer gradient
                     gradient: const LinearGradient(
                       begin: Alignment.topLeft,
                       end: Alignment.bottomRight,
@@ -368,7 +441,7 @@ class _CaretakerRegistrationScreenState
             children: [
               // HTML: text-xs (12px) → raised to 16sp.
               Text(
-                'Already have a professional account? ',
+                'Already have an account? ',
                 style: GoogleFonts.plusJakartaSans(
                   fontSize: 16,
                   color: ElderColors.onSurfaceVariant,
@@ -393,6 +466,18 @@ class _CaretakerRegistrationScreenState
       ),
     );
   }
+
+  void _showTermsDialog() {
+    Navigator.of(context).push(
+      MaterialPageRoute(builder: (_) => const TermsOfServiceScreen()),
+    );
+  }
+
+  void _showPrivacyDialog() {
+    Navigator.of(context).push(
+      MaterialPageRoute(builder: (_) => const PrivacyPolicyScreen()),
+    );
+  }
 }
 
 // ── _BackButton ──────────────────────────────────────────────────────────────
@@ -408,17 +493,20 @@ class _BackButton extends StatelessWidget {
       label: 'Go back to role selection',
       child: GestureDetector(
         onTap: onTap,
-        child: Container(
-          width: 56,
-          height: 56,
-          decoration: BoxDecoration(
-            color: ElderColors.surfaceContainerLow,
-            borderRadius: BorderRadius.circular(12),
-          ),
-          child: const Icon(
-            Icons.chevron_left_rounded,
-            size: 28,
-            color: ElderColors.onSurface,
+        child: Align(
+          alignment: Alignment.centerLeft,
+          child: Container(
+            width: 56,
+            height: 56,
+            decoration: BoxDecoration(
+              color: ElderColors.primary,
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: const Icon(
+              Icons.chevron_left_rounded,
+              size: 28,
+              color: ElderColors.onPrimary,
+            ),
           ),
         ),
       ),
@@ -442,6 +530,7 @@ class _CaretakerInput extends StatelessWidget {
     this.keyboardType,
     this.obscureText = false,
     this.validator,
+    this.suffixIcon,
   });
 
   final String label;
@@ -451,6 +540,7 @@ class _CaretakerInput extends StatelessWidget {
   final TextInputType? keyboardType;
   final bool obscureText;
   final FormFieldValidator<String>? validator;
+  final Widget? suffixIcon;
 
   @override
   Widget build(BuildContext context) {
@@ -486,6 +576,7 @@ class _CaretakerInput extends StatelessWidget {
                 color: ElderColors.onSurfaceVariant,
               ),
               prefixIcon: Icon(leadingIcon, size: 20, color: ElderColors.outline),
+              suffixIcon: suffixIcon,
               filled: true,
               fillColor: ElderColors.surfaceContainerHighest,
               contentPadding: const EdgeInsets.symmetric(
@@ -538,16 +629,16 @@ class _TrustRow extends StatelessWidget {
         mainAxisAlignment: MainAxisAlignment.spaceEvenly,
         children: const [
           _TrustBadge(
-            icon: Icons.health_and_safety_outlined,
-            label: 'HIPAA\nCOMPLIANT',
+            icon: Icons.verified_user_outlined,
+            label: 'VERIFIED\nCAREGIVER',
           ),
           _TrustBadge(
-            icon: Icons.lock_outline,
-            label: '256-BIT\nENCRYPTED',
+            icon: Icons.family_restroom_outlined,
+            label: 'FAMILY\nTRUSTED',
           ),
           _TrustBadge(
-            icon: Icons.verified_outlined,
-            label: 'ISO\nCERTIFIED',
+            icon: Icons.security_outlined,
+            label: 'SECURE\nDATA',
           ),
         ],
       ),

@@ -380,7 +380,7 @@ class _BottomNav extends StatelessWidget {
       _NavTabData(tab: _NavTab.feed, icon: Icons.rss_feed, label: 'Feed'),
       _NavTabData(tab: _NavTab.games, icon: Icons.videogame_asset, label: 'Games'),
       if (hasMedication)
-        _NavTabData(tab: _NavTab.medication, icon: Icons.medication, label: 'Medication'),
+        _NavTabData(tab: _NavTab.medication, icon: Icons.medication, label: 'Meds'),
     ];
 
     return Container(

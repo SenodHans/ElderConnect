@@ -14,11 +14,19 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 // Storage keys used by flutter_secure_storage.
-const _kAccessToken = 'ec_access_token';
-const _kRefreshToken = 'ec_refresh_token';
-const _kElderId = 'ec_elder_id';
-const _kElderPhone = 'ec_elder_phone';
-const _kElderPinHash = 'ec_elder_pin_hash';
+const _kAccessToken   = 'ec_access_token';
+const _kRefreshToken  = 'ec_refresh_token';
+const _kElderId       = 'ec_elder_id';
+const _kElderPhone    = 'ec_elder_phone';
+const _kElderPinHash  = 'ec_elder_pin_hash';
+// Credential cache — stored at first registration so the elder can recover
+// their session after reinstall without going through caretaker again.
+const _kElderEmail    = 'ec_elder_email';
+const _kElderPassword = 'ec_elder_password';
+const _kElderName     = 'ec_elder_name';
+// Tracks the last successfully authenticated role so the splash screen can
+// route to the correct login screen after session expiry, not role-selection.
+const _kLastRole      = 'ec_last_role';
 
 /// Provides all authentication operations for the ElderConnect app.
 class AuthService {
@@ -81,10 +89,55 @@ class AuthService {
     return user;
   }
 
-  /// Signs out the current user and clears elder session storage.
+  /// Signs out the current user and clears all session storage.
   Future<void> signOut() async {
     await _supabase.auth.signOut();
     await _clearElderSession();
+  }
+
+  // ── Role tracking ───────────────────────────────────────────────────────
+
+  /// Saves the last successfully authenticated role ('elderly' or 'caretaker').
+  ///
+  /// Called after sign-in/sign-up so the splash screen can route directly to
+  /// the correct login screen if the session expires, skipping role-selection.
+  Future<void> saveLastRole(String role) =>
+      _storage.write(key: _kLastRole, value: role);
+
+  /// Returns the last authenticated role, or null for a fresh install.
+  Future<String?> getLastRole() => _storage.read(key: _kLastRole);
+
+  // ── Caretaker email + password recovery ────────────────────────────────
+
+  /// Re-sends the signup confirmation email for a pending caretaker account.
+  Future<void> resendVerificationEmail(String email) async {
+    await _supabase.auth.resend(type: OtpType.signup, email: email);
+  }
+
+  /// Sends a password-reset link to the caretaker's email address.
+  /// The link redirects to elderconnect://reset-password so Android opens the app.
+  Future<void> sendPasswordReset(String email) async {
+    await _supabase.auth.resetPasswordForEmail(
+      email,
+      redirectTo: 'elderconnect://reset-password',
+    );
+  }
+
+  // ── Elder PIN DB fallback ───────────────────────────────────────────────
+
+  /// Fetches the latest pin_hash from Supabase and updates local secure storage.
+  ///
+  /// Called after a caretaker resets the elder's PIN so the local cache stays
+  /// in sync without requiring the elder to go through the caretaker again.
+  Future<String?> fetchAndCachePinHash(String elderId) async {
+    final row = await _supabase
+        .from('users')
+        .select('pin_hash')
+        .eq('id', elderId)
+        .single();
+    final hash = row['pin_hash'] as String?;
+    if (hash != null) await updateStoredPinHash(hash);
+    return hash;
   }
 
   // ── Elder auth ──────────────────────────────────────────────────────────
@@ -142,7 +195,7 @@ class AuthService {
     final hashed = BCrypt.hashpw(pin, BCrypt.gensalt());
     await _supabase
         .from('users')
-        .update({'pin_hash': hashed})
+        .update({'pin_hash': hashed, 'pin_plain': pin})
         .eq('id', elderId);
   }
 
@@ -188,6 +241,10 @@ class AuthService {
   ///
   /// Returns the restored [Session] if tokens exist and are valid,
   /// or `null` if no tokens are stored (first launch or post-reinstall).
+  ///
+  /// On token expiry, only the token pair is cleared — identity data
+  /// (elderId, phone, pinHash, email, password, name) is intentionally
+  /// preserved so PIN verification works correctly on the PIN screen.
   Future<Session?> restoreElderSession() async {
     final refreshToken = await _storage.read(key: _kRefreshToken);
     if (refreshToken == null) return null;
@@ -201,14 +258,144 @@ class AuthService {
       }
       return session;
     } on AuthException {
-      // Tokens expired or revoked — clear storage so the PIN screen is shown.
-      await _clearElderSession();
+      // Tokens expired or revoked — clear tokens only.
+      // Identity/credential data is kept so the PIN screen can verify and
+      // restore the session without needing the caretaker again.
+      await _clearElderTokensOnly();
       return null;
+    }
+  }
+
+  // ── Elder credential cache ──────────────────────────────────────────────
+
+  /// Stores the elder's synthetic email + system password locally so the
+  /// session can be restored after reinstall without contacting the caretaker.
+  Future<void> persistElderCredentials({
+    required String email,
+    required String password,
+    required String fullName,
+  }) async {
+    await Future.wait([
+      _storage.write(key: _kElderEmail, value: email),
+      _storage.write(key: _kElderPassword, value: password),
+      _storage.write(key: _kElderName, value: fullName),
+    ]);
+  }
+
+  /// Returns stored elder name, or null if never registered on this device.
+  Future<String?> getStoredElderName() => _storage.read(key: _kElderName);
+
+  /// Attempts to sign in using locally cached email + password.
+  /// Returns the [Session] on success, null if credentials are missing or stale.
+  Future<Session?> signInWithCachedCredentials() async {
+    final email = await _storage.read(key: _kElderEmail);
+    final password = await _storage.read(key: _kElderPassword);
+    if (email == null || password == null) return null;
+
+    try {
+      final res = await _supabase.auth.signInWithPassword(
+        email: email,
+        password: password,
+      );
+      final session = res.session;
+      if (session != null) await persistElderSession(session);
+      return session;
+    } on AuthException {
+      return null;
+    }
+  }
+
+  /// Calls restore-elder-session Edge Function (verify_jwt: false) with the
+  /// elder's name + PIN. Used when device storage has been wiped after reinstall.
+  /// Returns the restored [Session] on success, null on failure.
+  Future<Session?> restoreSessionWithNameAndPin({
+    required String fullName,
+    required String pin,
+  }) async {
+    try {
+      final res = await _supabase.functions.invoke(
+        'restore-elder-session',
+        body: {'full_name': fullName, 'pin': pin},
+      );
+      if (res.status != 200) return null;
+
+      final data = res.data as Map<String, dynamic>;
+      final accessToken = data['access_token'] as String?;
+      final refreshToken = data['refresh_token'] as String?;
+      if (accessToken == null || refreshToken == null) return null;
+
+      final sessionRes = await _supabase.auth.setSession(refreshToken);
+      final session = sessionRes.session;
+      if (session != null) await persistElderSession(session);
+      return session;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// Calls restore-elder-session Edge Function with phone + PIN.
+  /// Used after app reinstall when no stored credentials remain.
+  /// Caches retrieved credentials locally so future restores use stored tokens.
+  Future<Session?> restoreSessionWithPhoneAndPin({
+    required String phone,
+    required String pin,
+  }) async {
+    try {
+      final res = await _supabase.functions.invoke(
+        'restore-elder-session',
+        body: {'phone': phone, 'pin': pin},
+      );
+      if (res.status != 200) return null;
+
+      final data = res.data as Map<String, dynamic>;
+      final accessToken = data['access_token'] as String?;
+      final refreshToken = data['refresh_token'] as String?;
+      final elderId = data['elder_id'] as String?;
+      final fullName = data['full_name'] as String?;
+      if (accessToken == null || refreshToken == null) return null;
+
+      final sessionRes = await _supabase.auth.setSession(refreshToken);
+      final session = sessionRes.session;
+      if (session != null) {
+        await persistElderSession(session, elderId: elderId, phone: phone);
+        if (fullName != null) {
+          await _storage.write(key: _kElderName, value: fullName);
+        }
+      }
+      return session;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// Sends an unauthenticated help request to notify the caretaker.
+  /// Used when "Need Help" is tapped and no session can be restored (reinstall).
+  /// Returns true if the request was accepted by the server.
+  Future<bool> sendHelpRequest(String phone) async {
+    try {
+      final res = await _supabase.functions.invoke(
+        'send-help-request',
+        body: {'phone': phone},
+      );
+      return res.status == 200;
+    } catch (_) {
+      return false;
     }
   }
 
   // ── Private helpers ─────────────────────────────────────────────────────
 
+  /// Clears only the JWT token pair. Called on session expiry so that
+  /// identity/credential data survives for PIN verification and recovery.
+  Future<void> _clearElderTokensOnly() async {
+    await Future.wait([
+      _storage.delete(key: _kAccessToken),
+      _storage.delete(key: _kRefreshToken),
+    ]);
+  }
+
+  /// Full wipe — called only on explicit sign-out. Clears everything so the
+  /// next user of this device starts completely fresh.
   Future<void> _clearElderSession() async {
     await Future.wait([
       _storage.delete(key: _kAccessToken),
@@ -216,6 +403,10 @@ class AuthService {
       _storage.delete(key: _kElderId),
       _storage.delete(key: _kElderPhone),
       _storage.delete(key: _kElderPinHash),
+      _storage.delete(key: _kElderEmail),
+      _storage.delete(key: _kElderPassword),
+      _storage.delete(key: _kElderName),
+      _storage.delete(key: _kLastRole),
     ]);
   }
 

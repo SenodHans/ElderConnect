@@ -12,9 +12,12 @@ library;
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../core/constants/elder_colors.dart';
 import '../../../core/constants/elder_spacing.dart';
+import '../widgets/caretaker_avatar.dart';
 
 // Stitch config: rounded-xl = 0.5rem = 8dp.
 const double _kCardRadius = 8.0;
@@ -75,6 +78,77 @@ class _SearchLinkElderScreenState
     _anim.dispose();
     _usernameController.dispose();
     super.dispose();
+  }
+
+  Future<void> _sendRequest() async {
+    final query = _usernameController.text.trim();
+    if (query.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Enter the elder\'s name or ID first.',
+            style: GoogleFonts.plusJakartaSans(fontSize: 16),
+          ),
+        ),
+      );
+      return;
+    }
+    if (_selectedRelationship == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Please select your relationship first.',
+            style: GoogleFonts.plusJakartaSans(fontSize: 16),
+          ),
+        ),
+      );
+      return;
+    }
+
+    try {
+      final uid = Supabase.instance.client.auth.currentUser?.id;
+      if (uid == null) return;
+
+      // Search for the elder by name or ID.
+      final rows = await Supabase.instance.client
+          .from('users')
+          .select('id, full_name')
+          .eq('role', 'elderly')
+          .or('full_name.ilike.%$query%,id.ilike.%$query%')
+          .limit(1);
+
+      if (rows.isEmpty || !mounted) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('No elder found matching "$query".', style: GoogleFonts.plusJakartaSans(fontSize: 16))),
+          );
+        }
+        return;
+      }
+
+      final elderId = rows.first['id'] as String;
+      final elderName = rows.first['full_name'] as String? ?? 'Elder';
+
+      await Supabase.instance.client.from('caretaker_links').insert({
+        'caretaker_id': uid,
+        'elderly_user_id': elderId,
+        'status': 'pending',
+      });
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Link request sent to $elderName.', style: GoogleFonts.plusJakartaSans(fontSize: 16))),
+        );
+        _usernameController.clear();
+        setState(() => _selectedRelationship = null);
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to send request: $e', style: GoogleFonts.plusJakartaSans(fontSize: 16))),
+        );
+      }
+    }
   }
 
   Widget _animated(int i, Widget child) {
@@ -148,15 +222,15 @@ class _SearchLinkElderScreenState
             padding: const EdgeInsets.symmetric(horizontal: ElderSpacing.lg),
             child: Row(
               children: [
-                const Icon(
-                  Icons.medical_services_rounded,
-                  size: 24,
-                  color: ElderColors.tertiary,
+                Image.asset(
+                  'assets/images/elderconnect_logo.png',
+                  width: 32,
+                  height: 32,
                 ),
                 const SizedBox(width: ElderSpacing.sm),
                 Text(
                   'ElderConnect',
-                  style: GoogleFonts.plusJakartaSans(
+                  style: GoogleFonts.quicksand(
                     fontSize: 20,
                     fontWeight: FontWeight.w700,
                     color: ElderColors.tertiary,
@@ -164,22 +238,7 @@ class _SearchLinkElderScreenState
                   ),
                 ),
                 const Spacer(),
-                Semantics(
-                  label: 'Caretaker profile',
-                  child: Container(
-                    width: 40,
-                    height: 40,
-                    decoration: BoxDecoration(
-                      color: ElderColors.tertiaryFixed,
-                      shape: BoxShape.circle,
-                    ),
-                    child: const Icon(
-                      Icons.person_rounded,
-                      size: 22,
-                      color: ElderColors.onTertiaryFixed,
-                    ),
-                  ),
-                ),
+                const CaretakerAvatar(),
               ],
             ),
           ),
@@ -302,6 +361,8 @@ class _SearchLinkElderScreenState
                                 .withValues(alpha: 0.50),
                           ),
                           border: InputBorder.none,
+                          enabledBorder: InputBorder.none,
+                          focusedBorder: InputBorder.none,
                           contentPadding: const EdgeInsets.symmetric(
                             vertical: ElderSpacing.md,
                           ),
@@ -403,9 +464,7 @@ class _SearchLinkElderScreenState
             button: true,
             label: 'Send link request',
             child: GestureDetector(
-              onTap: () {
-                // TODO: dispatch link request to Supabase — backend sprint.
-              },
+              onTap: _sendRequest,
               child: Container(
                 height: 56,
                 decoration: BoxDecoration(
@@ -660,37 +719,10 @@ class _SearchLinkElderScreenState
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceAround,
             children: [
-              _NavItem(
-                icon: Icons.dashboard_rounded,
-                label: 'Dashboard',
-                active: false,
-                onTap: () {
-                  // TODO: context.go('/home/caretaker') — Batch 3.
-                },
-              ),
-              // Elder tab is active — this screen is under the Elder flow.
-              _NavItem(
-                icon: Icons.elderly_rounded,
-                label: 'Elder',
-                active: true,
-                onTap: () {},
-              ),
-              _NavItem(
-                icon: Icons.psychology_rounded,
-                label: 'Mood',
-                active: false,
-                onTap: () {
-                  // TODO: context.go('/mood-logs/caretaker') — Batch 3.
-                },
-              ),
-              _NavItem(
-                icon: Icons.link_rounded,
-                label: 'Links',
-                active: false,
-                onTap: () {
-                  // TODO: context.go('/links/caretaker') — Batch 3.
-                },
-              ),
+              _NavItem(icon: Icons.dashboard_rounded, label: 'Dashboard', active: false, onTap: () => context.go('/home/caretaker')),
+              _NavItem(icon: Icons.elderly_rounded, label: 'Elder', active: true, onTap: () => context.go('/elders/caretaker')),
+              _NavItem(icon: Icons.psychology_rounded, label: 'Mood', active: false, onTap: () => context.go('/mood-logs/caretaker')),
+              _NavItem(icon: Icons.link_rounded, label: 'Links', active: false, onTap: () => context.go('/links/caretaker')),
             ],
           ),
         ),

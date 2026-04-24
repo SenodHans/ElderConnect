@@ -197,7 +197,7 @@ class _ElderLoginFallbackScreenState
         const SizedBox(height: ElderSpacing.md), // gap-4 = 16dp
         Text(
           'ElderConnect',
-          style: GoogleFonts.plusJakartaSans(
+          style: GoogleFonts.quicksand(
             fontSize: 24, // text-2xl
             fontWeight: FontWeight.bold,
             color: ElderColors.primary,

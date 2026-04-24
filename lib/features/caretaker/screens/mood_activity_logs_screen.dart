@@ -12,8 +12,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:intl/intl.dart';
 import '../../../core/constants/elder_colors.dart';
 import '../../../core/constants/elder_spacing.dart';
+import '../providers/caretaker_mood_provider.dart';
+import '../widgets/caretaker_avatar.dart';
 
 // Stitch config: caretaker rounded overrides (same as caretaker_dashboard_screen).
 // rounded-xl = 0.5rem = 8dp; rounded-2xl = 16dp; rounded-lg = 0.25rem = 4dp.
@@ -29,29 +32,15 @@ const double _kChartHeight = 280.0;
 const double _kLabelArea = 28.0;
 
 enum _CTab { dashboard, elder, mood, links }
-enum _TimeFilter { week, month }
 enum _BarColor { stable, warning, urgent }
 
-// Named record type for each day's chart data.
-// Bar heights from Tailwind (h-N × 4 = dp): h-32=128, h-40=160, h-24=96,
-// h-36=144, h-52=208, h-28=112, h-34=136.
-// Colors: stable = tertiary, warning = onSurfaceVariant, urgent = error.
+// Chart entry record — maps DayMoodData to the bar-column builder.
 typedef _ChartEntry = ({
   String day,
   double height,
   _BarColor color,
   String? annotation,
 });
-
-const List<_ChartEntry> _kChartDays = [
-  (day: 'MON', height: 128.0, color: _BarColor.stable,  annotation: null),
-  (day: 'TUE', height: 160.0, color: _BarColor.stable,  annotation: null),
-  (day: 'WED', height:  96.0, color: _BarColor.warning, annotation: null),
-  (day: 'THU', height: 144.0, color: _BarColor.stable,  annotation: null),
-  (day: 'FRI', height: 208.0, color: _BarColor.urgent,  annotation: 'ANXIOUS'),
-  (day: 'SAT', height: 112.0, color: _BarColor.stable,  annotation: null),
-  (day: 'SUN', height: 136.0, color: _BarColor.stable,  annotation: null),
-];
 
 class MoodActivityLogsScreen extends ConsumerStatefulWidget {
   const MoodActivityLogsScreen({super.key});
@@ -65,7 +54,6 @@ class _MoodActivityLogsScreenState
     extends ConsumerState<MoodActivityLogsScreen>
     with TickerProviderStateMixin {
   _CTab _activeTab = _CTab.mood;
-  _TimeFilter _timeFilter = _TimeFilter.week;
 
   late final AnimationController _anim;
   late final List<CurvedAnimation> _anims;
@@ -106,6 +94,15 @@ class _MoodActivityLogsScreenState
         ),
       ),
     );
+  }
+
+  // Returns the selected elder's UUID, or '' if the caretaker has no linked elders.
+  // Called from sub-builder methods during build — ref.watch() is valid here.
+  String _getSelectedElderId() {
+    final elders = ref.watch(linkedEldersProvider).value ?? [];
+    if (elders.isEmpty) return '';
+    final idx = ref.watch(selectedElderIndexProvider);
+    return elders[idx.clamp(0, elders.length - 1)].id;
   }
 
   @override
@@ -165,15 +162,15 @@ class _MoodActivityLogsScreenState
             padding: const EdgeInsets.symmetric(horizontal: ElderSpacing.lg),
             child: Row(
               children: [
-                const Icon(
-                  Icons.medical_services_rounded,
-                  size: 24,
-                  color: ElderColors.tertiary,
+                Image.asset(
+                  'assets/images/elderconnect_logo.png',
+                  width: 32,
+                  height: 32,
                 ),
                 const SizedBox(width: ElderSpacing.sm),
                 Text(
                   'ElderConnect',
-                  style: GoogleFonts.plusJakartaSans(
+                  style: GoogleFonts.quicksand(
                     fontSize: 20,
                     fontWeight: FontWeight.w700,
                     color: ElderColors.tertiary,
@@ -181,28 +178,8 @@ class _MoodActivityLogsScreenState
                   ),
                 ),
                 const Spacer(),
-                // Caretaker avatar — 40×40, tertiaryFixed tint.
-                Semantics(
-                  label: 'Caretaker profile',
-                  child: Container(
-                    width: 40,
-                    height: 40,
-                    decoration: BoxDecoration(
-                      // bg-secondary-container (#cae4f1) → tertiaryFixed (#CCE5FF).
-                      color: ElderColors.tertiaryFixed,
-                      shape: BoxShape.circle,
-                      border: Border.all(
-                        color: ElderColors.surfaceContainerLowest,
-                        width: 2,
-                      ),
-                    ),
-                    child: const Icon(
-                      Icons.person_rounded,
-                      size: 22,
-                      color: ElderColors.onTertiaryFixed,
-                    ),
-                  ),
-                ),
+                // Caretaker avatar
+                const CaretakerAvatar(),
               ],
             ),
           ),
@@ -214,70 +191,88 @@ class _MoodActivityLogsScreenState
   // ── Page Header ─────────────────────────────────────────────────────────────
 
   Widget _buildPageHeader() {
+    final eldersAsync = ref.watch(linkedEldersProvider);
+    final selectedIdx = ref.watch(selectedElderIndexProvider);
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        // "Caretaker Portal" eyebrow label.
-        // text-secondary (#4a626d) → onSurfaceVariant; text-[10px] → raised to 16sp.
         Text(
-          'CARETAKER PORTAL',
+          'Mood & Activity Trends',
           style: GoogleFonts.plusJakartaSans(
-            fontSize: 16,
-            fontWeight: FontWeight.w600,
-            color: ElderColors.onSurfaceVariant,
-            letterSpacing: 1.4,
+            fontSize: 28,
+            fontWeight: FontWeight.w700,
+            color: ElderColors.tertiary,
+            letterSpacing: -0.5,
+            height: 1.1,
           ),
         ),
-        const SizedBox(height: ElderSpacing.xs),
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          crossAxisAlignment: CrossAxisAlignment.end,
-          children: [
-            Text(
-              'Mood & Activity\nTrends',
-              style: GoogleFonts.plusJakartaSans(
-                fontSize: 28,
-                fontWeight: FontWeight.w700,
-                color: ElderColors.tertiary,
-                letterSpacing: -0.5,
-                height: 1.1,
+
+        // Elder selector pill row — only shown when caretaker has ≥ 2 linked elders.
+        eldersAsync.when(
+          loading: () => const SizedBox.shrink(),
+          error: (_, __) => const SizedBox.shrink(),
+          data: (elders) {
+            if (elders.length < 2) return const SizedBox.shrink();
+            return Padding(
+              padding: const EdgeInsets.only(top: ElderSpacing.md),
+              child: SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                child: Row(
+                  children: elders.asMap().entries.map((e) {
+                    final active = e.key == selectedIdx;
+                    return Padding(
+                      padding: const EdgeInsets.only(right: ElderSpacing.sm),
+                      child: Semantics(
+                        button: true,
+                        label: 'View ${e.value.firstName}',
+                        selected: active,
+                        child: GestureDetector(
+                          onTap: () => ref
+                              .read(selectedElderIndexProvider.notifier)
+                              .state = e.key,
+                          child: AnimatedContainer(
+                            duration: const Duration(milliseconds: 200),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: ElderSpacing.md,
+                              vertical: ElderSpacing.sm,
+                            ),
+                            decoration: BoxDecoration(
+                              color: active
+                                  ? ElderColors.tertiary
+                                  : ElderColors.surfaceContainerLow,
+                              borderRadius: BorderRadius.circular(999),
+                            ),
+                            child: Text(
+                              e.value.firstName,
+                              style: GoogleFonts.plusJakartaSans(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w600,
+                                color: active
+                                    ? ElderColors.onTertiary
+                                    : ElderColors.onSurfaceVariant,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    );
+                  }).toList(),
+                ),
               ),
-            ),
-            _buildTimeFilter(),
-          ],
+            );
+          },
         ),
       ],
-    );
-  }
-
-  Widget _buildTimeFilter() {
-    return Container(
-      decoration: BoxDecoration(
-        color: ElderColors.surfaceContainerLow,
-        borderRadius: BorderRadius.circular(_kCardRadius),
-      ),
-      padding: const EdgeInsets.all(ElderSpacing.xs),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          _FilterPill(
-            label: 'Last 7 Days',
-            active: _timeFilter == _TimeFilter.week,
-            onTap: () => setState(() => _timeFilter = _TimeFilter.week),
-          ),
-          _FilterPill(
-            label: 'Last 30 Days',
-            active: _timeFilter == _TimeFilter.month,
-            onTap: () => setState(() => _timeFilter = _TimeFilter.month),
-          ),
-        ],
-      ),
     );
   }
 
   // ── Mood Progression Chart ──────────────────────────────────────────────────
 
   Widget _buildMoodChartCard() {
+    final elderId = _getSelectedElderId();
+    final chartAsync = ref.watch(elderMoodChartProvider(elderId));
+
     return Container(
       padding: const EdgeInsets.all(ElderSpacing.lg),
       decoration: BoxDecoration(
@@ -298,7 +293,6 @@ class _MoodActivityLogsScreenState
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Chart title + subtitle
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -312,7 +306,7 @@ class _MoodActivityLogsScreenState
                       ),
                     ),
                     Text(
-                      'Aggregate daily emotional stability scores',
+                      'Daily negative-mood intensity (higher bar = more concern)',
                       style: GoogleFonts.plusJakartaSans(
                         fontSize: 16,
                         color: ElderColors.onSurfaceVariant,
@@ -322,30 +316,43 @@ class _MoodActivityLogsScreenState
                 ),
               ),
               const SizedBox(width: ElderSpacing.md),
-              // Legend: Stable / Warning / Urgent
               Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  _LegendDot(
-                    color: ElderColors.tertiary,
-                    label: 'Stable',
-                  ),
+                  _LegendDot(color: ElderColors.tertiary, label: 'Stable'),
                   const SizedBox(height: ElderSpacing.xs),
-                  _LegendDot(
-                    color: ElderColors.onSurfaceVariant,
-                    label: 'Warning',
-                  ),
+                  _LegendDot(color: ElderColors.onSurfaceVariant, label: 'Warning'),
                   const SizedBox(height: ElderSpacing.xs),
-                  _LegendDot(
-                    color: ElderColors.error,
-                    label: 'Urgent',
-                  ),
+                  _LegendDot(color: ElderColors.error, label: 'Urgent'),
                 ],
               ),
             ],
           ),
           const SizedBox(height: ElderSpacing.lg),
-          _buildChart(),
+          chartAsync.when(
+            loading: () => const SizedBox(
+              height: _kChartHeight,
+              child: Center(
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  color: ElderColors.tertiary,
+                ),
+              ),
+            ),
+            error: (_, __) => SizedBox(
+              height: _kChartHeight,
+              child: Center(
+                child: Text(
+                  'Could not load mood data',
+                  style: GoogleFonts.plusJakartaSans(
+                    fontSize: 16,
+                    color: ElderColors.onSurfaceVariant,
+                  ),
+                ),
+              ),
+            ),
+            data: (chartData) => _buildChart(chartData),
+          ),
         ],
       ),
     );
@@ -357,7 +364,19 @@ class _MoodActivityLogsScreenState
     _BarColor.urgent  => ElderColors.error,
   };
 
-  Widget _buildChart() {
+  Widget _buildChart(List<DayMoodData> data) {
+    // Convert DayMoodData to the existing _ChartEntry record for _buildBarColumn.
+    final entries = data.map<_ChartEntry>((d) => (
+      day: d.dayLabel,
+      height: d.barHeight,
+      color: switch (d.barStatus) {
+        MoodBarStatus.stable  => _BarColor.stable,
+        MoodBarStatus.warning => _BarColor.warning,
+        MoodBarStatus.urgent  => _BarColor.urgent,
+      },
+      annotation: d.annotation,
+    )).toList();
+
     return SizedBox(
       height: _kChartHeight,
       child: Stack(
@@ -404,15 +423,11 @@ class _MoodActivityLogsScreenState
               ],
             ),
           ),
-
-          // Bar columns overlaid on zones.
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: ElderSpacing.xs),
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.end,
-              children: _kChartDays
-                  .map(_buildBarColumn)
-                  .toList(),
+              children: entries.map(_buildBarColumn).toList(),
             ),
           ),
         ],
@@ -510,6 +525,9 @@ class _MoodActivityLogsScreenState
   // ── Activity Stream ─────────────────────────────────────────────────────────
 
   Widget _buildActivityStream() {
+    final elderId = _getSelectedElderId();
+    final days = 7;
+
     return Container(
       padding: const EdgeInsets.all(ElderSpacing.lg),
       decoration: BoxDecoration(
@@ -519,10 +537,8 @@ class _MoodActivityLogsScreenState
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Header: list_alt icon + title
           Row(
             children: [
-              // on-primary-container (#8fbdda) → nearest: onPrimaryContainer.
               const Icon(
                 Icons.list_alt_rounded,
                 size: 22,
@@ -542,62 +558,28 @@ class _MoodActivityLogsScreenState
           ),
           const SizedBox(height: ElderSpacing.lg),
 
-          // Login status row
-          _ActivityRow(
-            icon: Icons.login_rounded,
-            // bg-secondary-container (#cae4f1) → tertiaryFixed (#CCE5FF).
-            iconBg: ElderColors.tertiaryFixed,
-            label: 'Login status',
-            subtitle: 'Active 2h ago',
-            statusLabel: 'STABLE',
-            statusColor: ElderColors.tertiary,
-          ),
-          const SizedBox(height: ElderSpacing.md),
+          // Live rows — async from Supabase.
+          if (elderId.isEmpty)
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: ElderSpacing.lg),
+              child: Text(
+                'Link an elder to view their activity stream.',
+                style: GoogleFonts.plusJakartaSans(
+                  fontSize: 16,
+                  color: ElderColors.onSurfaceVariant,
+                ),
+              ),
+            )
+          else
+            _buildActivityRows(elderId, days),
 
-          // Posts made row
-          _ActivityRow(
-            icon: Icons.rate_review_rounded,
-            iconBg: ElderColors.tertiaryFixed,
-            label: 'Posts made',
-            subtitle: '3 updates shared',
-            statusLabel: 'HIGH',
-            statusColor: ElderColors.tertiary,
-          ),
-          const SizedBox(height: ElderSpacing.md),
-
-          // Games played row
-          _ActivityRow(
-            icon: Icons.sports_esports_rounded,
-            iconBg: ElderColors.tertiaryFixed,
-            label: 'Games played',
-            subtitle: 'Memory Match (15m)',
-            statusLabel: 'NORMAL',
-            statusColor: ElderColors.tertiary,
-          ),
-          const SizedBox(height: ElderSpacing.md),
-
-          // Meds alert row — error state with border and pulsing dot.
-          _ActivityRow(
-            icon: Icons.medication_rounded,
-            iconBg: ElderColors.errorContainer,
-            iconColor: ElderColors.error,
-            label: 'Meds confirmed',
-            labelColor: ElderColors.error,
-            subtitle: 'Pending: Morning dose',
-            subtitleAlpha: 0.80,
-            subtitleColor: ElderColors.error,
-            showPulsingDot: true,
-            isAlert: true,
-          ),
           const SizedBox(height: ElderSpacing.lg),
-
-          // Export report outlined button.
           Semantics(
             button: true,
             label: 'Export full report',
             child: GestureDetector(
               onTap: () {
-                // TODO: implement PDF/CSV export in backend sprint.
+                // TODO: PDF/CSV export — planned for a future sprint.
               },
               child: Container(
                 width: double.infinity,
@@ -627,9 +609,128 @@ class _MoodActivityLogsScreenState
     );
   }
 
-  // ── Cognitive Training ───────────────────────────────────────────────────────
+  Widget _buildActivityRows(String elderId, int days) {
+    final activityAsync = ref.watch(
+      elderActivitySummaryProvider((elderId: elderId, days: days)),
+    );
+
+    return activityAsync.when(
+      loading: () => const SizedBox(
+        height: 160,
+        child: Center(
+          child: CircularProgressIndicator(strokeWidth: 2, color: ElderColors.tertiary),
+        ),
+      ),
+      error: (_, __) => Padding(
+        padding: const EdgeInsets.symmetric(vertical: ElderSpacing.lg),
+        child: Text(
+          'Could not load activity data.',
+          style: GoogleFonts.plusJakartaSans(
+            fontSize: 16,
+            color: ElderColors.onSurfaceVariant,
+          ),
+        ),
+      ),
+      data: (summary) {
+        final postLabel = summary.postCount == 0
+            ? 'No posts in this period'
+            : '${summary.postCount} post${summary.postCount == 1 ? '' : 's'} shared';
+        final gameLabel = summary.gamesPlayed == 0
+            ? 'No games played'
+            : summary.latestGameName != null
+                ? '${summary.latestGameName} + ${summary.gamesPlayed - 1} more'
+                : '${summary.gamesPlayed} session${summary.gamesPlayed == 1 ? '' : 's'}';
+
+        return Column(
+          children: [
+            _ActivityRow(
+              icon: Icons.login_rounded,
+              iconBg: ElderColors.tertiaryFixed,
+              label: 'Last seen',
+              subtitle: summary.lastActiveLabel,
+              statusLabel: summary.postCount > 0 ? 'ACTIVE' : 'QUIET',
+              statusColor: summary.postCount > 0
+                  ? ElderColors.tertiary
+                  : ElderColors.onSurfaceVariant,
+            ),
+            const SizedBox(height: ElderSpacing.md),
+            _ActivityRow(
+              icon: Icons.rate_review_rounded,
+              iconBg: ElderColors.tertiaryFixed,
+              label: 'Posts made',
+              subtitle: postLabel,
+              statusLabel: summary.postCount >= 3 ? 'HIGH' : summary.postCount >= 1 ? 'LOW' : 'NONE',
+              statusColor: summary.postCount >= 3
+                  ? ElderColors.tertiary
+                  : ElderColors.onSurfaceVariant,
+            ),
+            const SizedBox(height: ElderSpacing.md),
+            _ActivityRow(
+              icon: Icons.sports_esports_rounded,
+              iconBg: ElderColors.tertiaryFixed,
+              label: 'Games played',
+              subtitle: gameLabel,
+              statusLabel: summary.gamesPlayed >= 3 ? 'HIGH' : summary.gamesPlayed >= 1 ? 'LOW' : 'NONE',
+              statusColor: summary.gamesPlayed >= 3
+                  ? ElderColors.tertiary
+                  : ElderColors.onSurfaceVariant,
+            ),
+            const SizedBox(height: ElderSpacing.md),
+            _ActivityRow(
+              icon: Icons.medication_rounded,
+              iconBg: summary.hasPendingMeds
+                  ? ElderColors.errorContainer
+                  : ElderColors.tertiaryFixed,
+              iconColor: summary.hasPendingMeds
+                  ? ElderColors.error
+                  : ElderColors.tertiary,
+              label: 'Meds confirmed',
+              labelColor: summary.hasPendingMeds
+                  ? ElderColors.error
+                  : ElderColors.tertiary,
+              subtitle: summary.pendingMedLabel,
+              subtitleColor: summary.hasPendingMeds
+                  ? ElderColors.error
+                  : ElderColors.onSurfaceVariant,
+              subtitleAlpha: summary.hasPendingMeds ? 0.90 : 1.0,
+              showPulsingDot: summary.hasPendingMeds,
+              isAlert: summary.hasPendingMeds,
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  // ── Wellness Summary ─────────────────────────────────────────────────────────
 
   Widget _buildCognitiveTraining() {
+    final elderId = _getSelectedElderId();
+    final days = 7;
+    final activityAsync = elderId.isEmpty
+        ? null
+        : ref.watch(elderActivitySummaryProvider((elderId: elderId, days: days)));
+
+    // Derive progress values once data is available.
+    final double gamesProgress;
+    final double adherenceProgress;
+    final String gamesValue;
+    final String postsValue;
+
+    if (activityAsync == null || !activityAsync.hasValue) {
+      gamesProgress = 0.0;
+      adherenceProgress = 1.0;
+      gamesValue = '—';
+      postsValue = '—';
+    } else {
+      final s = activityAsync.value!;
+      // Games engagement: 1 game/day = 100% for the selected window.
+      gamesProgress = (s.gamesPlayed / days).clamp(0.0, 1.0);
+      adherenceProgress = s.medicationAdherence.clamp(0.0, 1.0);
+      gamesValue = '${s.gamesPlayed}';
+      postsValue = '${s.postCount}';
+    }
+
     return Container(
       padding: const EdgeInsets.all(ElderSpacing.lg),
       decoration: BoxDecoration(
@@ -651,7 +752,7 @@ class _MoodActivityLogsScreenState
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text(
-                'Cognitive Training',
+                'Wellness Summary',
                 style: GoogleFonts.plusJakartaSans(
                   fontSize: 18,
                   fontWeight: FontWeight.w700,
@@ -666,29 +767,23 @@ class _MoodActivityLogsScreenState
             ],
           ),
           const SizedBox(height: ElderSpacing.lg),
-
-          // Pattern Recognition — 75%
           _ProgressBar(
-            label: 'Pattern Recognition',
-            level: 'Level 14',
-            progress: 0.75,
+            label: 'Games Engagement',
+            level: '${(gamesProgress * 100).round()}%',
+            progress: gamesProgress,
           ),
           const SizedBox(height: ElderSpacing.lg),
-
-          // Spatial Memory — 40%
           _ProgressBar(
-            label: 'Spatial Memory',
-            level: 'Level 8',
-            progress: 0.40,
+            label: 'Medication Adherence',
+            level: '${(adherenceProgress * 100).round()}%',
+            progress: adherenceProgress,
           ),
           const SizedBox(height: ElderSpacing.lg),
-
-          // Stats: Avg Session + Daily Streak
           Row(
             children: [
-              Expanded(child: _StatTile(label: 'Avg Session', value: '22m')),
+              Expanded(child: _StatTile(label: 'Games Played', value: gamesValue)),
               const SizedBox(width: ElderSpacing.md),
-              Expanded(child: _StatTile(label: 'Daily Streak', value: '5 Days')),
+              Expanded(child: _StatTile(label: 'Posts Made', value: postsValue)),
             ],
           ),
         ],
@@ -696,32 +791,13 @@ class _MoodActivityLogsScreenState
     );
   }
 
-  // ── Recent Journal Entries ───────────────────────────────────────────────────
+  // ── Recent Posts (Journal Entries) ──────────────────────────────────────────
 
   Widget _buildJournalEntries() {
-    const entries = [
-      (
-        title: '"Had a lovely morning walk"',
-        timestamp: 'Today, 09:15 AM',
-        excerpt:
-            'The sun was out and we managed to walk around the block twice. '
-            'Resident was in high spirits and mentioned the garden looks well-tended...',
-      ),
-      (
-        title: '"Memory exercises completed"',
-        timestamp: 'Yesterday, 04:30 PM',
-        excerpt:
-            'Finished three rounds of the card matching game. Slight frustration '
-            'during the second round but recovered well after a short tea break...',
-      ),
-      (
-        title: '"General health update"',
-        timestamp: 'Oct 12, 11:20 AM',
-        excerpt:
-            'Appetite is stable. Consumed all lunch and dinner portions. No '
-            'complaints of physical discomfort throughout the evening shifts...',
-      ),
-    ];
+    final elderId = _getSelectedElderId();
+    final postsAsync = elderId.isEmpty
+        ? null
+        : ref.watch(elderRecentPostsProvider(elderId));
 
     return Container(
       padding: const EdgeInsets.all(ElderSpacing.lg),
@@ -741,7 +817,7 @@ class _MoodActivityLogsScreenState
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            'Recent Journal Entries',
+            'Recent Posts',
             style: GoogleFonts.plusJakartaSans(
               fontSize: 18,
               fontWeight: FontWeight.w700,
@@ -749,22 +825,71 @@ class _MoodActivityLogsScreenState
             ),
           ),
           const SizedBox(height: ElderSpacing.md),
-          for (int i = 0; i < entries.length; i++) ...[
-            _JournalEntry(
-              title: entries[i].title,
-              timestamp: entries[i].timestamp,
-              excerpt: entries[i].excerpt,
-            ),
-            if (i < entries.length - 1)
-              Divider(
-                color: ElderColors.surfaceContainerHigh,
-                thickness: 1,
-                height: 1,
+          if (postsAsync == null)
+            Text(
+              'Link an elder to see their recent posts.',
+              style: GoogleFonts.plusJakartaSans(
+                fontSize: 16,
+                color: ElderColors.onSurfaceVariant,
               ),
-          ],
+            )
+          else
+            postsAsync.when(
+              loading: () => const SizedBox(
+                height: 80,
+                child: Center(
+                  child: CircularProgressIndicator(strokeWidth: 2, color: ElderColors.tertiary),
+                ),
+              ),
+              error: (_, __) => Text(
+                'Could not load posts.',
+                style: GoogleFonts.plusJakartaSans(
+                  fontSize: 16,
+                  color: ElderColors.onSurfaceVariant,
+                ),
+              ),
+              data: (posts) {
+                if (posts.isEmpty) {
+                  return Text(
+                    'No posts yet.',
+                    style: GoogleFonts.plusJakartaSans(
+                      fontSize: 16,
+                      color: ElderColors.onSurfaceVariant,
+                    ),
+                  );
+                }
+                final now = DateTime.now();
+                return Column(
+                  children: [
+                    for (int i = 0; i < posts.length; i++) ...[
+                      _JournalEntry(
+                        title: '"${posts[i].content}"',
+                        timestamp: _relativeTimestamp(posts[i].createdAt, now),
+                        excerpt: posts[i].content,
+                      ),
+                      if (i < posts.length - 1)
+                        Divider(
+                          color: ElderColors.surfaceContainerHigh,
+                          thickness: 1,
+                          height: 1,
+                        ),
+                    ],
+                  ],
+                );
+              },
+            ),
         ],
       ),
     );
+  }
+
+  // Returns a human-readable relative timestamp for display in the journal section.
+  String _relativeTimestamp(DateTime dt, DateTime now) {
+    final diff = now.difference(dt);
+    if (diff.inMinutes < 60) return 'Today, ${DateFormat('hh:mm a').format(dt)}';
+    if (diff.inHours < 24) return 'Today, ${DateFormat('hh:mm a').format(dt)}';
+    if (diff.inDays == 1) return 'Yesterday, ${DateFormat('hh:mm a').format(dt)}';
+    return DateFormat('MMM d, hh:mm a').format(dt);
   }
 
   // ── Bottom Nav ──────────────────────────────────────────────────────────────
@@ -822,68 +947,6 @@ class _MoodActivityLogsScreenState
                 },
               ),
             ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-// ── _FilterPill ──────────────────────────────────────────────────────────────
-
-/// Time-range selector pill — "Last 7 Days" or "Last 30 Days".
-///
-/// Active: surfaceContainerLowest bg + shadow + primary text.
-/// Inactive: transparent bg + onSurfaceVariant text.
-class _FilterPill extends StatelessWidget {
-  const _FilterPill({
-    required this.label,
-    required this.active,
-    required this.onTap,
-  });
-
-  final String label;
-  final bool active;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return Semantics(
-      button: true,
-      label: label,
-      selected: active,
-      child: GestureDetector(
-        onTap: onTap,
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 200),
-          padding: const EdgeInsets.symmetric(
-            horizontal: ElderSpacing.md,
-            vertical: ElderSpacing.sm,
-          ),
-          decoration: BoxDecoration(
-            color: active
-                ? ElderColors.surfaceContainerLowest
-                : Colors.transparent,
-            borderRadius: BorderRadius.circular(_kMiniRadius),
-            boxShadow: active
-                ? [
-                    BoxShadow(
-                      color: ElderColors.onSurface.withValues(alpha: 0.06),
-                      blurRadius: 4,
-                      offset: const Offset(0, 1),
-                    ),
-                  ]
-                : null,
-          ),
-          child: Text(
-            label,
-            style: GoogleFonts.plusJakartaSans(
-              fontSize: 16,
-              fontWeight: FontWeight.w600,
-              color: active
-                  ? ElderColors.tertiary
-                  : ElderColors.onSurfaceVariant,
-            ),
           ),
         ),
       ),

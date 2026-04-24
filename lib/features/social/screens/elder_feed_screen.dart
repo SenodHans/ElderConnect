@@ -1,12 +1,24 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_tts/flutter_tts.dart';
+import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../../../core/constants/elder_colors.dart';
 import '../../../core/constants/elder_spacing.dart';
 import '../providers/posts_provider.dart';
 import '../providers/post_submission_provider.dart';
+import '../providers/reactions_provider.dart';
+import '../providers/comments_provider.dart';
+import '../providers/news_provider.dart';
+import '../services/photo_upload_service.dart';
 import '../../medications/providers/medications_provider.dart';
+import '../../auth/providers/user_provider.dart';
+import '../../../shared/widgets/aa_button.dart';
 
 // ── Screen-level constants ────────────────────────────────────────────────────
 /// rounded-xl = 1.5rem in Stitch Tailwind config → 24dp
@@ -30,17 +42,52 @@ class ElderFeedScreen extends ConsumerStatefulWidget {
 
 class _ElderFeedScreenState extends ConsumerState<ElderFeedScreen> {
   final _NavTab _activeTab = _NavTab.feed;
+  final _scrollController = ScrollController();
+
+  @override
+  void initState() {
+    super.initState();
+    _scrollController.addListener(_onScroll);
+  }
+
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  // Trigger loadMore when within 400px of the bottom.
+  void _onScroll() {
+    if (!_scrollController.hasClients) return;
+    final pos = _scrollController.position;
+    if (pos.pixels < pos.maxScrollExtent - 400) return;
+    final newsState = ref.read(newsProvider).valueOrNull;
+    if (newsState != null && newsState.hasMore && !newsState.isLoadingMore) {
+      ref.read(newsProvider.notifier).loadMore();
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     final bool hasMedication = ref.watch(hasMedicationProvider);
-    return Scaffold(
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (_, __) => context.go('/home/elder'),
+      child: Scaffold(
       backgroundColor: ElderColors.surface,
       body: Column(
         children: [
           const _TopAppBar(),
           Expanded(
-            child: SingleChildScrollView(
+            child: RefreshIndicator(
+              color: ElderColors.primary,
+              onRefresh: () async {
+                ref.invalidate(newsProvider);
+                ref.invalidate(postsProvider);
+              },
+              child: SingleChildScrollView(
+              controller: _scrollController,
+              physics: const AlwaysScrollableScrollPhysics(),
               padding: const EdgeInsets.fromLTRB(
                 ElderSpacing.lg,
                 ElderSpacing.xl,
@@ -53,30 +100,42 @@ class _ElderFeedScreenState extends ConsumerState<ElderFeedScreen> {
                   const _CreateSection(),
                   const SizedBox(height: ElderSpacing.xl),
                   const _PostsFeed(),
+                  const SizedBox(height: ElderSpacing.xl),
+                  const _NewsSection(),
                   // Clearance for the overlaid bottom nav sheet
                   const SizedBox(height: 120),
                 ],
               ),
             ),
           ),
+          ),
         ],
       ),
       bottomSheet: _BottomNav(
         activeTab: _activeTab,
         hasMedication: hasMedication,
-        onTabSelected: (_) {/* TODO: navigate via context.go when screens exist */},
+        onTabSelected: (tab) {
+          switch (tab) {
+            case _NavTab.home:       context.go('/home/elder');
+            case _NavTab.games:      context.go('/games/elder');
+            case _NavTab.medication: context.go('/medications/elder');
+            case _NavTab.feed:       break;
+          }
+        },
       ),
+    ),
     );
   }
 }
 
 // ── Top App Bar ───────────────────────────────────────────────────────────────
 
-class _TopAppBar extends StatelessWidget {
+class _TopAppBar extends ConsumerWidget {
   const _TopAppBar();
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final avatarUrl = ref.watch(userProvider).valueOrNull?.avatarUrl;
     return Container(
       color: ElderColors.surface.withValues(alpha: 0.80),
       child: SafeArea(
@@ -89,46 +148,11 @@ class _TopAppBar extends StatelessWidget {
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Row(
-                children: [
-                  Semantics(
-                    label: 'Open menu',
-                    button: true,
-                    child: Material(
-                      color: Colors.transparent,
-                      shape: const CircleBorder(),
-                      clipBehavior: Clip.antiAlias,
-                      child: InkWell(
-                        onTap: () {/* TODO: open side drawer */},
-                        child: const SizedBox(
-                          width: 48,
-                          height: 48,
-                          child: Icon(
-                            Icons.menu,
-                            color: ElderColors.primary,
-                            size: 28,
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: ElderSpacing.md),
-                  Text(
-                    'ElderConnect',
-                    style: GoogleFonts.plusJakartaSans(
-                      fontSize: 24,
-                      fontWeight: FontWeight.w700,
-                      color: ElderColors.primary,
-                      letterSpacing: -0.5,
-                    ),
-                  ),
-                ],
-              ),
               Semantics(
                 label: 'Your profile photo',
                 button: true,
                 child: GestureDetector(
-                  onTap: () {/* TODO: navigate to elder profile */},
+                  onTap: () => context.go('/profile/elder'),
                   child: Container(
                     width: 48,
                     height: 48,
@@ -140,16 +164,28 @@ class _TopAppBar extends StatelessWidget {
                       ),
                       color: ElderColors.surfaceContainerLow,
                     ),
-                    child: const ClipOval(
-                      child: Icon(
-                        Icons.person,
-                        color: ElderColors.onSurfaceVariant,
-                        size: 28,
-                      ),
+                    child: ClipOval(
+                      child: avatarUrl != null
+                          ? Image.network(
+                              avatarUrl,
+                              width: 48, height: 48,
+                              fit: BoxFit.cover,
+                              errorBuilder: (_, __, ___) => const Icon(
+                                Icons.person,
+                                color: ElderColors.onSurfaceVariant,
+                                size: 28,
+                              ),
+                            )
+                          : const Icon(
+                              Icons.person,
+                              color: ElderColors.onSurfaceVariant,
+                              size: 28,
+                            ),
                     ),
                   ),
                 ),
               ),
+              const AaButton(),
             ],
           ),
         ),
@@ -200,7 +236,12 @@ class _CreateSection extends ConsumerWidget {
                 label: 'Photo',
                 circleColor: ElderColors.secondaryContainer,
                 iconColor: ElderColors.onSecondaryContainer,
-                onTap: () {/* TODO: open photo picker */},
+                onTap: () => showModalBottomSheet<void>(
+                  context: context,
+                  isScrollControlled: true,
+                  backgroundColor: Colors.transparent,
+                  builder: (_) => const _PhotoPostComposerSheet(),
+                ),
               ),
             ),
             const SizedBox(width: ElderSpacing.md),
@@ -210,7 +251,18 @@ class _CreateSection extends ConsumerWidget {
                 label: 'Voice',
                 circleColor: ElderColors.tertiary,
                 iconColor: Colors.white,
-                onTap: () {/* TODO: start voice message recording */},
+                onTap: () => ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text(
+                      'Voice posts coming soon!',
+                      style: GoogleFonts.lexend(fontSize: 16),
+                    ),
+                    behavior: SnackBarBehavior.floating,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                ),
               ),
             ),
           ],
@@ -361,17 +413,13 @@ class _PostsFeed extends ConsumerWidget {
         for (var i = 0; i < posts.length; i++) {
           final post = posts[i];
           widgets.add(_SocialPostCard(
+            postId: post.id,
             authorName: post.authorName,
+            authorAvatarUrl: post.authorAvatarUrl,
             timestamp: _formatTimestamp(post.createdAt),
             content: post.content,
-            hasImage: post.hasPhoto,
-            isLiked: false,
+            photoUrl: post.photoUrl,
           ));
-          // Insert the static news card after the first post.
-          if (i == 0) {
-            widgets.add(const SizedBox(height: ElderSpacing.xl));
-            widgets.add(const _NewsCard());
-          }
           if (i < posts.length - 1) {
             widgets.add(const SizedBox(height: ElderSpacing.xl));
           }
@@ -412,23 +460,31 @@ class _PostsShimmer extends StatelessWidget {
 
 // ── Social Post Card ──────────────────────────────────────────────────────────
 
-class _SocialPostCard extends StatelessWidget {
+class _SocialPostCard extends ConsumerWidget {
   const _SocialPostCard({
+    required this.postId,
     required this.authorName,
     required this.timestamp,
     required this.content,
-    this.hasImage = false,
-    required this.isLiked,
+    this.authorAvatarUrl,
+    this.photoUrl,
   });
 
+  final String postId;
   final String authorName;
+  final String? authorAvatarUrl;
   final String timestamp;
   final String content;
-  final bool hasImage;
-  final bool isLiked;
+  final String? photoUrl;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final reactionsAsync = ref.watch(reactionsProvider(postId));
+    final reaction = reactionsAsync.valueOrNull ??
+        const ReactionState(count: 0, isLiked: false);
+    final commentsAsync = ref.watch(commentsProvider(postId));
+    final comments = commentsAsync.valueOrNull ?? [];
+
     return Container(
       padding: const EdgeInsets.all(ElderSpacing.lg),
       decoration: BoxDecoration(
@@ -445,22 +501,10 @@ class _SocialPostCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Header row — avatar + name/time + overflow menu
+          // Header row — avatar + name/time
           Row(
             children: [
-              Container(
-                width: 48,
-                height: 48,
-                decoration: const BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: ElderColors.surfaceContainerLow,
-                ),
-                child: const Icon(
-                  Icons.person,
-                  color: ElderColors.onSurfaceVariant,
-                  size: 26,
-                ),
-              ),
+              _PostAvatar(avatarUrl: authorAvatarUrl, size: 48),
               const SizedBox(width: ElderSpacing.sm + ElderSpacing.xs),
               Expanded(
                 child: Column(
@@ -477,34 +521,12 @@ class _SocialPostCard extends StatelessWidget {
                     ),
                     Text(
                       timestamp,
-                      // Bumped from text-sm (14sp) to 16sp — font size minimum rule
                       style: GoogleFonts.lexend(
                         fontSize: 16,
                         color: ElderColors.outline,
                       ),
                     ),
                   ],
-                ),
-              ),
-              Semantics(
-                label: 'More options',
-                button: true,
-                child: Material(
-                  color: Colors.transparent,
-                  shape: const CircleBorder(),
-                  clipBehavior: Clip.antiAlias,
-                  child: InkWell(
-                    onTap: () {/* TODO: show post options sheet */},
-                    child: const SizedBox(
-                      width: 48,
-                      height: 48,
-                      child: Icon(
-                        Icons.more_vert,
-                        color: ElderColors.outline,
-                        size: 24,
-                      ),
-                    ),
-                  ),
                 ),
               ),
             ],
@@ -520,19 +542,25 @@ class _SocialPostCard extends StatelessWidget {
               height: 1.6,
             ),
           ),
-          // Optional post image — tonal strip placeholder (CachedNetworkImage deferred)
-          if (hasImage) ...[
+          // Post image
+          if (photoUrl != null && photoUrl!.isNotEmpty) ...[
             const SizedBox(height: ElderSpacing.md),
             ClipRRect(
               borderRadius: BorderRadius.circular(16),
-              child: Container(
+              child: Image.network(
+                photoUrl!,
                 width: double.infinity,
                 height: 256,
-                color: ElderColors.surfaceContainerHigh,
-                child: const Icon(
-                  Icons.image,
-                  color: ElderColors.surfaceContainerHighest,
-                  size: 64,
+                fit: BoxFit.cover,
+                errorBuilder: (context, error, stack) => Container(
+                  width: double.infinity,
+                  height: 256,
+                  color: ElderColors.surfaceContainerHigh,
+                  child: const Icon(
+                    Icons.broken_image,
+                    color: ElderColors.surfaceContainerHighest,
+                    size: 48,
+                  ),
                 ),
               ),
             ),
@@ -541,60 +569,190 @@ class _SocialPostCard extends StatelessWidget {
           // Reaction buttons
           Row(
             children: [
-              _ReactionButton(
-                icon: Icons.favorite,
-                label: 'Love',
-                // Liked → errorContainer bg; not liked → surfaceContainerLow
-                backgroundColor: isLiked
-                    ? ElderColors.errorContainer
-                    : ElderColors.surfaceContainerLow,
-                foregroundColor: isLiked
-                    ? ElderColors.onErrorContainer
-                    : ElderColors.onSurfaceVariant,
-                filled: isLiked,
-                onTap: () {/* TODO: toggle love reaction */},
+              _LoveButton(
+                isLiked: reaction.isLiked,
+                count: reaction.count,
+                onTap: () => ref.read(reactionsProvider(postId).notifier).toggle(),
               ),
               const SizedBox(width: ElderSpacing.md),
-              _ReactionButton(
-                icon: Icons.chat_bubble,
-                label: 'Reply',
-                backgroundColor: ElderColors.surfaceContainerLow,
-                foregroundColor: ElderColors.onSurfaceVariant,
-                filled: false,
-                onTap: () {/* TODO: open reply composer */},
+              _ReplyButton(
+                commentCount: comments.length,
+                onTap: () => showModalBottomSheet<void>(
+                  context: context,
+                  isScrollControlled: true,
+                  backgroundColor: Colors.transparent,
+                  builder: (_) => _ReplySheet(postId: postId),
+                ),
               ),
             ],
           ),
+          // Inline comment thread
+          if (comments.isNotEmpty) ...[
+            const SizedBox(height: ElderSpacing.md),
+            Container(
+              height: 1,
+              color: ElderColors.outlineVariant.withValues(alpha: 0.5),
+            ),
+            const SizedBox(height: ElderSpacing.md),
+            ...comments.map((c) => _CommentRow(comment: c, postId: postId)),
+          ],
         ],
       ),
     );
   }
 }
 
-class _ReactionButton extends StatelessWidget {
-  const _ReactionButton({
-    required this.icon,
-    required this.label,
-    required this.backgroundColor,
-    required this.foregroundColor,
-    required this.filled,
-    required this.onTap,
-  });
+/// Circular avatar — shows profile photo if available, else person icon.
+class _PostAvatar extends StatelessWidget {
+  const _PostAvatar({required this.avatarUrl, required this.size});
 
-  final IconData icon;
-  final String label;
-  final Color backgroundColor;
-  final Color foregroundColor;
-  final bool filled;
-  final VoidCallback onTap;
+  final String? avatarUrl;
+  final double size;
 
   @override
   Widget build(BuildContext context) {
+    return Container(
+      width: size,
+      height: size,
+      decoration: const BoxDecoration(
+        shape: BoxShape.circle,
+        color: ElderColors.surfaceContainerLow,
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: avatarUrl != null && avatarUrl!.isNotEmpty
+          ? Image.network(
+              avatarUrl!,
+              fit: BoxFit.cover,
+              errorBuilder: (_, __, ___) => const Icon(
+                Icons.person,
+                color: ElderColors.onSurfaceVariant,
+                size: 26,
+              ),
+            )
+          : const Icon(
+              Icons.person,
+              color: ElderColors.onSurfaceVariant,
+              size: 26,
+            ),
+    );
+  }
+}
+
+/// Love button with bounce animation when toggled.
+class _LoveButton extends StatefulWidget {
+  const _LoveButton({
+    required this.isLiked,
+    required this.count,
+    required this.onTap,
+  });
+
+  final bool isLiked;
+  final int count;
+  final VoidCallback onTap;
+
+  @override
+  State<_LoveButton> createState() => _LoveButtonState();
+}
+
+class _LoveButtonState extends State<_LoveButton>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _ctrl;
+  late Animation<double> _scale;
+
+  @override
+  void initState() {
+    super.initState();
+    _ctrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 300),
+    );
+    _scale = TweenSequence([
+      TweenSequenceItem(tween: Tween(begin: 1.0, end: 1.35), weight: 40),
+      TweenSequenceItem(tween: Tween(begin: 1.35, end: 0.90), weight: 30),
+      TweenSequenceItem(tween: Tween(begin: 0.90, end: 1.0), weight: 30),
+    ]).animate(CurvedAnimation(parent: _ctrl, curve: Curves.easeOut));
+  }
+
+  @override
+  void didUpdateWidget(_LoveButton old) {
+    super.didUpdateWidget(old);
+    if (widget.isLiked && !old.isLiked) {
+      _ctrl.forward(from: 0);
+    }
+  }
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final label = widget.count > 0 ? 'Love (${widget.count})' : 'Love';
+    final bg = widget.isLiked
+        ? const Color(0xFFFFEBEE) // light red
+        : ElderColors.surfaceContainerLow;
+    final fg = widget.isLiked ? ElderColors.error : ElderColors.onSurfaceVariant;
+
     return Semantics(
       label: label,
       button: true,
       child: Material(
-        color: backgroundColor,
+        color: bg,
+        borderRadius: BorderRadius.circular(999),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(999),
+          onTap: widget.onTap,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(
+              horizontal: ElderSpacing.lg,
+              vertical: ElderSpacing.sm + ElderSpacing.xs,
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                ScaleTransition(
+                  scale: _scale,
+                  child: Icon(
+                    widget.isLiked ? Icons.favorite : Icons.favorite_border,
+                    color: fg,
+                    size: 22,
+                  ),
+                ),
+                const SizedBox(width: ElderSpacing.sm),
+                Text(
+                  label,
+                  style: GoogleFonts.lexend(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w700,
+                    color: fg,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Reply button showing comment count.
+class _ReplyButton extends StatelessWidget {
+  const _ReplyButton({required this.commentCount, required this.onTap});
+
+  final int commentCount;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final label = commentCount > 0 ? 'Reply ($commentCount)' : 'Reply';
+    return Semantics(
+      label: label,
+      button: true,
+      child: Material(
+        color: ElderColors.surfaceContainerLow,
         borderRadius: BorderRadius.circular(999),
         child: InkWell(
           borderRadius: BorderRadius.circular(999),
@@ -607,19 +765,18 @@ class _ReactionButton extends StatelessWidget {
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Icon(
-                  filled ? Icons.favorite : icon,
-                  color: foregroundColor,
+                const Icon(
+                  Icons.chat_bubble_outline,
+                  color: ElderColors.onSurfaceVariant,
                   size: 22,
                 ),
                 const SizedBox(width: ElderSpacing.sm),
                 Text(
                   label,
-                  // Bumped from implicit 14sp to 16sp — font size minimum rule
                   style: GoogleFonts.lexend(
                     fontSize: 16,
                     fontWeight: FontWeight.w700,
-                    color: foregroundColor,
+                    color: ElderColors.onSurfaceVariant,
                   ),
                 ),
               ],
@@ -631,13 +788,224 @@ class _ReactionButton extends StatelessWidget {
   }
 }
 
-// ── News Card ─────────────────────────────────────────────────────────────────
+/// A single comment row displayed inline inside the post card.
+class _CommentRow extends ConsumerWidget {
+  const _CommentRow({required this.comment, required this.postId});
 
-class _NewsCard extends StatelessWidget {
-  const _NewsCard();
+  final CommentModel comment;
+  final String postId;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: ElderSpacing.md),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _PostAvatar(avatarUrl: comment.authorAvatarUrl, size: 36),
+          const SizedBox(width: ElderSpacing.sm),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Double-tap anywhere on the bubble to like
+                GestureDetector(
+                  onDoubleTap: () => ref
+                      .read(commentsProvider(postId).notifier)
+                      .toggleCommentLike(comment.id),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: ElderSpacing.md,
+                      vertical: ElderSpacing.sm,
+                    ),
+                    decoration: const BoxDecoration(
+                      color: ElderColors.surfaceContainerLow,
+                      borderRadius: BorderRadius.only(
+                        topLeft: Radius.circular(4),
+                        topRight: Radius.circular(16),
+                        bottomLeft: Radius.circular(16),
+                        bottomRight: Radius.circular(16),
+                      ),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          comment.authorName,
+                          style: GoogleFonts.plusJakartaSans(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w700,
+                            color: ElderColors.onSurface,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          comment.content,
+                          style: GoogleFonts.lexend(
+                            fontSize: 17,
+                            color: ElderColors.onSurface,
+                            height: 1.4,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                // Tiny comment like button
+                Padding(
+                  padding: const EdgeInsets.only(left: ElderSpacing.sm, top: 4),
+                  child: GestureDetector(
+                    onTap: () => ref
+                        .read(commentsProvider(postId).notifier)
+                        .toggleCommentLike(comment.id),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          comment.isLikedByMe
+                              ? Icons.favorite
+                              : Icons.favorite_border,
+                          size: 14,
+                          color: comment.isLikedByMe
+                              ? ElderColors.error
+                              : ElderColors.outline,
+                        ),
+                        if (comment.likeCount > 0) ...[
+                          const SizedBox(width: 3),
+                          Text(
+                            '${comment.likeCount}',
+                            style: GoogleFonts.lexend(
+                              fontSize: 12,
+                              color: ElderColors.outline,
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ── News Section ──────────────────────────────────────────────────────────────
+
+/// Renders paginated articles from [newsProvider] with an infinite-scroll
+/// loading indicator. Scroll the outer [SingleChildScrollView] to the bottom
+/// to trigger the next page automatically.
+class _NewsSection extends ConsumerWidget {
+  const _NewsSection();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final newsAsync = ref.watch(newsProvider);
+    return newsAsync.when(
+      loading: () => Container(
+        width: double.infinity,
+        height: 100,
+        decoration: BoxDecoration(
+          color: ElderColors.surfaceContainerLow,
+          borderRadius: BorderRadius.circular(_kCardRadius),
+        ),
+      ),
+      error: (error, stack) => const SizedBox.shrink(),
+      data: (newsState) {
+        final articles = newsState.articles;
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Section header
+            Padding(
+              padding: const EdgeInsets.only(bottom: ElderSpacing.lg),
+              child: Text(
+                'In the News',
+                style: GoogleFonts.plusJakartaSans(
+                  fontSize: 24,
+                  fontWeight: FontWeight.w700,
+                  color: ElderColors.primary,
+                ),
+              ),
+            ),
+            for (var i = 0; i < articles.length; i++) ...[
+              _NewsCard(article: articles[i]),
+              const SizedBox(height: ElderSpacing.xl),
+            ],
+            // Loading more indicator or end-of-feed message
+            if (newsState.isLoadingMore)
+              const Center(
+                child: Padding(
+                  padding: EdgeInsets.symmetric(vertical: ElderSpacing.lg),
+                  child: CircularProgressIndicator(color: ElderColors.primary),
+                ),
+              )
+            else if (!newsState.hasMore && articles.isNotEmpty)
+              Center(
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(vertical: ElderSpacing.lg),
+                  child: Text(
+                    "You're all caught up!",
+                    style: GoogleFonts.lexend(
+                      fontSize: 16,
+                      color: ElderColors.outline,
+                    ),
+                  ),
+                ),
+              ),
+          ],
+        );
+      },
+    );
+  }
+}
+
+/// A single news article card with TTS support.
+class _NewsCard extends StatefulWidget {
+  const _NewsCard({required this.article});
+
+  final NewsArticle article;
+
+  @override
+  State<_NewsCard> createState() => _NewsCardState();
+}
+
+class _NewsCardState extends State<_NewsCard> {
+  final _tts = FlutterTts();
+  bool _speaking = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _tts.setLanguage('en-US');
+    _tts.setSpeechRate(0.45); // Slower pace for elderly listeners
+    _tts.setCompletionHandler(() {
+      if (mounted) setState(() => _speaking = false);
+    });
+  }
+
+  @override
+  void dispose() {
+    _tts.stop();
+    super.dispose();
+  }
+
+  Future<void> _toggleTts() async {
+    if (_speaking) {
+      await _tts.stop();
+      setState(() => _speaking = false);
+    } else {
+      setState(() => _speaking = true);
+      await _tts.speak(widget.article.title);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
+    final article = widget.article;
     return Container(
       decoration: BoxDecoration(
         color: ElderColors.surfaceContainerLowest,
@@ -654,19 +1022,18 @@ class _NewsCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Image strip — tonal placeholder (CachedNetworkImage in backend sprint)
+          // Image strip — network image or tonal placeholder
           Stack(
             children: [
-              Container(
-                width: double.infinity,
-                height: 192,
-                color: ElderColors.surfaceContainerHigh,
-                child: const Icon(
-                  Icons.landscape,
-                  color: ElderColors.surfaceContainerHighest,
-                  size: 64,
-                ),
-              ),
+              article.imageUrl != null
+                  ? Image.network(
+                      article.imageUrl!,
+                      width: double.infinity,
+                      height: 192,
+                      fit: BoxFit.cover,
+                      errorBuilder: (context, error, stack) => _imagePlaceholder(),
+                    )
+                  : _imagePlaceholder(),
               // Category badge
               Positioned(
                 top: ElderSpacing.sm + ElderSpacing.xs,
@@ -681,7 +1048,7 @@ class _NewsCard extends StatelessWidget {
                     borderRadius: BorderRadius.circular(999),
                   ),
                   child: Text(
-                    'HEALTH',
+                    article.category.toUpperCase(),
                     style: GoogleFonts.lexend(
                       fontSize: 12,
                       fontWeight: FontWeight.w700,
@@ -704,7 +1071,7 @@ class _NewsCard extends StatelessWidget {
                   children: [
                     Expanded(
                       child: Text(
-                        'Nature Walk Benefits for Seniors',
+                        article.title,
                         style: GoogleFonts.plusJakartaSans(
                           fontSize: 22,
                           fontWeight: FontWeight.w700,
@@ -714,21 +1081,23 @@ class _NewsCard extends StatelessWidget {
                       ),
                     ),
                     const SizedBox(width: ElderSpacing.md),
-                    // Text-to-speech button
+                    // TTS toggle — speaks/stops the article title
                     Semantics(
-                      label: 'Read article aloud',
+                      label: _speaking ? 'Stop reading' : 'Read article aloud',
                       button: true,
                       child: Material(
-                        color: ElderColors.primaryContainer,
+                        color: _speaking
+                            ? ElderColors.primary
+                            : ElderColors.primaryContainer,
                         shape: const CircleBorder(),
                         child: InkWell(
                           customBorder: const CircleBorder(),
-                          onTap: () {/* TODO: trigger TTS for this article */},
-                          child: const SizedBox(
+                          onTap: _toggleTts,
+                          child: SizedBox(
                             width: 48,
                             height: 48,
                             child: Icon(
-                              Icons.volume_up,
+                              _speaking ? Icons.stop_rounded : Icons.volume_up,
                               color: Colors.white,
                               size: 22,
                             ),
@@ -740,7 +1109,7 @@ class _NewsCard extends StatelessWidget {
                 ),
                 const SizedBox(height: ElderSpacing.xs),
                 Text(
-                  'Health Today',
+                  article.source,
                   style: GoogleFonts.lexend(
                     fontSize: 16,
                     fontWeight: FontWeight.w600,
@@ -752,18 +1121,22 @@ class _NewsCard extends StatelessWidget {
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     Text(
-                      '5 min read',
-                      // Bumped from text-sm (14sp) to 16sp — font size minimum rule
+                      '${article.readMinutes} min read',
                       style: GoogleFonts.lexend(
                         fontSize: 16,
                         color: ElderColors.outline,
                       ),
                     ),
                     Semantics(
-                      label: 'Read full article',
+                      label: 'Read article',
                       button: true,
                       child: GestureDetector(
-                        onTap: () {/* TODO: open article in news reader */},
+                        onTap: () => showModalBottomSheet<void>(
+                          context: context,
+                          isScrollControlled: true,
+                          backgroundColor: Colors.transparent,
+                          builder: (_) => _ArticleReaderSheet(article: article),
+                        ),
                         child: Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
@@ -794,6 +1167,17 @@ class _NewsCard extends StatelessWidget {
       ),
     );
   }
+
+  Widget _imagePlaceholder() => Container(
+        width: double.infinity,
+        height: 192,
+        color: ElderColors.surfaceContainerHigh,
+        child: const Icon(
+          Icons.landscape,
+          color: ElderColors.surfaceContainerHighest,
+          size: 64,
+        ),
+      );
 }
 
 // ── Bottom Navigation Bar ─────────────────────────────────────────────────────
@@ -816,7 +1200,7 @@ class _BottomNav extends StatelessWidget {
       _NavTabData(tab: _NavTab.feed, icon: Icons.rss_feed, label: 'Feed'),
       _NavTabData(tab: _NavTab.games, icon: Icons.videogame_asset, label: 'Games'),
       if (hasMedication)
-        _NavTabData(tab: _NavTab.medication, icon: Icons.medication, label: 'Medication'),
+        _NavTabData(tab: _NavTab.medication, icon: Icons.medication, label: 'Meds'),
     ];
 
     return Container(
@@ -1077,6 +1461,875 @@ class _TextPostComposerSheetState
               ),
             ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+// ── Photo Post Composer Sheet ─────────────────────────────────────────────────
+
+/// Bottom sheet for composing a photo post.
+/// Lets the elder pick a photo from gallery, add an optional caption, and post.
+class _PhotoPostComposerSheet extends ConsumerStatefulWidget {
+  const _PhotoPostComposerSheet();
+
+  @override
+  ConsumerState<_PhotoPostComposerSheet> createState() =>
+      _PhotoPostComposerSheetState();
+}
+
+class _PhotoPostComposerSheetState
+    extends ConsumerState<_PhotoPostComposerSheet> {
+  final _controller = TextEditingController();
+  XFile? _pickedFile;
+  bool _uploading = false;
+  String? _error;
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  Future<void> _pickPhoto() async {
+    final source = await showModalBottomSheet<ImageSource>(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (_) => Container(
+        decoration: const BoxDecoration(
+          color: ElderColors.surface,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        ),
+        padding: const EdgeInsets.fromLTRB(
+            ElderSpacing.lg, ElderSpacing.lg, ElderSpacing.lg, ElderSpacing.xxl),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 32, height: 4,
+              decoration: BoxDecoration(
+                color: ElderColors.outlineVariant,
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            const SizedBox(height: ElderSpacing.lg),
+            Text('Add a Photo',
+                style: GoogleFonts.plusJakartaSans(
+                    fontSize: 20,
+                    fontWeight: FontWeight.w700,
+                    color: ElderColors.onSurface),
+                textAlign: TextAlign.center),
+            const SizedBox(height: ElderSpacing.lg),
+            _SourceOption(
+              icon: Icons.camera_alt_rounded,
+              label: 'Take a Photo',
+              onTap: () => Navigator.pop(context, ImageSource.camera),
+            ),
+            const SizedBox(height: ElderSpacing.md),
+            _SourceOption(
+              icon: Icons.photo_library_rounded,
+              label: 'Choose from Gallery',
+              onTap: () => Navigator.pop(context, ImageSource.gallery),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (source == null) return;
+    final service = PhotoUploadService(Supabase.instance.client);
+    final file = await service.pick(source);
+    if (file != null && mounted) setState(() => _pickedFile = file);
+  }
+
+  Future<void> _submit() async {
+    if (_pickedFile == null) return;
+    setState(() { _uploading = true; _error = null; });
+
+    try {
+      final service = PhotoUploadService(Supabase.instance.client);
+      final url = await service.upload(_pickedFile!);
+      final caption = _controller.text.trim();
+      await ref.read(postSubmissionProvider.notifier).submitPost(
+            content: caption.isEmpty ? '📷' : caption,
+            photoUrl: url,
+          );
+      if (mounted) Navigator.of(context).pop();
+    } catch (e) {
+      setState(() { _uploading = false; _error = 'Upload failed. Please try again.'; });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final bottomInset = MediaQuery.viewInsetsOf(context).bottom;
+    return Container(
+      margin: EdgeInsets.only(bottom: bottomInset),
+      decoration: const BoxDecoration(
+        color: ElderColors.surfaceContainerLowest,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      padding: const EdgeInsets.fromLTRB(
+        ElderSpacing.lg, ElderSpacing.md, ElderSpacing.lg, ElderSpacing.lg,
+      ),
+      child: SafeArea(
+        top: false,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Drag handle
+            Center(
+              child: Container(
+                width: 40, height: 4,
+                decoration: BoxDecoration(
+                  color: ElderColors.outline.withValues(alpha: 0.4),
+                  borderRadius: BorderRadius.circular(9999),
+                ),
+              ),
+            ),
+            const SizedBox(height: ElderSpacing.lg),
+            Text(
+              'Share a photo',
+              style: GoogleFonts.plusJakartaSans(
+                fontSize: 24, fontWeight: FontWeight.w700,
+                color: ElderColors.primary,
+              ),
+            ),
+            const SizedBox(height: ElderSpacing.lg),
+
+            // Photo picker / preview
+            GestureDetector(
+              onTap: _uploading ? null : _pickPhoto,
+              child: Container(
+                width: double.infinity,
+                height: 180,
+                decoration: BoxDecoration(
+                  color: ElderColors.surfaceContainerHighest,
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(
+                    color: _pickedFile != null
+                        ? ElderColors.primaryContainer
+                        : ElderColors.outline.withValues(alpha: 0.3),
+                    width: 2,
+                  ),
+                ),
+                child: _pickedFile != null
+                    ? ClipRRect(
+                        borderRadius: BorderRadius.circular(14),
+                        child: Image.file(
+                          File(_pickedFile!.path),
+                          fit: BoxFit.cover,
+                          errorBuilder: (context, error, stack) =>
+                              const Icon(Icons.broken_image, size: 48),
+                        ),
+                      )
+                    : Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          const Icon(Icons.add_photo_alternate_outlined,
+                              size: 48, color: ElderColors.onSurfaceVariant),
+                          const SizedBox(height: ElderSpacing.sm),
+                          Text(
+                            'Tap to choose a photo',
+                            style: GoogleFonts.lexend(
+                              fontSize: 16,
+                              color: ElderColors.onSurfaceVariant,
+                            ),
+                          ),
+                        ],
+                      ),
+              ),
+            ),
+            const SizedBox(height: ElderSpacing.md),
+
+            // Caption
+            TextField(
+              controller: _controller,
+              maxLines: 2,
+              style: GoogleFonts.lexend(
+                  fontSize: 18, color: ElderColors.onSurface),
+              decoration: InputDecoration(
+                hintText: 'Add a caption (optional)',
+                hintStyle: GoogleFonts.lexend(
+                    fontSize: 18, color: ElderColors.onSurfaceVariant),
+                filled: true,
+                fillColor: ElderColors.surfaceContainerHighest,
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(16),
+                  borderSide: BorderSide.none,
+                ),
+                contentPadding: const EdgeInsets.all(ElderSpacing.md),
+              ),
+            ),
+
+            if (_error != null) ...[
+              const SizedBox(height: ElderSpacing.sm),
+              Text(_error!,
+                  style: GoogleFonts.lexend(
+                      fontSize: 16, color: ElderColors.error)),
+            ],
+            const SizedBox(height: ElderSpacing.lg),
+
+            // Post button
+            SizedBox(
+              width: double.infinity,
+              height: 56,
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  gradient: _pickedFile == null
+                      ? null
+                      : const LinearGradient(
+                          colors: [
+                            ElderColors.primary, ElderColors.primaryContainer
+                          ],
+                        ),
+                  color: _pickedFile == null ? ElderColors.surfaceContainerLow : null,
+                  borderRadius: BorderRadius.circular(24),
+                ),
+                child: Material(
+                  color: Colors.transparent,
+                  borderRadius: BorderRadius.circular(24),
+                  child: InkWell(
+                    borderRadius: BorderRadius.circular(24),
+                    onTap: (_pickedFile == null || _uploading) ? null : _submit,
+                    child: Center(
+                      child: _uploading
+                          ? const SizedBox(
+                              width: 24, height: 24,
+                              child: CircularProgressIndicator(
+                                  color: Colors.white, strokeWidth: 2.5),
+                            )
+                          : Text(
+                              'Post Photo',
+                              style: GoogleFonts.lexend(
+                                fontSize: 20,
+                                fontWeight: FontWeight.w700,
+                                color: _pickedFile == null
+                                    ? ElderColors.onSurfaceVariant
+                                    : Colors.white,
+                              ),
+                            ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ── Reply Sheet ───────────────────────────────────────────────────────────────
+
+/// Comment composer — inserts a comment into `post_comments` and shows it
+/// as an inline thread inside the post card.
+class _ReplySheet extends ConsumerStatefulWidget {
+  const _ReplySheet({required this.postId});
+
+  final String postId;
+
+  @override
+  ConsumerState<_ReplySheet> createState() => _ReplySheetState();
+}
+
+class _ReplySheetState extends ConsumerState<_ReplySheet> {
+  final _controller = TextEditingController();
+  final _focusNode = FocusNode();
+  bool _submitting = false;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance
+        .addPostFrameCallback((_) => _focusNode.requestFocus());
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    _focusNode.dispose();
+    super.dispose();
+  }
+
+  Future<void> _submit() async {
+    final text = _controller.text.trim();
+    if (text.isEmpty) return;
+    setState(() => _submitting = true);
+    await ref.read(commentsProvider(widget.postId).notifier).addComment(text);
+    if (mounted) Navigator.of(context).pop();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final bottomInset = MediaQuery.viewInsetsOf(context).bottom;
+    return Container(
+      margin: EdgeInsets.only(bottom: bottomInset),
+      decoration: const BoxDecoration(
+        color: ElderColors.surfaceContainerLowest,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      padding: const EdgeInsets.fromLTRB(
+          ElderSpacing.lg, ElderSpacing.md, ElderSpacing.lg, ElderSpacing.lg),
+      child: SafeArea(
+        top: false,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Center(
+              child: Container(
+                width: 40, height: 4,
+                decoration: BoxDecoration(
+                  color: ElderColors.outline.withValues(alpha: 0.4),
+                  borderRadius: BorderRadius.circular(9999),
+                ),
+              ),
+            ),
+            const SizedBox(height: ElderSpacing.lg),
+            Text(
+              'Write a comment',
+              style: GoogleFonts.plusJakartaSans(
+                fontSize: 24, fontWeight: FontWeight.w700,
+                color: ElderColors.primary,
+              ),
+            ),
+            const SizedBox(height: ElderSpacing.lg),
+            TextField(
+              controller: _controller,
+              focusNode: _focusNode,
+              maxLines: 4,
+              minLines: 2,
+              style: GoogleFonts.lexend(
+                  fontSize: 18, color: ElderColors.onSurface, height: 1.6),
+              decoration: InputDecoration(
+                hintText: 'Share your thoughts...',
+                hintStyle: GoogleFonts.lexend(
+                    fontSize: 18, color: ElderColors.onSurfaceVariant),
+                filled: true,
+                fillColor: ElderColors.surfaceContainerHighest,
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(16),
+                  borderSide: BorderSide.none,
+                ),
+                contentPadding: const EdgeInsets.all(ElderSpacing.lg),
+              ),
+            ),
+            const SizedBox(height: ElderSpacing.lg),
+            SizedBox(
+              width: double.infinity,
+              height: 56,
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  gradient: const LinearGradient(
+                    colors: [ElderColors.primary, ElderColors.primaryContainer],
+                  ),
+                  borderRadius: BorderRadius.circular(24),
+                ),
+                child: Material(
+                  color: Colors.transparent,
+                  borderRadius: BorderRadius.circular(24),
+                  child: InkWell(
+                    borderRadius: BorderRadius.circular(24),
+                    onTap: _submitting ? null : _submit,
+                    child: Center(
+                      child: _submitting
+                          ? const SizedBox(
+                              width: 24, height: 24,
+                              child: CircularProgressIndicator(
+                                  color: Colors.white, strokeWidth: 2.5),
+                            )
+                          : Text(
+                              'Post Comment',
+                              style: GoogleFonts.lexend(
+                                fontSize: 20,
+                                fontWeight: FontWeight.w700,
+                                color: Colors.white,
+                              ),
+                            ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ── Article Reader Sheet ──────────────────────────────────────────────────────
+
+/// Full-screen bottom sheet that displays a news article with:
+/// - Hero image strip and category badge
+/// - Large accessible title + source
+/// - Article description/excerpt read by TTS
+/// - Optional "Open full article in browser" fallback
+class _ArticleReaderSheet extends StatefulWidget {
+  const _ArticleReaderSheet({required this.article});
+
+  final NewsArticle article;
+
+  @override
+  State<_ArticleReaderSheet> createState() => _ArticleReaderSheetState();
+}
+
+class _ArticleReaderSheetState extends State<_ArticleReaderSheet> {
+  final _tts = FlutterTts();
+  bool _speaking = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _tts.setLanguage('en-US');
+    _tts.setSpeechRate(0.42);
+    _tts.setCompletionHandler(() {
+      if (mounted) setState(() => _speaking = false);
+    });
+  }
+
+  @override
+  void dispose() {
+    _tts.stop();
+    super.dispose();
+  }
+
+  Future<void> _toggleTts() async {
+    if (_speaking) {
+      await _tts.stop();
+      setState(() => _speaking = false);
+    } else {
+      setState(() => _speaking = true);
+      final article = widget.article;
+      // Read title → description → content body for a complete listen experience.
+      final text = [
+        article.title,
+        if (article.description != null && article.description!.isNotEmpty)
+          article.description!,
+        if (article.content != null && article.content!.isNotEmpty)
+          article.content!,
+      ].join('. ');
+      await _tts.speak(text);
+    }
+  }
+
+  Future<void> _openInBrowser() async {
+    final url = widget.article.url;
+    if (url == null) return;
+    final uri = Uri.tryParse(url);
+    if (uri == null) return;
+    if (await canLaunchUrl(uri)) {
+      // inAppBrowserView opens a Chrome Custom Tab — stays inside the app.
+      await launchUrl(uri, mode: LaunchMode.inAppBrowserView);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final article = widget.article;
+    // Use almost full screen height so content is readable without scrolling.
+    final sheetHeight = MediaQuery.sizeOf(context).height * 0.92;
+
+    return Container(
+      height: sheetHeight,
+      decoration: const BoxDecoration(
+        color: ElderColors.surfaceContainerLowest,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+      ),
+      child: Column(
+        children: [
+          // ── Drag handle ───────────────────────────────────────────────────
+          Padding(
+            padding: const EdgeInsets.only(top: ElderSpacing.md),
+            child: Container(
+              width: 40,
+              height: 4,
+              decoration: BoxDecoration(
+                color: ElderColors.outline.withValues(alpha: 0.4),
+                borderRadius: BorderRadius.circular(9999),
+              ),
+            ),
+          ),
+
+          // ── Scrollable body ───────────────────────────────────────────────
+          Expanded(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.only(bottom: ElderSpacing.xl),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Hero image
+                  Stack(
+                    children: [
+                      article.imageUrl != null
+                          ? Image.network(
+                              article.imageUrl!,
+                              width: double.infinity,
+                              height: 240,
+                              fit: BoxFit.cover,
+                              errorBuilder: (_, __, ___) => _imagePlaceholder(),
+                            )
+                          : _imagePlaceholder(),
+                      // Back / close button
+                      Positioned(
+                        top: ElderSpacing.lg,
+                        left: ElderSpacing.lg,
+                        child: Semantics(
+                          label: 'Close article',
+                          button: true,
+                          child: Material(
+                            color: Colors.black54,
+                            shape: const CircleBorder(),
+                            child: InkWell(
+                              customBorder: const CircleBorder(),
+                              onTap: () => Navigator.of(context).pop(),
+                              child: const SizedBox(
+                                width: 48,
+                                height: 48,
+                                child: Icon(
+                                  Icons.close_rounded,
+                                  color: Colors.white,
+                                  size: 24,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                      // Category badge
+                      Positioned(
+                        bottom: ElderSpacing.md,
+                        left: ElderSpacing.lg,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: ElderSpacing.md,
+                            vertical: ElderSpacing.xs,
+                          ),
+                          decoration: BoxDecoration(
+                            color: ElderColors.tertiary,
+                            borderRadius: BorderRadius.circular(999),
+                          ),
+                          child: Text(
+                            article.category.toUpperCase(),
+                            style: GoogleFonts.lexend(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w700,
+                              color: Colors.white,
+                              letterSpacing: 1.2,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+
+                  // ── Article metadata ──────────────────────────────────────
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(
+                      ElderSpacing.lg,
+                      ElderSpacing.xl,
+                      ElderSpacing.lg,
+                      0,
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        // Source + read time row
+                        Row(
+                          children: [
+                            Text(
+                              article.source,
+                              style: GoogleFonts.lexend(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w600,
+                                color: ElderColors.primary,
+                              ),
+                            ),
+                            const SizedBox(width: ElderSpacing.md),
+                            Container(
+                              width: 4,
+                              height: 4,
+                              decoration: const BoxDecoration(
+                                shape: BoxShape.circle,
+                                color: ElderColors.outline,
+                              ),
+                            ),
+                            const SizedBox(width: ElderSpacing.md),
+                            Text(
+                              '${article.readMinutes} min read',
+                              style: GoogleFonts.lexend(
+                                fontSize: 16,
+                                color: ElderColors.outline,
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: ElderSpacing.md),
+
+                        // Title
+                        Text(
+                          article.title,
+                          style: GoogleFonts.plusJakartaSans(
+                            fontSize: 26,
+                            fontWeight: FontWeight.w700,
+                            color: ElderColors.onSurface,
+                            height: 1.3,
+                          ),
+                        ),
+                        const SizedBox(height: ElderSpacing.xl),
+
+                        // ── Listen / stop button ──────────────────────────
+                        Semantics(
+                          label: _speaking
+                              ? 'Stop reading aloud'
+                              : 'Listen to this article',
+                          button: true,
+                          child: GestureDetector(
+                            onTap: _toggleTts,
+                            child: AnimatedContainer(
+                              duration: const Duration(milliseconds: 200),
+                              width: double.infinity,
+                              height: 64,
+                              decoration: BoxDecoration(
+                                gradient: _speaking
+                                    ? null
+                                    : const LinearGradient(
+                                        colors: [
+                                          ElderColors.primary,
+                                          ElderColors.primaryContainer,
+                                        ],
+                                      ),
+                                color: _speaking ? ElderColors.errorContainer : null,
+                                borderRadius: BorderRadius.circular(20),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: ElderColors.primary.withValues(alpha: 0.25),
+                                    blurRadius: 12,
+                                    offset: const Offset(0, 4),
+                                  ),
+                                ],
+                              ),
+                              child: Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Icon(
+                                    _speaking
+                                        ? Icons.stop_rounded
+                                        : Icons.volume_up_rounded,
+                                    color: _speaking
+                                        ? ElderColors.onErrorContainer
+                                        : Colors.white,
+                                    size: 28,
+                                  ),
+                                  const SizedBox(width: ElderSpacing.md),
+                                  Text(
+                                    _speaking ? 'Stop Reading' : 'Listen to Article',
+                                    style: GoogleFonts.lexend(
+                                      fontSize: 20,
+                                      fontWeight: FontWeight.w700,
+                                      color: _speaking
+                                          ? ElderColors.onErrorContainer
+                                          : Colors.white,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: ElderSpacing.xl),
+
+                        // Divider
+                        Container(
+                          height: 1,
+                          color: ElderColors.outline.withValues(alpha: 0.15),
+                        ),
+                        const SizedBox(height: ElderSpacing.xl),
+
+                        // ── Article excerpt + body ────────────────────────
+                        if (article.description != null &&
+                            article.description!.isNotEmpty) ...[
+                          Text(
+                            'Summary',
+                            style: GoogleFonts.plusJakartaSans(
+                              fontSize: 18,
+                              fontWeight: FontWeight.w700,
+                              color: ElderColors.onSurfaceVariant,
+                            ),
+                          ),
+                          const SizedBox(height: ElderSpacing.md),
+                          Text(
+                            article.description!,
+                            style: GoogleFonts.lexend(
+                              fontSize: 20,
+                              color: ElderColors.onSurface,
+                              height: 1.7,
+                            ),
+                          ),
+                          const SizedBox(height: ElderSpacing.xl),
+                        ],
+                        if (article.content != null &&
+                            article.content!.isNotEmpty) ...[
+                          Container(
+                            height: 1,
+                            color: ElderColors.outline.withValues(alpha: 0.15),
+                          ),
+                          const SizedBox(height: ElderSpacing.xl),
+                          Text(
+                            'Article',
+                            style: GoogleFonts.plusJakartaSans(
+                              fontSize: 18,
+                              fontWeight: FontWeight.w700,
+                              color: ElderColors.onSurfaceVariant,
+                            ),
+                          ),
+                          const SizedBox(height: ElderSpacing.md),
+                          Text(
+                            article.content!,
+                            style: GoogleFonts.lexend(
+                              fontSize: 20,
+                              color: ElderColors.onSurface,
+                              height: 1.7,
+                            ),
+                          ),
+                          const SizedBox(height: ElderSpacing.xl),
+                        ],
+
+                        // ── Open in browser fallback ───────────────────────
+                        if (article.url != null) ...[
+                          Container(
+                            height: 1,
+                            color: ElderColors.outline.withValues(alpha: 0.15),
+                          ),
+                          const SizedBox(height: ElderSpacing.xl),
+                          Semantics(
+                            label: 'Open full article in browser',
+                            button: true,
+                            child: GestureDetector(
+                              onTap: _openInBrowser,
+                              child: Container(
+                                width: double.infinity,
+                                padding: const EdgeInsets.all(ElderSpacing.lg),
+                                decoration: BoxDecoration(
+                                  color: ElderColors.surfaceContainerLow,
+                                  borderRadius: BorderRadius.circular(16),
+                                ),
+                                child: Row(
+                                  children: [
+                                    Container(
+                                      width: 48,
+                                      height: 48,
+                                      decoration: BoxDecoration(
+                                        color: ElderColors.primaryContainer
+                                            .withValues(alpha: 0.2),
+                                        shape: BoxShape.circle,
+                                      ),
+                                      child: const Icon(
+                                        Icons.open_in_browser_rounded,
+                                        color: ElderColors.primary,
+                                        size: 24,
+                                      ),
+                                    ),
+                                    const SizedBox(width: ElderSpacing.md),
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          Text(
+                                            'Read full article',
+                                            style: GoogleFonts.lexend(
+                                              fontSize: 18,
+                                              fontWeight: FontWeight.w700,
+                                              color: ElderColors.onSurface,
+                                            ),
+                                          ),
+                                          Text(
+                                            'Opens in your browser',
+                                            style: GoogleFonts.lexend(
+                                              fontSize: 16,
+                                              color: ElderColors.outline,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                    const Icon(
+                                      Icons.arrow_forward_ios_rounded,
+                                      color: ElderColors.outline,
+                                      size: 18,
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _imagePlaceholder() => Container(
+        width: double.infinity,
+        height: 240,
+        color: ElderColors.surfaceContainerHigh,
+        child: const Icon(
+          Icons.landscape,
+          color: ElderColors.surfaceContainerHighest,
+          size: 64,
+        ),
+      );
+}
+
+// ── _SourceOption ─────────────────────────────────────────────────────────────
+
+/// Reusable option row used inside the camera/gallery picker bottom sheet.
+class _SourceOption extends StatelessWidget {
+  const _SourceOption({
+    required this.icon,
+    required this.label,
+    required this.onTap,
+  });
+
+  final IconData icon;
+  final String label;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      button: true,
+      label: label,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(16),
+        child: Container(
+          padding: const EdgeInsets.all(ElderSpacing.lg),
+          decoration: BoxDecoration(
+            color: ElderColors.surfaceContainerLow,
+            borderRadius: BorderRadius.circular(16),
+          ),
+          child: Row(
+            children: [
+              Icon(icon, size: 28, color: ElderColors.primary),
+              const SizedBox(width: ElderSpacing.md),
+              Text(label,
+                  style: GoogleFonts.plusJakartaSans(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w600,
+                      color: ElderColors.onSurface)),
+            ],
+          ),
         ),
       ),
     );

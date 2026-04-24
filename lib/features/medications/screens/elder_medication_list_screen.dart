@@ -1,7 +1,9 @@
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../core/constants/elder_colors.dart';
 import '../../../core/constants/elder_spacing.dart';
 import '../providers/medications_provider.dart';
@@ -60,9 +62,15 @@ class ElderMedicationListScreen extends ConsumerWidget {
       ),
       bottomSheet: _BottomNav(
         activeTab: _NavTab.medication,
-        // TODO: drive from provider
         hasMedication: true,
-        onTabSelected: (_) {/* TODO: navigate via context.go */},
+        onTabSelected: (tab) {
+          switch (tab) {
+            case _NavTab.home:       context.go('/home/elder');
+            case _NavTab.feed:       context.go('/feed/elder');
+            case _NavTab.games:      context.go('/games/elder');
+            case _NavTab.medication: break;
+          }
+        },
       ),
     );
   }
@@ -239,7 +247,21 @@ class _UpNextCard extends ConsumerWidget {
                     borderRadius: BorderRadius.circular(_kButtonRadius),
                     child: InkWell(
                       borderRadius: BorderRadius.circular(_kButtonRadius),
-                      onTap: () {/* TODO: log medication as taken */},
+                      onTap: () async {
+                        try {
+                          await Supabase.instance.client
+                              .from('medication_logs')
+                              .update({
+                                'status': 'taken',
+                                'taken_at': DateTime.now().toIso8601String(),
+                              })
+                              .eq('id', log.id);
+                          ref.invalidate(nextMedicationProvider);
+                          ref.invalidate(medicationHistoryProvider);
+                        } catch (_) {
+                          // Non-fatal — the next provider refresh will correct state.
+                        }
+                      },
                       child: Container(
                         width: double.infinity,
                         constraints: const BoxConstraints(minHeight: 64),
@@ -429,7 +451,7 @@ class _BottomNav extends StatelessWidget {
       _NavTabData(tab: _NavTab.feed, icon: Icons.rss_feed, label: 'Feed'),
       _NavTabData(tab: _NavTab.games, icon: Icons.videogame_asset, label: 'Games'),
       if (hasMedication)
-        _NavTabData(tab: _NavTab.medication, icon: Icons.medication, label: 'Medication'),
+        _NavTabData(tab: _NavTab.medication, icon: Icons.medication, label: 'Meds'),
     ];
 
     return Container(

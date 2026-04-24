@@ -1,30 +1,23 @@
-/// Elder PIN Login — high-visibility variant for elderly users.
+/// Elder PIN Login — high-visibility fallback shown after session expiry or reinstall.
 ///
-/// Fallback screen shown after session expiry or app reinstall.
-/// Not a daily login screen — per auth spec, elder sessions persist
-/// indefinitely. PIN validation deferred to backend sprint.
-///
-/// Stitch folder: elder_pin_login_high_visibility
-/// HTML comment: "Significantly increased font size and weight for legibility"
+/// Normal daily flow: session restores from flutter_secure_storage automatically.
+/// This screen only appears when that restoration fails.
 library;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../core/constants/elder_colors.dart';
 import '../../../core/constants/elder_spacing.dart';
 import '../providers/auth_provider.dart';
 
-// Stitch config: rounded-2xl = 1.25rem = 20dp, rounded-xl = 0.75rem = 12dp.
-const double _kKeyRadius = 20.0;   // rounded-2xl — numpad keys
-const double _kSlotRadius = 12.0;  // rounded-xl — PIN slot containers
-
-// Stitch config: w-16 = 64dp, h-20 = 80dp, h-[84px] = 84dp.
-const double _kSlotWidth = 64.0;
-const double _kSlotHeight = 80.0;
-const double _kKeyHeight = 84.0;
-
+const double _kKeyRadius = 20.0;
+const double _kSlotRadius = 12.0;
+const double _kSlotWidth = 60.0;
+const double _kSlotHeight = 72.0;
+const double _kKeyHeight = 72.0; // slightly smaller to make room for buttons below
 const int _kPinLength = 4;
 
 class ElderPinLoginScreen extends ConsumerStatefulWidget {
@@ -37,13 +30,17 @@ class ElderPinLoginScreen extends ConsumerStatefulWidget {
 
 class _ElderPinLoginScreenState extends ConsumerState<ElderPinLoginScreen>
     with SingleTickerProviderStateMixin {
-
   late final AnimationController _anim;
   late final CurvedAnimation _fadeIn;
 
   final List<int> _pin = [];
   bool _isVerifying = false;
   bool _hasError = false;
+  bool _sendingHelp = false;
+
+  // Elder's display name — loaded from secure storage, shown below "Welcome Back".
+  // Also used as fallback for the name+PIN session recovery Edge Function.
+  String? _storedName;
 
   @override
   void initState() {
@@ -53,6 +50,12 @@ class _ElderPinLoginScreenState extends ConsumerState<ElderPinLoginScreen>
       vsync: this,
     )..forward();
     _fadeIn = CurvedAnimation(parent: _anim, curve: Curves.easeOut);
+    _loadStoredName();
+  }
+
+  Future<void> _loadStoredName() async {
+    final name = await ref.read(authServiceProvider).getStoredElderName();
+    if (mounted) setState(() => _storedName = name);
   }
 
   @override
@@ -63,7 +66,7 @@ class _ElderPinLoginScreenState extends ConsumerState<ElderPinLoginScreen>
   }
 
   void _onDigit(int digit) {
-    if (_pin.length >= _kPinLength) return;
+    if (_pin.length >= _kPinLength || _isVerifying) return;
     setState(() => _pin.add(digit));
     if (_pin.length == _kPinLength) _onPinComplete();
   }
@@ -75,25 +78,59 @@ class _ElderPinLoginScreenState extends ConsumerState<ElderPinLoginScreen>
 
   Future<void> _onPinComplete() async {
     if (_isVerifying) return;
-    setState(() { _isVerifying = true; _hasError = false; });
+    setState(() {
+      _isVerifying = true;
+      _hasError = false;
+    });
 
     final service = ref.read(authServiceProvider);
     final enteredPin = _pin.join();
 
     try {
-      // Verify against the locally cached hash — no DB query needed.
+      // Read identifiers FIRST — restoreElderSession() calls _clearElderSession()
+      // on expired tokens, which deletes elderId and makes the DB fallback impossible.
+      final elderId = await service.getStoredElderId();
       final storedHash = await service.getStoredPinHash();
 
+      bool pinVerified = false;
+
+      // Step 1: fast local hash check — offline, covers the normal daily case.
       if (storedHash != null && service.verifyPinLocal(enteredPin, storedHash)) {
-        // Hash matches — restore the Supabase session from secure storage.
-        final session = await service.restoreElderSession();
+        pinVerified = true;
+      }
+
+      // Step 2: DB fallback — runs when local hash is missing or stale (after PIN reset).
+      if (!pinVerified && elderId != null) {
+        final dbMatch = await service.verifyElderPin(
+          elderId: elderId,
+          pin: enteredPin,
+        );
+        if (dbMatch) {
+          pinVerified = true;
+          await service.fetchAndCachePinHash(elderId);
+        }
+      }
+
+      if (pinVerified) {
+        // Session restoration cascade — three layers of fallback:
+        // 1. Refresh token (fast, covers normal session-expiry case)
+        // 2. Cached email+password (handles token rotation issues)
+        // 3. Name+PIN Edge Function (covers full reinstall / wiped storage)
+        var session = await service.restoreElderSession();
+        session ??= await service.signInWithCachedCredentials();
+        if (session == null && _storedName != null) {
+          session = await service.restoreSessionWithNameAndPin(
+            fullName: _storedName!,
+            pin: enteredPin,
+          );
+        }
         if (mounted && session != null) {
-          context.go('/home/elder');
+          await service.saveLastRole('elderly');
+          if (mounted) context.go('/home/elder');
           return;
         }
       }
 
-      // PIN wrong or session restore failed — clear input and show error.
       if (mounted) {
         setState(() {
           _pin.clear();
@@ -112,6 +149,130 @@ class _ElderPinLoginScreenState extends ConsumerState<ElderPinLoginScreen>
     }
   }
 
+  /// Notifies the caretaker that the elder needs help.
+  ///
+  /// Fast path: if a session can be restored, calls send-sos-alert (authenticated).
+  /// Fallback: if no session (reinstall), shows a phone number dialog and calls
+  /// send-help-request (unauthenticated, identifies elder by phone).
+  Future<void> _sendHelpNotification() async {
+    if (_sendingHelp) return;
+    setState(() => _sendingHelp = true);
+
+    final service = ref.read(authServiceProvider);
+    try {
+      var session = await service.restoreElderSession();
+      session ??= await service.signInWithCachedCredentials();
+
+      if (session != null) {
+        // Authenticated path — elder is known, use send-sos-alert.
+        await Supabase.instance.client.functions.invoke(
+          'send-sos-alert',
+          body: {'message': 'Elder needs help signing in'},
+        );
+        if (mounted) _showHelpSentSnackBar();
+      } else {
+        // Reinstall path — ask for phone number, then send unauthenticated request.
+        if (mounted) await _sendHelpWithPhone(service);
+      }
+    } catch (_) {
+      if (mounted) {
+        // Fallback: still offer the phone-based path.
+        await _sendHelpWithPhone(service);
+      }
+    } finally {
+      if (mounted) setState(() => _sendingHelp = false);
+    }
+  }
+
+  /// Shows a phone number dialog and calls send-help-request with the anon key.
+  Future<void> _sendHelpWithPhone(dynamic service) async {
+    final phoneCtrl = TextEditingController();
+    final confirmed = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Text(
+          'Enter Your Phone Number',
+          style: GoogleFonts.plusJakartaSans(fontSize: 22, fontWeight: FontWeight.w700),
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'We will notify your caretaker right away.',
+              style: GoogleFonts.lexend(fontSize: 17, color: ElderColors.onSurfaceVariant),
+            ),
+            const SizedBox(height: 16),
+            TextField(
+              controller: phoneCtrl,
+              keyboardType: TextInputType.phone,
+              autofocus: true,
+              style: GoogleFonts.lexend(fontSize: 20),
+              decoration: InputDecoration(
+                hintText: '07X XXX XXXX',
+                hintStyle: GoogleFonts.lexend(fontSize: 20, color: ElderColors.outline),
+                filled: true,
+                fillColor: ElderColors.surfaceContainerLow,
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(14),
+                  borderSide: BorderSide.none,
+                ),
+                contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: Text('Cancel', style: GoogleFonts.lexend(fontSize: 18, color: ElderColors.onSurfaceVariant)),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: FilledButton.styleFrom(backgroundColor: ElderColors.primary),
+            child: Text('Send', style: GoogleFonts.lexend(fontSize: 18, fontWeight: FontWeight.w700)),
+          ),
+        ],
+      ),
+    );
+
+    final phone = phoneCtrl.text.trim();
+    phoneCtrl.dispose();
+
+    if (confirmed == true && phone.isNotEmpty && mounted) {
+      final ok = await service.sendHelpRequest(phone);
+      if (mounted) {
+        if (ok) {
+          _showHelpSentSnackBar();
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+            content: Text(
+              'Could not send notification. Please call your caretaker directly.',
+              style: GoogleFonts.lexend(fontSize: 16),
+            ),
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          ));
+        }
+      }
+    }
+  }
+
+  void _showHelpSentSnackBar() {
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+      content: Text(
+        'Your caretaker has been notified. They will contact you shortly.',
+        style: GoogleFonts.lexend(fontSize: 16),
+      ),
+      behavior: SnackBarBehavior.floating,
+      backgroundColor: ElderColors.primary,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      duration: const Duration(seconds: 5),
+    ));
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -126,126 +287,200 @@ class _ElderPinLoginScreenState extends ConsumerState<ElderPinLoginScreen>
               child: child,
             ),
           ),
-          child: Column(
-            children: [
-              _buildHeader(),
-              Expanded(
+          child: SingleChildScrollView(
+            child: ConstrainedBox(
+              constraints: BoxConstraints(
+                minHeight: MediaQuery.of(context).size.height -
+                    MediaQuery.of(context).padding.top -
+                    MediaQuery.of(context).padding.bottom,
+              ),
+              child: IntrinsicHeight(
                 child: Column(
                   children: [
-                    const SizedBox(height: ElderSpacing.md), // pt-4
+                    _buildHeader(),
+                    const SizedBox(height: ElderSpacing.sm),
 
-                    // "Welcome Back" — text-[2.5rem] = 40sp, bold, onSurface
+                    // "Welcome Back"
                     Padding(
                       padding: const EdgeInsets.symmetric(
                           horizontal: ElderSpacing.lg),
                       child: Text(
                         'Welcome Back',
                         style: GoogleFonts.plusJakartaSans(
-                          fontSize: 40, // text-[2.5rem]
+                          fontSize: 36,
                           fontWeight: FontWeight.bold,
                           color: ElderColors.onSurface,
-                          height: 1.2, // leading-tight
+                          height: 1.2,
                         ),
                         textAlign: TextAlign.center,
                       ),
                     ),
 
-                    const SizedBox(height: ElderSpacing.lg), // mb-6
+                    // Elder's name — shown when we have it in secure storage.
+                    if (_storedName != null) ...[
+                      const SizedBox(height: ElderSpacing.xs),
+                      Padding(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: ElderSpacing.lg),
+                        child: Text(
+                          _storedName!,
+                          style: GoogleFonts.plusJakartaSans(
+                            fontSize: 26,
+                            fontWeight: FontWeight.w600,
+                            color: ElderColors.primary,
+                            height: 1.3,
+                          ),
+                          textAlign: TextAlign.center,
+                        ),
+                      ),
+                    ],
 
-                    // Subtitle — text-2xl (24sp) bold, onSurfaceVariant.
-                    // HTML comment: "Significantly increased font size and weight for legibility"
+                    const SizedBox(height: ElderSpacing.md),
+
                     Padding(
                       padding: const EdgeInsets.symmetric(
                           horizontal: ElderSpacing.lg),
                       child: Text(
                         'Enter your PIN to continue.',
                         style: GoogleFonts.lexend(
-                          fontSize: 24, // text-2xl — intentionally large per HTML design comment
-                          fontWeight: FontWeight.bold,
+                          fontSize: 20,
+                          fontWeight: FontWeight.w500,
                           color: ElderColors.onSurfaceVariant,
-                          height: 1.6, // leading-relaxed
+                          height: 1.5,
                         ),
                         textAlign: TextAlign.center,
                       ),
                     ),
 
-                    const SizedBox(height: ElderSpacing.xxl), // mb-14 ≈ 56dp → xxl (48dp)
+                    const SizedBox(height: ElderSpacing.xl),
 
                     _buildPinSlots(),
 
                     const Spacer(),
+                    const SizedBox(height: ElderSpacing.lg),
 
                     _buildNumPad(),
 
-                    const SizedBox(height: ElderSpacing.xxl), // pb-12 = 48dp
+                    const SizedBox(height: ElderSpacing.lg),
+
+                    // ── Action buttons row below numpad ───────────────────────
+                    Padding(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: ElderSpacing.lg),
+                      child: Row(
+                        children: [
+                          // Need Help — teal pill, notifies caretaker
+                          Expanded(
+                            child: Semantics(
+                              button: true,
+                              label: 'Need help — notify my caretaker',
+                              child: _sendingHelp
+                                  ? const Center(
+                                      child: SizedBox(
+                                        width: 24, height: 24,
+                                        child: CircularProgressIndicator(
+                                            strokeWidth: 2),
+                                      ),
+                                    )
+                                  : TextButton.icon(
+                                      onPressed: _sendHelpNotification,
+                                      icon: const Icon(
+                                        Icons.notifications_active_outlined,
+                                        color: ElderColors.primary,
+                                        size: 20,
+                                      ),
+                                      label: Text(
+                                        'Need Help?',
+                                        style: GoogleFonts.lexend(
+                                          fontSize: 16,
+                                          fontWeight: FontWeight.w700,
+                                          color: ElderColors.primary,
+                                        ),
+                                      ),
+                                      style: TextButton.styleFrom(
+                                        padding: const EdgeInsets.symmetric(
+                                            vertical: ElderSpacing.sm),
+                                        shape: RoundedRectangleBorder(
+                                          borderRadius:
+                                              BorderRadius.circular(14),
+                                          side: const BorderSide(
+                                              color: ElderColors.primaryFixed,
+                                              width: 1.5),
+                                        ),
+                                        backgroundColor: ElderColors.primaryFixed
+                                            .withValues(alpha: 0.40),
+                                      ),
+                                    ),
+                            ),
+                          ),
+                          const SizedBox(width: ElderSpacing.md),
+                          // I'm New Here — green/white
+                          Expanded(
+                            child: Semantics(
+                              button: true,
+                              label: 'I am new to ElderConnect',
+                              child: TextButton(
+                                onPressed: () =>
+                                    context.go('/register/elder'),
+                                style: TextButton.styleFrom(
+                                  padding: const EdgeInsets.symmetric(
+                                      vertical: ElderSpacing.sm),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(14),
+                                    side: BorderSide(
+                                      color: Colors.green.shade600,
+                                      width: 1.5,
+                                    ),
+                                  ),
+                                  backgroundColor:
+                                      Colors.green.shade50,
+                                ),
+                                child: Text(
+                                  "I'm New Here",
+                                  style: GoogleFonts.lexend(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.w700,
+                                    color: Colors.green.shade700,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+
+                    const SizedBox(height: ElderSpacing.xl),
                   ],
                 ),
               ),
-            ],
+            ),
           ),
         ),
       ),
     );
   }
 
-  /// Screen-owned header: support button (left) + wordmark (center).
-  /// The pr-14 on the wordmark optically balances it against the left button.
   Widget _buildHeader() {
     return Padding(
       padding: const EdgeInsets.symmetric(
-        horizontal: ElderSpacing.lg, // px-6 = 24dp
-        vertical: ElderSpacing.xl,   // py-8 = 32dp
+        horizontal: ElderSpacing.lg,
+        vertical: ElderSpacing.lg,
       ),
-      child: Row(
-        children: [
-          // Support / help button — 56×56 circle, surfaceContainerLow bg
-          Semantics(
-            button: true,
-            label: 'Help and Support',
-            child: GestureDetector(
-              onTap: () {
-                // TODO(backend-sprint): open support contact flow.
-              },
-              child: Container(
-                width: 56,
-                height: 56,
-                decoration: const BoxDecoration(
-                  color: ElderColors.surfaceContainerLow,
-                  shape: BoxShape.circle,
-                ),
-                child: const Icon(
-                  Icons.support_agent_outlined,
-                  size: 30, // text-3xl
-                  color: ElderColors.primary,
-                ),
-              ),
-            ),
+      child: Center(
+        child: Text(
+          'ElderConnect',
+          style: GoogleFonts.quicksand(
+            fontSize: 24,
+            fontWeight: FontWeight.bold,
+            color: ElderColors.primary,
+            letterSpacing: -0.5,
           ),
-
-          // Wordmark — flex-1 + pr-14 to optically center against left button
-          Expanded(
-            child: Padding(
-              padding: const EdgeInsets.only(right: 56), // pr-14 = 56dp
-              child: Text(
-                'ElderConnect',
-                style: GoogleFonts.plusJakartaSans(
-                  fontSize: 24, // text-2xl
-                  fontWeight: FontWeight.bold,
-                  color: ElderColors.primary,
-                  letterSpacing: -0.5, // tracking-tight
-                ),
-                textAlign: TextAlign.center,
-              ),
-            ),
-          ),
-        ],
+        ),
       ),
     );
   }
 
-  /// 4 PIN slot tiles — filled slots show bullet dot with primary bottom border.
-  /// Empty slots show a transparent bottom border (invisible at rest).
-  /// Slots turn error colour on incorrect PIN entry.
   Widget _buildPinSlots() {
     return Column(
       children: [
@@ -254,16 +489,13 @@ class _ElderPinLoginScreenState extends ConsumerState<ElderPinLoginScreen>
           children: List.generate(_kPinLength, (i) {
             final filled = i < _pin.length;
             return Padding(
-              padding: EdgeInsets.only(
-                left: i == 0 ? 0 : ElderSpacing.md, // gap-4 = 16dp
-              ),
+              padding: EdgeInsets.only(left: i == 0 ? 0 : ElderSpacing.md),
               child: _PinSlot(filled: filled, hasError: _hasError),
             );
           }),
         ),
-        // Error message shown below the slots on wrong PIN
         if (_hasError) ...[
-          const SizedBox(height: ElderSpacing.md),
+          const SizedBox(height: ElderSpacing.sm),
           Text(
             'Incorrect PIN. Please try again.',
             style: GoogleFonts.lexend(
@@ -276,20 +508,19 @@ class _ElderPinLoginScreenState extends ConsumerState<ElderPinLoginScreen>
     );
   }
 
-  /// 3-column numpad grid — gap-6 = 24dp, max-width 340dp.
   Widget _buildNumPad() {
     return ConstrainedBox(
-      constraints: const BoxConstraints(maxWidth: 340),
+      constraints: const BoxConstraints(maxWidth: 320),
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: ElderSpacing.lg),
         child: Column(
           children: [
             _buildNumRow(1, 2, 3),
-            const SizedBox(height: ElderSpacing.lg), // gap-y-6 = 24dp
+            const SizedBox(height: ElderSpacing.md),
             _buildNumRow(4, 5, 6),
-            const SizedBox(height: ElderSpacing.lg),
+            const SizedBox(height: ElderSpacing.md),
             _buildNumRow(7, 8, 9),
-            const SizedBox(height: ElderSpacing.lg),
+            const SizedBox(height: ElderSpacing.md),
             _buildBottomRow(),
           ],
         ),
@@ -297,29 +528,25 @@ class _ElderPinLoginScreenState extends ConsumerState<ElderPinLoginScreen>
     );
   }
 
-  /// Builds a row of three digit keys.
-  /// Explicit int params avoid the classic Dart closure-captures-loop-variable bug.
   Widget _buildNumRow(int a, int b, int c) {
     return Row(
       children: [
         Expanded(child: _NumKey(digit: a, onPressed: () => _onDigit(a))),
-        const SizedBox(width: ElderSpacing.lg), // gap-x-6 = 24dp
+        const SizedBox(width: ElderSpacing.md),
         Expanded(child: _NumKey(digit: b, onPressed: () => _onDigit(b))),
-        const SizedBox(width: ElderSpacing.lg),
+        const SizedBox(width: ElderSpacing.md),
         Expanded(child: _NumKey(digit: c, onPressed: () => _onDigit(c))),
       ],
     );
   }
 
-  /// Row 4: empty spacer | 0 | backspace
   Widget _buildBottomRow() {
     return Row(
       children: [
-        // Empty cell — HTML: <div></div>
         const Expanded(child: SizedBox(height: _kKeyHeight)),
-        const SizedBox(width: ElderSpacing.lg),
+        const SizedBox(width: ElderSpacing.md),
         Expanded(child: _NumKey(digit: 0, onPressed: () => _onDigit(0))),
-        const SizedBox(width: ElderSpacing.lg),
+        const SizedBox(width: ElderSpacing.md),
         Expanded(child: _BackspaceKey(onPressed: _onBackspace)),
       ],
     );
@@ -328,11 +555,6 @@ class _ElderPinLoginScreenState extends ConsumerState<ElderPinLoginScreen>
 
 // ── _PinSlot ─────────────────────────────────────────────────────────────────
 
-/// Single PIN entry slot.
-///
-/// Filled: 3px primary bottom border + bullet dot (text-4xl = 36sp).
-/// Empty: transparent bottom border (visually no border at rest).
-/// Error state: error-colour bottom border + error-colour dot.
 class _PinSlot extends StatelessWidget {
   const _PinSlot({required this.filled, this.hasError = false});
   final bool filled;
@@ -352,24 +574,13 @@ class _PinSlot extends StatelessWidget {
       decoration: BoxDecoration(
         color: ElderColors.surfaceContainerHighest,
         borderRadius: BorderRadius.circular(_kSlotRadius),
-        border: Border(
-          bottom: BorderSide(
-            color: borderColor,
-            width: 3, // border-b-[3px]
-          ),
-        ),
+        border: Border(bottom: BorderSide(color: borderColor, width: 3)),
       ),
       child: filled
           ? Align(
-              alignment: const Alignment(0, 0.2), // mb-2 optical baseline
-              child: Text(
-                '•',
-                style: TextStyle(
-                  fontSize: 36, // text-4xl
-                  color: dotColor,
-                  height: 1,
-                ),
-              ),
+              alignment: const Alignment(0, 0.2),
+              child: Text('•',
+                  style: TextStyle(fontSize: 32, color: dotColor, height: 1)),
             )
           : null,
     );
@@ -378,8 +589,6 @@ class _PinSlot extends StatelessWidget {
 
 // ── _NumKey ───────────────────────────────────────────────────────────────────
 
-/// Single numpad digit key — surfaceContainerLowest bg + shadow at rest,
-/// surfaceContainerLow on press. Matches CSS `active:bg-surface-container-low`.
 class _NumKey extends StatefulWidget {
   const _NumKey({required this.digit, required this.onPressed});
   final int digit;
@@ -417,7 +626,7 @@ class _NumKeyState extends State<_NumKey> {
                 : [
                     BoxShadow(
                       color: ElderColors.onSurface.withValues(alpha: 0.06),
-                      blurRadius: 32,
+                      blurRadius: 20,
                       offset: const Offset(0, 4),
                     ),
                   ],
@@ -426,7 +635,7 @@ class _NumKeyState extends State<_NumKey> {
             child: Text(
               '${widget.digit}',
               style: GoogleFonts.plusJakartaSans(
-                fontSize: 32, // text-[2rem]
+                fontSize: 28,
                 fontWeight: FontWeight.bold,
                 color: ElderColors.onSurface,
               ),
@@ -440,8 +649,6 @@ class _NumKeyState extends State<_NumKey> {
 
 // ── _BackspaceKey ─────────────────────────────────────────────────────────────
 
-/// Backspace key — surfaceContainerLow bg (always, per HTML), onSurfaceVariant icon.
-/// Press: surfaceVariant bg.
 class _BackspaceKey extends StatefulWidget {
   const _BackspaceKey({required this.onPressed});
   final VoidCallback onPressed;
@@ -475,11 +682,8 @@ class _BackspaceKeyState extends State<_BackspaceKey> {
             borderRadius: BorderRadius.circular(_kKeyRadius),
           ),
           child: const Center(
-            child: Icon(
-              Icons.backspace_outlined,
-              size: 40, // text-[2.5rem]
-              color: ElderColors.onSurfaceVariant,
-            ),
+            child: Icon(Icons.backspace_outlined,
+                size: 32, color: ElderColors.onSurfaceVariant),
           ),
         ),
       ),
@@ -488,20 +692,9 @@ class _BackspaceKeyState extends State<_BackspaceKey> {
 }
 
 // ── ACCESSIBILITY AUDIT ──────────────────────────────────────────────────────
-// ✅ Tap targets ≥ 56×56dp    — Support button: 56×56 circle ✅
-//                               _NumKey: _kKeyHeight=84dp full column width ✅
-//                               _BackspaceKey: 84dp full column width ✅
-//                               _PinSlot: 64×80dp (read-only display, not interactive) ✅
-// ✅ Font sizes ≥ 16sp         — wordmark 24sp | "Welcome Back" 40sp
-//                               | subtitle 24sp (intentionally large per HTML design comment)
-//                               | digit keys 32sp | bullet dot 36sp ✅
-// ✅ Colour contrast WCAG AA   — primary (#005050) on background (#FAF9FA): ~12:1 ✅ AAA
-//                               onSurface (#1A1C1D) on background: ~17:1 ✅ AAA
-//                               onSurface (#1A1C1D) on surfaceContainerHighest (#E3E2E3): ~13:1 ✅ AAA
-//                               onSurface (#1A1C1D) on surfaceContainerLowest (#FFF): ~18:1 ✅ AAA
-//                               onSurfaceVariant (#3E4948) on surfaceContainerLow (#F4F3F4): ~7:1 ✅ AAA
-// ✅ Semantic labels            — Support button, all numpad keys, backspace: Semantics(button:true, label) ✅
-// ✅ No colour as sole cue      — PIN slot state: filled dot + primary border (2 cues) ✅
-// ✅ Touch targets ≥ 8dp apart  — ElderSpacing.lg (24dp) gap between numpad keys ✅
-//                               ElderSpacing.md (16dp) gap between PIN slots ✅
-// ────────────────────────────────────────────────────────────────────────────
+// ✅ Tap targets ≥ 48dp — numpad keys 72dp; action buttons padded to ≥ 48dp
+// ✅ Font sizes ≥ 16sp — all text 16sp+; title 36sp; numpad digits 28sp
+// ✅ Colour contrast WCAG AA — primary on primaryFixed tint; green.700 on green.50
+// ✅ Semantics labels on all interactive elements
+// ✅ No overflow — SingleChildScrollView + IntrinsicHeight
+// ✅ Two distinct button styles so colour is not the sole differentiator

@@ -1,41 +1,31 @@
 /// Post Game Score — celebration result screen shown after an elder completes
-/// a wellness game. Displays the score, personal best comparison, family
-/// leaderboard, and a share-with-family action prompt.
-///
-/// Elder portal screen — Games tab is active in the bottom nav.
-///
-/// Top bar note: Stitch HTML places the elder avatar on the left and a
-/// settings icon on the right. All other elder screens use the standard
-/// menu-left / wordmark / avatar-right pattern. The standard pattern is
-/// used here for portal consistency (Stitch html-shell variation discarded).
+/// a wellness game. No bottom nav — this is a self-contained result card.
+/// Navigating away goes back to /games/elder.
 library;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../core/constants/elder_colors.dart';
 import '../../../core/constants/elder_spacing.dart';
+import '../../social/providers/post_submission_provider.dart';
+import '../providers/wellness_scores_provider.dart';
 
-// Tailwind config for this screen (elder portal — differs from caretaker):
-// rounded-xl = 0.75rem = 12dp; rounded-lg = 0.5rem = 8dp; full = 9999px.
-// rounded-3xl (not in custom config) = Tailwind default 1.5rem = 24dp.
-// rounded-2xl (not in custom config) = Tailwind default 1rem = 16dp.
-// rounded-[2rem] / rounded-[2.5rem] are explicit CSS values.
-const double _kScoreCardRadius  = 24.0;  // rounded-3xl
-const double _kBentoCardRadius  = 32.0;  // rounded-[2rem]
-const double _kActionCardRadius = 40.0;  // rounded-[2.5rem]
-const double _kLeaderRowRadius  = 16.0;  // rounded-2xl
-const double _kButtonRadius     = 12.0;  // rounded-xl (custom config)
-
-// Matches elder_games_screen nav constants.
-const double _kNavTopRadius    = 32.0;
-const double _kNavActiveSize   = 64.0;
-const double _kNavInactiveSize = 56.0;
-
-enum _NavTab { home, feed, games, medication }
+const double _kScoreCardRadius  = 24.0;
+const double _kBentoCardRadius  = 32.0;
+const double _kActionCardRadius = 40.0;
+const double _kButtonRadius     = 12.0;
+const double _kLeaderRowRadius  = 16.0;
 
 class PostGameScoreScreen extends ConsumerStatefulWidget {
-  const PostGameScoreScreen({super.key});
+  const PostGameScoreScreen({super.key, required this.result});
+
+  // Keys: {'game': String, 'score': int, 'total': int}  (Trivia/Scramble/Word)
+  //       {'game': String, 'moves': int, 'time': String} (Memory)
+  //       {'game': String}                               (Breathing)
+  final Map<String, dynamic> result;
 
   @override
   ConsumerState<PostGameScoreScreen> createState() =>
@@ -46,15 +36,19 @@ class _PostGameScoreScreenState extends ConsumerState<PostGameScoreScreen>
     with TickerProviderStateMixin {
   late final AnimationController _anim;
   late final List<CurvedAnimation> _anims;
+  bool _shareLoading = false;
+  bool _shared = false;
+
+  String get _gameName =>
+      widget.result['game'] as String? ?? 'Wellness Activity';
 
   @override
   void initState() {
     super.initState();
     _anim = AnimationController(
-      duration: const Duration(milliseconds: 300),
+      duration: const Duration(milliseconds: 400),
       vsync: this,
     )..forward();
-    // Four staggered sections: [0] top bar, [1] hero, [2] bento, [3] action.
     _anims = List.generate(
       4,
       (i) => CurvedAnimation(
@@ -62,6 +56,54 @@ class _PostGameScoreScreenState extends ConsumerState<PostGameScoreScreen>
         curve: Interval(i * 0.08, (i * 0.08) + 0.60, curve: Curves.easeOut),
       ),
     );
+    _saveScore();
+  }
+
+  Future<void> _saveScore() async {
+    final user = Supabase.instance.client.auth.currentUser;
+    if (user == null) return;
+    try {
+      await Supabase.instance.client.from('wellness_logs').insert({
+        'user_id': user.id,
+        'game_name': _gameName,
+        if (widget.result['score'] != null) 'score': widget.result['score'] as int,
+        if (widget.result['total'] != null) 'total': widget.result['total'] as int,
+      });
+      // Refresh leaderboard + personal best after save
+      ref.invalidate(gameLeaderboardProvider(_gameName));
+      ref.invalidate(personalBestProvider(_gameName));
+      ref.invalidate(myRecentScoresProvider);
+    } catch (_) {}
+  }
+
+  Future<void> _shareScore() async {
+    setState(() => _shareLoading = true);
+    final score = widget.result['score'] as int?;
+    final total = widget.result['total'] as int?;
+    final moves = widget.result['moves'] as int?;
+    final time  = widget.result['time'] as String?;
+
+    String message;
+    if (score != null && total != null) {
+      message = 'I scored $score/$total in $_gameName! 🎮';
+    } else if (moves != null && time != null) {
+      message = 'I completed $_gameName in $time with $moves moves! 🎮';
+    } else {
+      message = 'I just completed $_gameName! 🎮';
+    }
+
+    try {
+      await ref
+          .read(postSubmissionProvider.notifier)
+          .submitPost(content: message);
+      if (mounted) {
+        setState(() { _shareLoading = false; _shared = true; });
+        await Future.delayed(const Duration(milliseconds: 800));
+        if (mounted) context.go('/games/elder');
+      }
+    } catch (_) {
+      if (mounted) setState(() => _shareLoading = false);
+    }
   }
 
   @override
@@ -71,18 +113,16 @@ class _PostGameScoreScreenState extends ConsumerState<PostGameScoreScreen>
     super.dispose();
   }
 
-  Widget _animated(int i, Widget child) {
-    return AnimatedBuilder(
-      animation: _anims[i],
-      builder: (_, _) => Opacity(
-        opacity: _anims[i].value,
-        child: Transform.translate(
-          offset: Offset(0, 20 * (1 - _anims[i].value)),
-          child: child,
+  Widget _fade(int i, Widget child) => AnimatedBuilder(
+        animation: _anims[i],
+        builder: (_, _) => Opacity(
+          opacity: _anims[i].value,
+          child: Transform.translate(
+            offset: Offset(0, 20 * (1 - _anims[i].value)),
+            child: child,
+          ),
         ),
-      ),
-    );
-  }
+      );
 
   @override
   Widget build(BuildContext context) {
@@ -90,126 +130,80 @@ class _PostGameScoreScreenState extends ConsumerState<PostGameScoreScreen>
       backgroundColor: ElderColors.surface,
       body: Column(
         children: [
-          _animated(0, const _TopAppBar()),
+          // Close button row (no full app bar — score screen is self-contained)
+          _fade(0, _CloseBar(onClose: () => context.go('/games/elder'))),
           Expanded(
             child: SingleChildScrollView(
               padding: const EdgeInsets.fromLTRB(
                 ElderSpacing.lg,
-                ElderSpacing.xl,
+                ElderSpacing.sm,
                 ElderSpacing.lg,
                 ElderSpacing.xl,
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  _animated(1, const _HeroSection()),
+                  _fade(1, _HeroSection(result: widget.result)),
                   const SizedBox(height: ElderSpacing.xxl),
-                  _animated(2, const _BentoSection()),
+                  _fade(2, _BentoSection(
+                    gameName: _gameName,
+                    currentScore: widget.result['score'] as int?,
+                  )),
                   const SizedBox(height: ElderSpacing.xxl),
-                  _animated(3, const _ActionPromptSection()),
-                  // Clearance for bottom nav
-                  const SizedBox(height: 120),
+                  _fade(3, _ActionSection(
+                    shareLoading: _shareLoading,
+                    shared: _shared,
+                    onShare: _shareScore,
+                    onSkip: () => context.go('/games/elder'),
+                  )),
+                  const SizedBox(height: ElderSpacing.xl),
                 ],
               ),
             ),
           ),
         ],
       ),
-      bottomSheet: _BottomNav(
-        activeTab: _NavTab.games,
-        hasMedication: true,
-        onTabSelected: (_) {
-          // TODO: drive navigation via context.go — post backend sprint.
-        },
-      ),
     );
   }
 }
 
-// ── Top App Bar ───────────────────────────────────────────────────────────────
+// ── Close Bar ─────────────────────────────────────────────────────────────────
 
-/// Standard elder portal top bar — menu left, ElderConnect wordmark, avatar right.
-///
-/// Matches elder_games_screen._TopAppBar exactly for portal consistency.
-class _TopAppBar extends StatelessWidget {
-  const _TopAppBar();
+class _CloseBar extends StatelessWidget {
+  const _CloseBar({required this.onClose});
+  final VoidCallback onClose;
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      color: ElderColors.surface.withValues(alpha: 0.80),
-      child: SafeArea(
-        bottom: false,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(
-            horizontal: ElderSpacing.lg,
-            vertical: ElderSpacing.md,
-          ),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Row(
-                children: [
-                  Semantics(
-                    label: 'Open menu',
-                    button: true,
-                    child: Material(
-                      color: Colors.transparent,
-                      shape: const CircleBorder(),
-                      clipBehavior: Clip.antiAlias,
-                      child: InkWell(
-                        onTap: () {/* TODO: open side drawer */},
-                        child: const SizedBox(
-                          width: 48,
-                          height: 48,
-                          child: Icon(
-                            Icons.menu,
-                            color: ElderColors.primary,
-                            size: 24,
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: ElderSpacing.md),
-                  Text(
-                    'ElderConnect',
-                    style: GoogleFonts.plusJakartaSans(
-                      fontSize: 24,
-                      fontWeight: FontWeight.w700,
-                      color: ElderColors.primary,
-                      letterSpacing: -0.5,
-                    ),
-                  ),
-                ],
-              ),
-              Semantics(
-                label: 'Your profile photo',
-                button: true,
-                child: GestureDetector(
-                  onTap: () {/* TODO: navigate to elder profile */},
-                  child: Container(
-                    width: 48,
-                    height: 48,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      border: Border.all(
-                        color: ElderColors.primaryFixed,
-                        width: 2,
-                      ),
-                      color: ElderColors.surfaceContainerLow,
-                    ),
-                    child: const ClipOval(
-                      child: Icon(
-                        Icons.person,
-                        color: ElderColors.onSurfaceVariant,
-                        size: 28,
-                      ),
-                    ),
+    return SafeArea(
+      bottom: false,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(
+          horizontal: ElderSpacing.md,
+          vertical: ElderSpacing.sm,
+        ),
+        child: Align(
+          alignment: Alignment.centerRight,
+          child: Semantics(
+            label: 'Back to games',
+            button: true,
+            child: Material(
+              color: ElderColors.surfaceContainerLow,
+              shape: const CircleBorder(),
+              child: InkWell(
+                customBorder: const CircleBorder(),
+                onTap: onClose,
+                child: const SizedBox(
+                  width: 48,
+                  height: 48,
+                  child: Icon(
+                    Icons.close_rounded,
+                    color: ElderColors.onSurfaceVariant,
+                    size: 22,
                   ),
                 ),
               ),
-            ],
+            ),
           ),
         ),
       ),
@@ -219,57 +213,49 @@ class _TopAppBar extends StatelessWidget {
 
 // ── Hero Section ──────────────────────────────────────────────────────────────
 
-/// Centred celebration section: stars icon with amber glow, "Great Job!" title,
-/// and the score card.
 class _HeroSection extends StatelessWidget {
-  const _HeroSection();
+  const _HeroSection({required this.result});
+  final Map<String, dynamic> result;
 
   @override
   Widget build(BuildContext context) {
+    final gameName = result['game'] as String? ?? 'Wellness Activity';
+    final score = result['score'] as int?;
+    final total = result['total'] as int?;
+    final moves = result['moves'] as int?;
+    final time  = result['time'] as String?;
+
     return Column(
       children: [
-        // Stars icon with decorative amber glow blob.
-        // Stitch: bg-secondary-container opacity-20 blur-3xl = glowing halo.
+        Text(
+          gameName,
+          style: GoogleFonts.lexend(
+            fontSize: 18, color: ElderColors.onSurfaceVariant),
+          textAlign: TextAlign.center,
+        ),
+        const SizedBox(height: ElderSpacing.md),
         SizedBox(
-          width: 120,
-          height: 120,
-          child: Stack(
-            alignment: Alignment.center,
-            children: [
-              // Glow blob — secondaryContainer (#FDA54F amber) at 20% opacity.
-              Container(
-                width: 100,
-                height: 100,
-                decoration: BoxDecoration(
-                  color: ElderColors.secondaryContainer.withValues(alpha: 0.20),
-                  shape: BoxShape.circle,
-                ),
+          width: 120, height: 120,
+          child: Stack(alignment: Alignment.center, children: [
+            Container(
+              width: 100, height: 100,
+              decoration: BoxDecoration(
+                color: ElderColors.secondaryContainer.withValues(alpha: 0.20),
+                shape: BoxShape.circle,
               ),
-              // Stars icon — filled (FILL=1), text-secondary = amber (#8e4e00).
-              const Icon(
-                Icons.stars_rounded,
-                size: 80,
-                color: ElderColors.secondary,
-              ),
-            ],
-          ),
+            ),
+            const Icon(Icons.stars_rounded, size: 80, color: ElderColors.secondary),
+          ]),
         ),
         const SizedBox(height: ElderSpacing.lg),
-
-        // "Great Job!" headline — text-5xl = 48sp, Plus Jakarta Sans extrabold.
         Text(
           'Great Job!',
           style: GoogleFonts.plusJakartaSans(
-            fontSize: 48,
-            fontWeight: FontWeight.w800,
-            color: ElderColors.primary,
-            height: 1.1,
-          ),
+            fontSize: 48, fontWeight: FontWeight.w800,
+            color: ElderColors.primary, height: 1.1),
           textAlign: TextAlign.center,
         ),
         const SizedBox(height: ElderSpacing.lg),
-
-        // Score card — rounded-3xl = 24dp, surfaceContainerLowest bg, p-8 = 32dp.
         Container(
           width: double.infinity,
           padding: const EdgeInsets.all(ElderSpacing.xl),
@@ -279,61 +265,116 @@ class _HeroSection extends StatelessWidget {
             boxShadow: [
               BoxShadow(
                 color: ElderColors.onSurface.withValues(alpha: 0.04),
-                blurRadius: 8,
-                offset: const Offset(0, 2),
+                blurRadius: 8, offset: const Offset(0, 2),
               ),
             ],
           ),
-          child: Column(
-            children: [
-              Text(
-                'Your Score',
-                style: GoogleFonts.lexend(
-                  fontSize: 18,
-                  fontWeight: FontWeight.w500,
-                  color: ElderColors.onSurfaceVariant,
-                ),
-              ),
-              const SizedBox(height: ElderSpacing.sm),
-              // Score value — text-5xl = 48sp, secondary amber (#8e4e00).
-              Text(
-                '1,250 points!',
-                style: GoogleFonts.plusJakartaSans(
-                  fontSize: 48,
-                  fontWeight: FontWeight.w800,
-                  color: ElderColors.secondary,
-                  height: 1.1,
-                ),
-                textAlign: TextAlign.center,
-              ),
-            ],
-          ),
+          child: score != null && total != null
+              ? _TriviaResult(score: score, total: total)
+              : moves != null && time != null
+                  ? _MemoryResult(moves: moves, time: time)
+                  : _GenericResult(),
         ),
       ],
     );
   }
 }
 
-// ── Bento Section ─────────────────────────────────────────────────────────────
-
-/// Two-card bento layout stacked vertically on mobile:
-///   1. Personal Best — trophy icon + beat-by text.
-///   2. Family Standings — 3-row leaderboard.
-class _BentoSection extends StatelessWidget {
-  const _BentoSection();
+class _TriviaResult extends StatelessWidget {
+  const _TriviaResult({required this.score, required this.total});
+  final int score, total;
 
   @override
-  Widget build(BuildContext context) {
-    return Column(
-      children: [
-        _buildPersonalBest(),
-        const SizedBox(height: ElderSpacing.lg),
-        _buildFamilyStandings(),
-      ],
-    );
-  }
+  Widget build(BuildContext context) => Column(children: [
+        Text('Your Score',
+            style: GoogleFonts.lexend(
+                fontSize: 18, fontWeight: FontWeight.w500,
+                color: ElderColors.onSurfaceVariant)),
+        const SizedBox(height: ElderSpacing.sm),
+        Text('$score / $total',
+            style: GoogleFonts.plusJakartaSans(
+                fontSize: 56, fontWeight: FontWeight.w800,
+                color: ElderColors.secondary, height: 1.1),
+            textAlign: TextAlign.center),
+        const SizedBox(height: ElderSpacing.xs),
+        Text(
+          score == total
+              ? 'Perfect score!'
+              : score >= total * 0.7 ? 'Well done!' : 'Keep practising!',
+          style: GoogleFonts.lexend(fontSize: 18, color: ElderColors.onSurfaceVariant),
+        ),
+      ]);
+}
 
-  Widget _buildPersonalBest() {
+class _MemoryResult extends StatelessWidget {
+  const _MemoryResult({required this.moves, required this.time});
+  final int moves; final String time;
+
+  @override
+  Widget build(BuildContext context) => Row(
+        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+        children: [
+          _Stat(label: 'Moves', value: '$moves', icon: Icons.touch_app_rounded),
+          Container(width: 1, height: 48, color: ElderColors.outlineVariant),
+          _Stat(label: 'Time', value: time, icon: Icons.timer_rounded),
+        ],
+      );
+}
+
+class _GenericResult extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) => Text(
+        'Activity complete!',
+        style: GoogleFonts.lexend(
+            fontSize: 24, fontWeight: FontWeight.w600,
+            color: ElderColors.primary),
+        textAlign: TextAlign.center,
+      );
+}
+
+class _Stat extends StatelessWidget {
+  const _Stat({required this.label, required this.value, required this.icon});
+  final String label, value; final IconData icon;
+
+  @override
+  Widget build(BuildContext context) => Column(children: [
+        Icon(icon, size: 28, color: ElderColors.primary),
+        const SizedBox(height: ElderSpacing.xs),
+        Text(value,
+            style: GoogleFonts.plusJakartaSans(
+                fontSize: 36, fontWeight: FontWeight.w800,
+                color: ElderColors.secondary)),
+        Text(label,
+            style: GoogleFonts.lexend(
+                fontSize: 16, color: ElderColors.onSurfaceVariant)),
+      ]);
+}
+
+// ── Bento Section (Personal Best + Leaderboard) ───────────────────────────────
+
+class _BentoSection extends ConsumerWidget {
+  const _BentoSection({required this.gameName, this.currentScore});
+  final String gameName;
+  final int? currentScore;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    return Column(children: [
+      _PersonalBestCard(gameName: gameName, currentScore: currentScore),
+      const SizedBox(height: ElderSpacing.lg),
+      _LeaderboardCard(gameName: gameName),
+    ]);
+  }
+}
+
+class _PersonalBestCard extends ConsumerWidget {
+  const _PersonalBestCard({required this.gameName, this.currentScore});
+  final String gameName; final int? currentScore;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final bestAsync = ref.watch(personalBestProvider(gameName));
+
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(ElderSpacing.xl),
@@ -341,56 +382,74 @@ class _BentoSection extends StatelessWidget {
         color: ElderColors.surfaceContainerLow,
         borderRadius: BorderRadius.circular(_kBentoCardRadius),
       ),
-      child: Column(
-        children: [
-          // Trophy icon — emoji_events in tertiary (#004b74).
-          const Icon(
-            Icons.emoji_events_rounded,
-            size: 40,
-            color: ElderColors.tertiary,
-          ),
-          const SizedBox(height: ElderSpacing.md),
-          Text(
-            'Personal Best',
+      child: Column(children: [
+        const Icon(Icons.emoji_events_rounded, size: 40, color: ElderColors.tertiary),
+        const SizedBox(height: ElderSpacing.md),
+        Text('Personal Best',
             style: GoogleFonts.plusJakartaSans(
-              fontSize: 24,
-              fontWeight: FontWeight.w700,
-              color: ElderColors.onSurface,
-            ),
-            textAlign: TextAlign.center,
-          ),
-          const SizedBox(height: ElderSpacing.sm),
-          // Rich text: "150 points" in primary bold.
-          RichText(
-            textAlign: TextAlign.center,
-            text: TextSpan(
-              style: GoogleFonts.lexend(
-                fontSize: 18,
-                color: ElderColors.onSurfaceVariant,
-                height: 1.5,
-              ),
-              children: [
-                const TextSpan(
-                  text: 'You surpassed your previous high score by ',
-                ),
-                TextSpan(
-                  text: '150 points',
+                fontSize: 24, fontWeight: FontWeight.w700,
+                color: ElderColors.onSurface),
+            textAlign: TextAlign.center),
+        const SizedBox(height: ElderSpacing.sm),
+        bestAsync.when(
+          loading: () => const SizedBox(
+              height: 28,
+              child: CircularProgressIndicator(
+                  color: ElderColors.primary, strokeWidth: 2)),
+          error: (_, __) => const SizedBox.shrink(),
+          data: (best) {
+            if (best == null || currentScore == null) {
+              return Text(
+                currentScore != null
+                    ? 'Your first score: $currentScore pts!'
+                    : 'Activity complete!',
+                style: GoogleFonts.lexend(
+                    fontSize: 18, color: ElderColors.onSurfaceVariant,
+                    height: 1.5),
+                textAlign: TextAlign.center,
+              );
+            }
+            final diff = currentScore! - best;
+            if (diff > 0) {
+              return RichText(
+                textAlign: TextAlign.center,
+                text: TextSpan(
                   style: GoogleFonts.lexend(
-                    fontSize: 18,
-                    fontWeight: FontWeight.w700,
-                    color: ElderColors.primary,
-                  ),
+                      fontSize: 18, color: ElderColors.onSurfaceVariant, height: 1.5),
+                  children: [
+                    const TextSpan(text: 'New personal best! You surpassed by '),
+                    TextSpan(
+                      text: '+$diff pts',
+                      style: GoogleFonts.lexend(
+                          fontSize: 18, fontWeight: FontWeight.w700,
+                          color: ElderColors.primary),
+                    ),
+                    const TextSpan(text: ' 🎉'),
+                  ],
                 ),
-                const TextSpan(text: '!'),
-              ],
-            ),
-          ),
-        ],
-      ),
+              );
+            }
+            return Text(
+              'Your best is $best pts. Keep going!',
+              style: GoogleFonts.lexend(
+                  fontSize: 18, color: ElderColors.onSurfaceVariant, height: 1.5),
+              textAlign: TextAlign.center,
+            );
+          },
+        ),
+      ]),
     );
   }
+}
 
-  Widget _buildFamilyStandings() {
+class _LeaderboardCard extends ConsumerWidget {
+  const _LeaderboardCard({required this.gameName});
+  final String gameName;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final boardAsync = ref.watch(gameLeaderboardProvider(gameName));
+
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(ElderSpacing.lg),
@@ -400,66 +459,127 @@ class _BentoSection extends StatelessWidget {
         boxShadow: [
           BoxShadow(
             color: ElderColors.onSurface.withValues(alpha: 0.04),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
+            blurRadius: 8, offset: const Offset(0, 2),
           ),
         ],
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Header: groups icon + title
-          Row(
-            children: [
-              const Icon(
-                Icons.groups_rounded,
-                size: 22,
-                color: ElderColors.primary,
-              ),
-              const SizedBox(width: ElderSpacing.sm),
-              Text(
-                'Family Standings',
-                style: GoogleFonts.plusJakartaSans(
-                  fontSize: 20,
-                  fontWeight: FontWeight.w700,
-                  color: ElderColors.onSurface,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: ElderSpacing.lg),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Row(children: [
+          const Icon(Icons.leaderboard_rounded, size: 22, color: ElderColors.primary),
+          const SizedBox(width: ElderSpacing.sm),
+          Text('Leaderboard',
+              style: GoogleFonts.plusJakartaSans(
+                  fontSize: 20, fontWeight: FontWeight.w700,
+                  color: ElderColors.onSurface)),
+        ]),
+        const SizedBox(height: ElderSpacing.lg),
+        boardAsync.when(
+          loading: () => const Center(
+              child: CircularProgressIndicator(color: ElderColors.primary)),
+          error: (_, __) => Text('Could not load scores',
+              style: GoogleFonts.lexend(
+                  fontSize: 16, color: ElderColors.onSurfaceVariant)),
+          data: (entries) {
+            if (entries.isEmpty) {
+              return Text('No scores yet — be the first!',
+                  style: GoogleFonts.lexend(
+                      fontSize: 16, color: ElderColors.onSurfaceVariant));
+            }
+            return Column(
+              children: entries.asMap().entries.map((e) {
+                final rank = e.key + 1;
+                final entry = e.value;
+                return Padding(
+                  padding: EdgeInsets.only(
+                      bottom: rank < entries.length ? ElderSpacing.md : 0),
+                  child: _LeaderRow(rank: rank, entry: entry),
+                );
+              }).toList(),
+            );
+          },
+        ),
+      ]),
+    );
+  }
+}
 
-          // Leaderboard rows
-          _LeaderboardRow(
-            rank: 1,
-            name: 'You',
-            score: '1,250',
-            isHighlighted: true,
+class _LeaderRow extends StatelessWidget {
+  const _LeaderRow({required this.rank, required this.entry});
+  final int rank; final LeaderboardEntry entry;
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      label: 'Rank $rank: ${entry.name}, ${entry.score} points',
+      child: Container(
+        padding: const EdgeInsets.symmetric(
+            horizontal: ElderSpacing.sm, vertical: ElderSpacing.sm),
+        decoration: BoxDecoration(
+          color: entry.isMe ? ElderColors.primaryFixed : ElderColors.surface,
+          borderRadius: BorderRadius.circular(_kLeaderRowRadius),
+        ),
+        child: Row(children: [
+          SizedBox(
+            width: 24,
+            child: Text('$rank',
+                style: GoogleFonts.lexend(
+                    fontSize: 16, fontWeight: FontWeight.w700,
+                    color: entry.isMe
+                        ? ElderColors.onPrimaryFixed
+                        : ElderColors.onSurfaceVariant)),
           ),
-          const SizedBox(height: ElderSpacing.md),
-          _LeaderboardRow(
-            rank: 2,
-            name: 'David (Son)',
-            score: '1,180',
+          const SizedBox(width: ElderSpacing.sm),
+          Container(
+            width: 40, height: 40,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: entry.isMe
+                  ? ElderColors.primaryFixedDim
+                  : ElderColors.surfaceContainerLow,
+              border: entry.isMe
+                  ? Border.all(color: ElderColors.primaryContainer, width: 2)
+                  : null,
+            ),
+            child: Icon(Icons.person_rounded, size: 22,
+                color: entry.isMe
+                    ? ElderColors.onPrimaryFixed
+                    : ElderColors.onSurfaceVariant),
           ),
-          const SizedBox(height: ElderSpacing.md),
-          _LeaderboardRow(
-            rank: 3,
-            name: 'Sarah (Granddaughter)',
-            score: '950',
+          const SizedBox(width: ElderSpacing.sm),
+          Expanded(
+            child: Text(entry.name,
+                style: GoogleFonts.lexend(
+                    fontSize: 16,
+                    fontWeight:
+                        entry.isMe ? FontWeight.w600 : FontWeight.w500,
+                    color: entry.isMe
+                        ? ElderColors.onPrimaryFixed
+                        : ElderColors.onSurface)),
           ),
-        ],
+          Text('${entry.score} pts',
+              style: GoogleFonts.lexend(
+                  fontSize: 16, fontWeight: FontWeight.w700,
+                  color: entry.isMe
+                      ? ElderColors.onPrimaryFixed
+                      : ElderColors.onSurfaceVariant)),
+        ]),
       ),
     );
   }
 }
 
-// ── Action Prompt Section ─────────────────────────────────────────────────────
+// ── Action Section ────────────────────────────────────────────────────────────
 
-/// "Share your success?" CTA — tertiaryFixed bg with decorative blob,
-/// plus Yes (primary) and Maybe Later (surfaceContainerHighest) buttons.
-class _ActionPromptSection extends StatelessWidget {
-  const _ActionPromptSection();
+class _ActionSection extends StatelessWidget {
+  const _ActionSection({
+    required this.shareLoading,
+    required this.shared,
+    required this.onShare,
+    required this.onSkip,
+  });
+
+  final bool shareLoading, shared;
+  final VoidCallback onShare, onSkip;
 
   @override
   Widget build(BuildContext context) {
@@ -467,420 +587,108 @@ class _ActionPromptSection extends StatelessWidget {
       borderRadius: BorderRadius.circular(_kActionCardRadius),
       child: Container(
         color: ElderColors.tertiaryFixed,
-        child: Stack(
-          children: [
-            // Decorative blob — top-right, tertiaryFixedDim at 30% opacity.
-            // Mirrors Stitch: absolute -mr-10 -mt-10 w-40 h-40 opacity-30.
-            Positioned(
-              top: -40,
-              right: -40,
-              child: Container(
-                width: 160,
-                height: 160,
-                decoration: BoxDecoration(
-                  color: ElderColors.tertiaryFixedDim.withValues(alpha: 0.30),
-                  shape: BoxShape.circle,
-                ),
-              ),
-            ),
-
-            // Content
-            Padding(
-              padding: const EdgeInsets.all(ElderSpacing.xxl),
-              child: Column(
-                children: [
-                  Text(
-                    'Share your success?',
-                    style: GoogleFonts.plusJakartaSans(
-                      fontSize: 30,
-                      fontWeight: FontWeight.w700,
-                      // on-tertiary-fixed (#001d31) → onTertiaryFixed.
-                      color: ElderColors.onTertiaryFixed,
-                      height: 1.2,
-                    ),
-                    textAlign: TextAlign.center,
-                  ),
-                  const SizedBox(height: ElderSpacing.md),
-                  Text(
-                    'Let your family know how well you\'re doing! They\'ll get a notification with your new score.',
-                    style: GoogleFonts.lexend(
-                      fontSize: 18,
-                      // on-tertiary-fixed-variant (#004b73) → onTertiaryFixedVariant.
-                      color: ElderColors.onTertiaryFixedVariant,
-                      height: 1.5,
-                    ),
-                    textAlign: TextAlign.center,
-                  ),
-                  const SizedBox(height: ElderSpacing.xxl),
-
-                  // Action buttons — stacked vertically on mobile.
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      // "Yes" — primary bg, share icon, min 72dp.
-                      Semantics(
-                        button: true,
-                        label: 'Yes, share my score with family',
-                        child: Material(
-                          color: ElderColors.primary,
-                          borderRadius: BorderRadius.circular(_kButtonRadius),
-                          child: InkWell(
-                            borderRadius: BorderRadius.circular(_kButtonRadius),
-                            onTap: () {
-                              // TODO: trigger share notification — post backend sprint.
-                            },
-                            child: Container(
-                              constraints: const BoxConstraints(minHeight: 72),
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: ElderSpacing.xxl,
-                                vertical: ElderSpacing.md,
-                              ),
-                              child: Row(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  const Icon(
-                                    Icons.share_rounded,
-                                    color: ElderColors.onPrimary,
-                                    size: 24,
-                                  ),
-                                  const SizedBox(width: ElderSpacing.sm),
-                                  Text(
-                                    'Yes',
-                                    style: GoogleFonts.lexend(
-                                      fontSize: 20,
-                                      fontWeight: FontWeight.w700,
-                                      color: ElderColors.onPrimary,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: ElderSpacing.md),
-
-                      // "Maybe Later" — surfaceContainerHighest bg, min 72dp.
-                      Semantics(
-                        button: true,
-                        label: 'Maybe later',
-                        child: Material(
-                          color: ElderColors.surfaceContainerHighest,
-                          borderRadius: BorderRadius.circular(_kButtonRadius),
-                          child: InkWell(
-                            borderRadius: BorderRadius.circular(_kButtonRadius),
-                            onTap: () {
-                              // TODO: context.go('/games/elder') — dismiss to games.
-                            },
-                            child: Container(
-                              constraints: const BoxConstraints(minHeight: 72),
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: ElderSpacing.xxl,
-                                vertical: ElderSpacing.md,
-                              ),
-                              child: Center(
-                                child: Text(
-                                  'Maybe Later',
-                                  style: GoogleFonts.lexend(
-                                    fontSize: 20,
-                                    fontWeight: FontWeight.w600,
-                                    color: ElderColors.onSurface,
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-// ── _LeaderboardRow ───────────────────────────────────────────────────────────
-
-/// Single leaderboard row — rank number, avatar circle, name, score.
-///
-/// [isHighlighted] true for the current user's row: primaryFixed bg with
-/// onPrimaryFixed text and a primaryContainer avatar border.
-class _LeaderboardRow extends StatelessWidget {
-  const _LeaderboardRow({
-    required this.rank,
-    required this.name,
-    required this.score,
-    this.isHighlighted = false,
-  });
-
-  final int rank;
-  final String name;
-  final String score;
-  final bool isHighlighted;
-
-  @override
-  Widget build(BuildContext context) {
-    final textColor = isHighlighted
-        ? ElderColors.onPrimaryFixed
-        : ElderColors.onSurface;
-    final dimColor = isHighlighted
-        ? ElderColors.onPrimaryFixed
-        : ElderColors.onSurfaceVariant;
-
-    return Semantics(
-      label: 'Rank $rank: $name, $score points',
-      child: Container(
-        padding: const EdgeInsets.symmetric(
-          horizontal: ElderSpacing.sm,
-          vertical: ElderSpacing.sm,
-        ),
-        decoration: BoxDecoration(
-          // bg-primary-fixed (#a0f0f0) → primaryFixed; bg-surface → surface.
-          color: isHighlighted
-              ? ElderColors.primaryFixed
-              : ElderColors.surface,
-          borderRadius: BorderRadius.circular(_kLeaderRowRadius),
-        ),
-        child: Row(
-          children: [
-            // Rank number — w-6 = 24dp reserved width.
-            SizedBox(
-              width: 24,
-              child: Text(
-                '$rank',
-                style: GoogleFonts.lexend(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w700,
-                  color: dimColor,
-                ),
-              ),
-            ),
-            const SizedBox(width: ElderSpacing.sm),
-
-            // Avatar circle — 40×40dp, border on highlighted row.
-            // TODO(backend-sprint): replace with CachedNetworkImage.
-            Container(
-              width: 40,
-              height: 40,
+        child: Stack(children: [
+          Positioned(
+            top: -40, right: -40,
+            child: Container(
+              width: 160, height: 160,
               decoration: BoxDecoration(
+                color: ElderColors.tertiaryFixedDim.withValues(alpha: 0.30),
                 shape: BoxShape.circle,
-                color: isHighlighted
-                    ? ElderColors.primaryFixedDim
-                    : ElderColors.surfaceContainerLow,
-                border: isHighlighted
-                    ? Border.all(color: ElderColors.primaryContainer, width: 2)
-                    : null,
-              ),
-              child: Icon(
-                Icons.person_rounded,
-                size: 22,
-                color: isHighlighted
-                    ? ElderColors.onPrimaryFixed
-                    : ElderColors.onSurfaceVariant,
               ),
             ),
-            const SizedBox(width: ElderSpacing.sm),
-
-            Expanded(
-              child: Text(
-                name,
-                style: GoogleFonts.lexend(
-                  fontSize: 16,
-                  fontWeight: isHighlighted ? FontWeight.w600 : FontWeight.w500,
-                  color: textColor,
-                ),
-              ),
-            ),
-
-            // Score
-            Text(
-              score,
-              style: GoogleFonts.lexend(
-                fontSize: 16,
-                fontWeight: FontWeight.w700,
-                color: dimColor,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-// ── Bottom Navigation Bar ─────────────────────────────────────────────────────
-
-/// Elder portal bottom nav — mirrors elder_games_screen._BottomNav exactly.
-/// Games tab is active on this post-game result screen.
-class _BottomNav extends StatelessWidget {
-  const _BottomNav({
-    required this.activeTab,
-    required this.hasMedication,
-    required this.onTabSelected,
-  });
-
-  final _NavTab activeTab;
-  final bool hasMedication;
-  final ValueChanged<_NavTab> onTabSelected;
-
-  @override
-  Widget build(BuildContext context) {
-    final tabs = [
-      _NavTabData(tab: _NavTab.home,  icon: Icons.home,           label: 'Home'),
-      _NavTabData(tab: _NavTab.feed,  icon: Icons.rss_feed,       label: 'Feed'),
-      _NavTabData(tab: _NavTab.games, icon: Icons.videogame_asset, label: 'Games'),
-      if (hasMedication)
-        _NavTabData(tab: _NavTab.medication, icon: Icons.medication, label: 'Medication'),
-    ];
-
-    return Container(
-      decoration: BoxDecoration(
-        color: ElderColors.surface,
-        borderRadius: const BorderRadius.vertical(
-          top: Radius.circular(_kNavTopRadius),
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: ElderColors.onSurface.withValues(alpha: 0.05),
-            blurRadius: 20,
-            offset: const Offset(0, -4),
           ),
-        ],
-      ),
-      child: SafeArea(
-        top: false,
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(
-            ElderSpacing.md,
-            ElderSpacing.sm,
-            ElderSpacing.md,
-            ElderSpacing.md,
-          ),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceAround,
-            children: tabs
-                .map(
-                  (t) => _NavItem(
-                    data: t,
-                    isActive: t.tab == activeTab,
-                    onTap: () => onTabSelected(t.tab),
-                  ),
-                )
-                .toList(),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _NavTabData {
-  const _NavTabData({
-    required this.tab,
-    required this.icon,
-    required this.label,
-  });
-  final _NavTab tab;
-  final IconData icon;
-  final String label;
-}
-
-class _NavItem extends StatelessWidget {
-  const _NavItem({
-    required this.data,
-    required this.isActive,
-    required this.onTap,
-  });
-
-  final _NavTabData data;
-  final bool isActive;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return Semantics(
-      label: isActive ? '${data.label}, selected' : data.label,
-      button: true,
-      child: GestureDetector(
-        onTap: onTap,
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 200),
-          curve: Curves.easeOut,
-          width:  isActive ? _kNavActiveSize  : _kNavInactiveSize,
-          height: isActive ? _kNavActiveSize  : _kNavInactiveSize,
-          decoration: isActive
-              ? BoxDecoration(
-                  color: ElderColors.primaryContainer,
-                  shape: BoxShape.circle,
-                  boxShadow: [
-                    BoxShadow(
-                      color: ElderColors.primaryContainer.withValues(alpha: 0.40),
-                      blurRadius: 12,
-                      offset: const Offset(0, 4),
-                    ),
-                  ],
-                )
-              : null,
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(
-                data.icon,
-                color: isActive ? Colors.white : ElderColors.onSurfaceVariant,
-                size: 24,
-              ),
-              const SizedBox(height: 2),
+          Padding(
+            padding: const EdgeInsets.all(ElderSpacing.xxl),
+            child: Column(children: [
+              Text('Share your success?',
+                  style: GoogleFonts.plusJakartaSans(
+                      fontSize: 30, fontWeight: FontWeight.w700,
+                      color: ElderColors.onTertiaryFixed, height: 1.2),
+                  textAlign: TextAlign.center),
+              const SizedBox(height: ElderSpacing.md),
               Text(
-                data.label,
-                // 12sp exception: inside 64dp constrained circle — two-cue (icon+label).
+                "Post your score to the feed so your caretaker and family can celebrate with you!",
                 style: GoogleFonts.lexend(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w500,
-                  color: isActive ? Colors.white : ElderColors.onSurfaceVariant,
-                ),
+                    fontSize: 18, color: ElderColors.onTertiaryFixedVariant,
+                    height: 1.5),
+                textAlign: TextAlign.center,
               ),
-            ],
+              const SizedBox(height: ElderSpacing.xxl),
+              Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+                // Share button
+                Semantics(
+                  button: true, label: 'Share my score',
+                  child: Material(
+                    color: shared ? Colors.green : ElderColors.primary,
+                    borderRadius: BorderRadius.circular(_kButtonRadius),
+                    child: InkWell(
+                      borderRadius: BorderRadius.circular(_kButtonRadius),
+                      onTap: (shareLoading || shared) ? null : onShare,
+                      child: Container(
+                        constraints: const BoxConstraints(minHeight: 72),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: ElderSpacing.xxl, vertical: ElderSpacing.md),
+                        child: Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              if (shareLoading)
+                                const SizedBox(width: 22, height: 22,
+                                    child: CircularProgressIndicator(
+                                        color: Colors.white, strokeWidth: 2.5))
+                              else
+                                Icon(
+                                  shared
+                                      ? Icons.check_circle_rounded
+                                      : Icons.share_rounded,
+                                  color: ElderColors.onPrimary, size: 24),
+                              const SizedBox(width: ElderSpacing.sm),
+                              Text(
+                                shared ? 'Shared!' : 'Yes, Share!',
+                                style: GoogleFonts.lexend(
+                                    fontSize: 20, fontWeight: FontWeight.w700,
+                                    color: ElderColors.onPrimary)),
+                            ]),
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: ElderSpacing.md),
+                // Skip button
+                Semantics(
+                  button: true, label: 'Maybe later',
+                  child: Material(
+                    color: ElderColors.surfaceContainerHighest,
+                    borderRadius: BorderRadius.circular(_kButtonRadius),
+                    child: InkWell(
+                      borderRadius: BorderRadius.circular(_kButtonRadius),
+                      onTap: onSkip,
+                      child: Container(
+                        constraints: const BoxConstraints(minHeight: 72),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: ElderSpacing.xxl, vertical: ElderSpacing.md),
+                        child: Center(
+                          child: Text('Maybe Later',
+                              style: GoogleFonts.lexend(
+                                  fontSize: 20, fontWeight: FontWeight.w600,
+                                  color: ElderColors.onSurface)),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ]),
+            ]),
           ),
-        ),
+        ]),
       ),
     );
   }
 }
 
 // ── ACCESSIBILITY AUDIT ──────────────────────────────────────────────────────
-// ✅ Tap targets ≥ 48×48dp    — "Yes" button: minHeight 72dp ✅
-//                               "Maybe Later" button: minHeight 72dp ✅
-//                               top bar menu + avatar: 48×48dp ✅
-//                               nav tabs: active 64dp circle; inactive 56dp ✅
-// ✅ Font sizes ≥ 16sp         — all body/label text 16sp or above ✅
-//                               | "Great Job!": 48sp ✅
-//                               | score "1,250 points!": 48sp ✅
-//                               | "Your Score": 18sp ✅
-//                               | "Personal Best": 24sp ✅
-//                               | personal best body: 18sp (raised from lg) ✅
-//                               | "Family Standings": 20sp ✅
-//                               | leaderboard text: 16sp (raised from font-medium) ✅
-//                               | "Share your success?": 30sp ✅
-//                               | action subtitle: 18sp ✅
-//                               | "Yes" / "Maybe Later": 20sp ✅
-//                               | EXCEPTIONS with comment:
-//                               |   nav labels: 12sp (circle constrained, two-cue) ✅
-// ✅ Colour contrast WCAG AA   — onPrimary (#FFF) on primary (#005050): ~12:1 ✅
-//                               onTertiaryFixed (#001d31) on tertiaryFixed (#CCE5FF): ~11:1 ✅
-//                               onPrimaryFixed (#002020) on primaryFixed (#A0F0F0): ~9:1 ✅
-//                               secondary (#8e4e00) on surfaceContainerLowest: ~7:1 ✅
-//                               onSurface (#1a1c1d) on surfaceContainerHighest: ~11:1 ✅
-// ✅ Semantic labels            — open menu, profile photo, share score, maybe later,
-//                               nav tabs (selected state), all leaderboard rows ✅
-// ✅ No colour as sole cue      — rank 1 row: highlighted bg + rank number + "You" label ✅
-//                               personal best: icon + text description ✅
-//                               buttons: "Yes" / "Maybe Later" labels ✅
-// ✅ Touch targets ≥ 8dp apart  — ElderSpacing.md (16dp) between bento cards ✅
-//                               ElderSpacing.md (16dp) between leaderboard rows ✅
-//                               ElderSpacing.md (16dp) between action buttons ✅
-// ────────────────────────────────────────────────────────────────────────────
+// ✅ Tap targets ≥ 48dp  — close button 48dp circle, action buttons minHeight 72dp
+// ✅ Font sizes ≥ 16sp   — all body text 16sp+, exception: none
+// ✅ WCAG AA contrast    — onPrimary/white on primary teal, onTertiaryFixed on tertiaryFixed
+// ✅ Semantic labels     — close, share, skip, leaderboard rows all labelled
+// ✅ No colour-only cue  — rank number + name + score on every leaderboard row

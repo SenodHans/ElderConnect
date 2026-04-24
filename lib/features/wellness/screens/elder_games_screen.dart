@@ -2,10 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:intl/intl.dart';
 import '../../../core/constants/elder_colors.dart';
 import '../../../core/constants/elder_spacing.dart';
 import '../../medications/providers/medications_provider.dart';
 import '../../../shared/widgets/aa_button.dart';
+import '../providers/wellness_scores_provider.dart';
+import '../../auth/providers/user_provider.dart';
 
 // ── Screen-level constants ────────────────────────────────────────────────────
 /// rounded-[2rem] explicit on game cards → 32dp
@@ -62,7 +65,6 @@ class ElderGamesScreen extends ConsumerWidget {
                       badgeLabel: 'Cognitive',
                       accentColor: ElderColors.primary,
                       title: 'Memory Card Flip',
-                      description: 'Test your memory and match the hidden pairs of cards.',
                       onTap: () => context.go('/games/memory'),
                     ),
                     const SizedBox(height: ElderSpacing.md),
@@ -73,7 +75,6 @@ class ElderGamesScreen extends ConsumerWidget {
                       badgeLabel: 'Wellness',
                       accentColor: ElderColors.tertiary,
                       title: 'Breathing Exercise',
-                      description: 'Find your calm with guided rhythmic breathing patterns.',
                       onTap: () => context.go('/games/breathing'),
                     ),
                     const SizedBox(height: ElderSpacing.md),
@@ -84,7 +85,6 @@ class ElderGamesScreen extends ConsumerWidget {
                       badgeLabel: 'Language',
                       accentColor: ElderColors.secondary,
                       title: 'Word Scramble',
-                      description: 'Tap the shuffled letters in the right order to spell the word.',
                       onTap: () => context.go('/games/scramble'),
                     ),
                     const SizedBox(height: ElderSpacing.md),
@@ -95,9 +95,10 @@ class ElderGamesScreen extends ConsumerWidget {
                       badgeLabel: 'Knowledge',
                       accentColor: ElderColors.error,
                       title: 'Trivia Quiz',
-                      description: 'Discover fun facts and challenge your daily knowledge.',
                       onTap: () => context.go('/games/trivia'),
                     ),
+                    const SizedBox(height: ElderSpacing.xxl),
+                    const _MyScoresButton(),
                     const SizedBox(height: ElderSpacing.xxl),
                     const _DailyTipSection(),
                     // Clearance for bottom nav
@@ -127,11 +128,12 @@ class ElderGamesScreen extends ConsumerWidget {
 
 // ── Top App Bar ───────────────────────────────────────────────────────────────
 
-class _TopAppBar extends StatelessWidget {
+class _TopAppBar extends ConsumerWidget {
   const _TopAppBar();
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final avatarUrl = ref.watch(userProvider).valueOrNull?.avatarUrl;
     return Container(
       color: ElderColors.surface.withValues(alpha: 0.80),
       child: SafeArea(
@@ -160,12 +162,23 @@ class _TopAppBar extends StatelessWidget {
                       ),
                       color: ElderColors.surfaceContainerLow,
                     ),
-                    child: const ClipOval(
-                      child: Icon(
-                        Icons.person,
-                        color: ElderColors.onSurfaceVariant,
-                        size: 28,
-                      ),
+                    child: ClipOval(
+                      child: avatarUrl != null
+                          ? Image.network(
+                              avatarUrl,
+                              width: 48, height: 48,
+                              fit: BoxFit.cover,
+                              errorBuilder: (_, __, ___) => const Icon(
+                                Icons.person,
+                                color: ElderColors.onSurfaceVariant,
+                                size: 28,
+                              ),
+                            )
+                          : const Icon(
+                              Icons.person,
+                              color: ElderColors.onSurfaceVariant,
+                              size: 28,
+                            ),
                     ),
                   ),
                 ),
@@ -371,7 +384,6 @@ class _GameCard extends StatefulWidget {
     required this.badgeLabel,
     required this.accentColor,
     required this.title,
-    required this.description,
     required this.onTap,
   });
 
@@ -381,7 +393,6 @@ class _GameCard extends StatefulWidget {
   final String badgeLabel;
   final Color accentColor;
   final String title;
-  final String description;
   final VoidCallback onTap;
 
   @override
@@ -456,53 +467,37 @@ class _GameCardState extends State<_GameCard> {
                             color: widget.iconColor, size: 32),
                       ),
                       const SizedBox(width: ElderSpacing.lg),
-                      // Title + badge + description
+                      // Title + badge
                       Expanded(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            Row(
-                              children: [
-                                Expanded(
-                                  child: Text(
-                                    widget.title,
-                                    style: GoogleFonts.plusJakartaSans(
-                                      fontSize: 20,
-                                      fontWeight: FontWeight.w700,
-                                      color: ElderColors.onSurface,
-                                    ),
-                                  ),
-                                ),
-                                Container(
-                                  padding: const EdgeInsets.symmetric(
-                                      horizontal: ElderSpacing.sm, vertical: 3),
-                                  decoration: BoxDecoration(
-                                    color: widget.accentColor.withValues(alpha: 0.10),
-                                    borderRadius: BorderRadius.circular(999),
-                                  ),
-                                  child: Text(
-                                    widget.badgeLabel.toUpperCase(),
-                                    style: GoogleFonts.lexend(
-                                      fontSize: 12,
-                                      fontWeight: FontWeight.w700,
-                                      color: widget.accentColor,
-                                      letterSpacing: 0.8,
-                                    ),
-                                  ),
-                                ),
-                              ],
+                            Text(
+                              widget.title,
+                              style: GoogleFonts.plusJakartaSans(
+                                fontSize: 20,
+                                fontWeight: FontWeight.w700,
+                                color: ElderColors.onSurface,
+                              ),
                             ),
                             const SizedBox(height: ElderSpacing.xs),
-                            Text(
-                              widget.description,
-                              style: GoogleFonts.lexend(
-                                fontSize: 14,
-                                color: ElderColors.onSurfaceVariant,
-                                height: 1.3,
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: ElderSpacing.sm, vertical: 3),
+                              decoration: BoxDecoration(
+                                color: widget.accentColor.withValues(alpha: 0.10),
+                                borderRadius: BorderRadius.circular(999),
                               ),
-                              maxLines: 2,
-                              overflow: TextOverflow.ellipsis,
+                              child: Text(
+                                widget.badgeLabel.toUpperCase(),
+                                style: GoogleFonts.lexend(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w700,
+                                  color: widget.accentColor,
+                                  letterSpacing: 0.8,
+                                ),
+                              ),
                             ),
                           ],
                         ),
@@ -518,6 +513,283 @@ class _GameCardState extends State<_GameCard> {
           ),
         ),
       ),
+    );
+  }
+}
+
+// ── My Scores Button ──────────────────────────────────────────────────────────
+
+/// Tappable card that opens a bottom sheet with the elder's recent game scores.
+class _MyScoresButton extends StatelessWidget {
+  const _MyScoresButton();
+
+  void _openScoresSheet(BuildContext context) {
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => const _ScoresBottomSheet(),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      label: 'View my recent scores',
+      button: true,
+      child: GestureDetector(
+        onTap: () => _openScoresSheet(context),
+        child: Container(
+          padding: const EdgeInsets.all(ElderSpacing.lg),
+          decoration: BoxDecoration(
+            color: ElderColors.primaryFixed,
+            borderRadius: BorderRadius.circular(24),
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 56,
+                height: 56,
+                decoration: BoxDecoration(
+                  color: ElderColors.primary.withValues(alpha: 0.15),
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                child: const Icon(Icons.leaderboard_rounded,
+                    color: ElderColors.primary, size: 28),
+              ),
+              const SizedBox(width: ElderSpacing.md),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'My Recent Scores',
+                      style: GoogleFonts.plusJakartaSans(
+                        fontSize: 20,
+                        fontWeight: FontWeight.w700,
+                        color: ElderColors.onPrimaryFixed,
+                      ),
+                    ),
+                    Text(
+                      'Tap to view your game history',
+                      style: GoogleFonts.lexend(
+                        fontSize: 16,
+                        color: ElderColors.onPrimaryFixed.withValues(alpha: 0.70),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const Icon(Icons.chevron_right_rounded,
+                  color: ElderColors.primary, size: 24),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Animated bottom sheet displaying the elder's 10 most recent game plays.
+class _ScoresBottomSheet extends ConsumerWidget {
+  const _ScoresBottomSheet();
+
+  static const _gameIcons = {
+    'Memory Card Flip': Icons.psychology,
+    'Breathing Exercise': Icons.waves,
+    'Word Scramble': Icons.text_fields_rounded,
+    'Trivia Quiz': Icons.quiz,
+  };
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final scoresAsync = ref.watch(myRecentScoresProvider);
+
+    return DraggableScrollableSheet(
+      initialChildSize: 0.55,
+      minChildSize: 0.35,
+      maxChildSize: 0.90,
+      expand: false,
+      builder: (ctx, scrollCtrl) => Container(
+        decoration: const BoxDecoration(
+          color: ElderColors.surface,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+        ),
+        child: Column(
+          children: [
+            // Drag handle
+            Padding(
+              padding: const EdgeInsets.only(top: ElderSpacing.md),
+              child: Center(
+                child: Container(
+                  width: 36, height: 4,
+                  decoration: BoxDecoration(
+                    color: ElderColors.outlineVariant,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(
+                  ElderSpacing.lg, ElderSpacing.md, ElderSpacing.lg, 0),
+              child: Text(
+                'My Recent Scores',
+                style: GoogleFonts.plusJakartaSans(
+                  fontSize: 22,
+                  fontWeight: FontWeight.w700,
+                  color: ElderColors.onSurface,
+                ),
+                textAlign: TextAlign.center,
+              ),
+            ),
+            const SizedBox(height: ElderSpacing.md),
+            Expanded(
+              child: scoresAsync.when(
+                loading: () => const Center(child: CircularProgressIndicator()),
+                error: (_, __) => Center(
+                  child: Text('Could not load scores',
+                      style: GoogleFonts.lexend(
+                          fontSize: 16, color: ElderColors.onSurfaceVariant)),
+                ),
+                data: (logs) {
+                  if (logs.isEmpty) {
+                    return Center(
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(Icons.sports_esports,
+                              size: 56, color: ElderColors.outlineVariant),
+                          const SizedBox(height: ElderSpacing.md),
+                          Text('No games played yet',
+                              style: GoogleFonts.lexend(
+                                  fontSize: 18,
+                                  color: ElderColors.onSurfaceVariant)),
+                        ],
+                      ),
+                    );
+                  }
+                  return ListView.separated(
+                    controller: scrollCtrl,
+                    padding: const EdgeInsets.fromLTRB(
+                        ElderSpacing.lg, 0, ElderSpacing.lg, ElderSpacing.xl),
+                    itemCount: logs.length,
+                    separatorBuilder: (_, __) =>
+                        const SizedBox(height: ElderSpacing.sm),
+                    itemBuilder: (_, i) =>
+                        _ScoreRow(log: logs[i], gameIcons: _gameIcons),
+                  );
+                },
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Old inline scores section — replaced by [_MyScoresButton] / [_ScoresBottomSheet].
+/// Kept as dead class so removed reference compiles; delete in cleanup sprint.
+// ignore: unused_element
+class _MyScoresSection extends ConsumerWidget {
+  const _MyScoresSection();
+
+  static const _gameIcons = {
+    'Memory Card Flip': Icons.psychology,
+    'Breathing Exercise': Icons.waves,
+    'Word Scramble': Icons.text_fields_rounded,
+    'Trivia Quiz': Icons.quiz,
+  };
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final scoresAsync = ref.watch(myRecentScoresProvider);
+
+    return scoresAsync.when(
+      loading: () => const SizedBox.shrink(),
+      error: (_, __) => const SizedBox.shrink(),
+      data: (logs) {
+        if (logs.isEmpty) return const SizedBox.shrink();
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'MY RECENT SCORES',
+              style: GoogleFonts.lexend(
+                fontSize: 16,
+                fontWeight: FontWeight.w600,
+                color: ElderColors.primaryContainer,
+                letterSpacing: 1.5,
+              ),
+            ),
+            const SizedBox(height: ElderSpacing.md),
+            ...logs.map((log) => Padding(
+                  padding: const EdgeInsets.only(bottom: ElderSpacing.sm),
+                  child: _ScoreRow(log: log, gameIcons: _gameIcons),
+                )),
+          ],
+        );
+      },
+    );
+  }
+}
+
+class _ScoreRow extends StatelessWidget {
+  const _ScoreRow({required this.log, required this.gameIcons});
+  final WellnessLog log;
+  final Map<String, IconData> gameIcons;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(
+          horizontal: ElderSpacing.md, vertical: ElderSpacing.sm),
+      decoration: BoxDecoration(
+        color: ElderColors.surfaceContainerLowest,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: ElderColors.onSurface.withValues(alpha: 0.04),
+            blurRadius: 4, offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Row(children: [
+        Container(
+          width: 40, height: 40,
+          decoration: BoxDecoration(
+            color: ElderColors.primaryFixed,
+            borderRadius: BorderRadius.circular(10),
+          ),
+          child: Icon(
+            gameIcons[log.gameName] ?? Icons.sports_esports,
+            color: ElderColors.primary, size: 22,
+          ),
+        ),
+        const SizedBox(width: ElderSpacing.md),
+        Expanded(
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text(
+              log.gameName,
+              style: GoogleFonts.plusJakartaSans(
+                  fontSize: 16, fontWeight: FontWeight.w600,
+                  color: ElderColors.onSurface),
+            ),
+            Text(
+              DateFormat('MMM d, h:mm a').format(log.createdAt),
+              style: GoogleFonts.lexend(
+                  fontSize: 14, color: ElderColors.outline),
+            ),
+          ]),
+        ),
+        Text(
+          log.displayScore,
+          style: GoogleFonts.lexend(
+              fontSize: 18, fontWeight: FontWeight.w700,
+              color: ElderColors.primary),
+        ),
+      ]),
     );
   }
 }
@@ -701,7 +973,7 @@ class _BottomNav extends StatelessWidget {
       _NavTabData(tab: _NavTab.feed, icon: Icons.rss_feed, label: 'Feed'),
       _NavTabData(tab: _NavTab.games, icon: Icons.videogame_asset, label: 'Games'),
       if (hasMedication)
-        _NavTabData(tab: _NavTab.medication, icon: Icons.medication, label: 'Medication'),
+        _NavTabData(tab: _NavTab.medication, icon: Icons.medication, label: 'Meds'),
     ];
 
     return Container(

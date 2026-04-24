@@ -1,15 +1,20 @@
+import 'dart:io';
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../../../core/constants/elder_colors.dart';
 import '../../../core/constants/elder_spacing.dart';
 import '../../auth/providers/user_provider.dart';
 import '../../medications/providers/medications_provider.dart';
+import '../../social/providers/post_submission_provider.dart';
 import '../../social/providers/voice_message_provider.dart';
+import '../../social/services/photo_upload_service.dart';
 import '../../../shared/models/medication_model.dart';
 import '../../../shared/widgets/aa_button.dart';
 
@@ -63,7 +68,7 @@ class _ElderHomeScreenState extends ConsumerState<ElderHomeScreen> {
     final bool hasMedication = ref.watch(hasMedicationProvider);
     return PopScope(
       canPop: false,
-      onPopInvoked: (_) => _onWillPop(),
+      onPopInvokedWithResult: (_, __) => _onWillPop(),
       child: Scaffold(
       backgroundColor: ElderColors.surface,
       body: Column(
@@ -119,11 +124,12 @@ class _ElderHomeScreenState extends ConsumerState<ElderHomeScreen> {
 
 // ── Top App Bar ───────────────────────────────────────────────────────────────
 
-class _TopAppBar extends StatelessWidget {
+class _TopAppBar extends ConsumerWidget {
   const _TopAppBar();
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final avatarUrl = ref.watch(userProvider).valueOrNull?.avatarUrl;
     return ClipRect(
       child: BackdropFilter(
         filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
@@ -155,12 +161,23 @@ class _TopAppBar extends StatelessWidget {
                           ),
                           color: ElderColors.surfaceContainerLow,
                         ),
-                        child: const ClipOval(
-                          child: Icon(
-                            Icons.person,
-                            color: ElderColors.onSurfaceVariant,
-                            size: 28,
-                          ),
+                        child: ClipOval(
+                          child: avatarUrl != null
+                              ? Image.network(
+                                  avatarUrl,
+                                  width: 48, height: 48,
+                                  fit: BoxFit.cover,
+                                  errorBuilder: (_, __, ___) => const Icon(
+                                    Icons.person,
+                                    color: ElderColors.onSurfaceVariant,
+                                    size: 28,
+                                  ),
+                                )
+                              : const Icon(
+                                  Icons.person,
+                                  color: ElderColors.onSurfaceVariant,
+                                  size: 28,
+                                ),
                         ),
                       ),
                     ),
@@ -544,9 +561,14 @@ class _FeedbackTile extends StatelessWidget {
 
 // ── Mood Check Card ───────────────────────────────────────────────────────────
 
-class _MoodCard extends StatelessWidget {
+class _MoodCard extends StatefulWidget {
   const _MoodCard();
 
+  @override
+  State<_MoodCard> createState() => _MoodCardState();
+}
+
+class _MoodCardState extends State<_MoodCard> {
   static const _moods = [
     ('😊', 'Great'),
     ('🙂', 'Good'),
@@ -555,6 +577,44 @@ class _MoodCard extends StatelessWidget {
     ('😔', 'Sad'),
     ('🤒', 'Unwell'),
   ];
+
+  String? _selectedEmoji;
+
+  void _onMoodSelected(String emoji, String label) async {
+    setState(() => _selectedEmoji = emoji);
+    // Map emoji label to a MOSAIC score: Great=1.0, Good=0.75, Okay=0.5, Tired=0.35, Sad=0.2, Unwell=0.15
+    const scores = {
+      'Great': 1.0, 'Good': 0.75, 'Okay': 0.5,
+      'Tired': 0.35, 'Sad': 0.2, 'Unwell': 0.15,
+    };
+    final moodLabel = scores[label]! >= 0.5 ? 'POSITIVE' : 'NEGATIVE';
+    try {
+      final uid = Supabase.instance.client.auth.currentUser?.id;
+      if (uid != null) {
+        await Supabase.instance.client.from('mood_logs').insert({
+          'user_id': uid,
+          'label': moodLabel,
+          'score': scores[label],
+          'source': 'daily_prompt',
+          'emoji_self_report': emoji,
+        });
+      }
+    } catch (_) {
+      // Non-fatal — mood logging should never block the elder.
+    }
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Mood recorded: $label',
+            style: GoogleFonts.lexend(fontSize: 16),
+          ),
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        ),
+      );
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -565,7 +625,7 @@ class _MoodCard extends StatelessWidget {
         borderRadius: BorderRadius.circular(_kCardRadius),
         boxShadow: [
           BoxShadow(
-            color: ElderColors.onSurface.withValues(alpha:0.06),
+            color: ElderColors.onSurface.withValues(alpha: 0.06),
             blurRadius: 8,
             offset: const Offset(0, 2),
           ),
@@ -590,13 +650,49 @@ class _MoodCard extends StatelessWidget {
               crossAxisCount: 3,
               crossAxisSpacing: ElderSpacing.md,
               mainAxisSpacing: ElderSpacing.md,
-              childAspectRatio: 0.72,
+              childAspectRatio: 0.80,
             ),
             itemCount: _moods.length,
             itemBuilder: (context, i) {
               final (emoji, label) = _moods[i];
-              return _MoodButton(emoji: emoji, label: label);
+              return _MoodButton(
+                emoji: emoji,
+                label: label,
+                isSelected: _selectedEmoji == emoji,
+                onSelect: () => _onMoodSelected(emoji, label),
+              );
             },
+          ),
+          const SizedBox(height: ElderSpacing.lg),
+          // Navigate to the full daily journal for deeper mood entry.
+          Semantics(
+            button: true,
+            label: 'Write in journal',
+            child: GestureDetector(
+              onTap: () => context.go('/mood/journal'),
+              child: Container(
+                height: 56,
+                decoration: BoxDecoration(
+                  color: ElderColors.primaryContainer.withValues(alpha: 0.30),
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const Icon(Icons.edit_note_rounded, size: 24, color: ElderColors.primary),
+                    const SizedBox(width: ElderSpacing.sm),
+                    Text(
+                      'Write in Journal',
+                      style: GoogleFonts.plusJakartaSans(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w600,
+                        color: ElderColors.primary,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
           ),
         ],
       ),
@@ -605,9 +701,17 @@ class _MoodCard extends StatelessWidget {
 }
 
 class _MoodButton extends StatefulWidget {
-  const _MoodButton({required this.emoji, required this.label});
+  const _MoodButton({
+    required this.emoji,
+    required this.label,
+    required this.isSelected,
+    required this.onSelect,
+  });
+
   final String emoji;
   final String label;
+  final bool isSelected;
+  final VoidCallback onSelect;
 
   @override
   State<_MoodButton> createState() => _MoodButtonState();
@@ -621,29 +725,28 @@ class _MoodButtonState extends State<_MoodButton> {
     return Semantics(
       label: widget.label,
       button: true,
+      selected: widget.isSelected,
       child: GestureDetector(
         onTapDown: (_) => setState(() => _scale = 0.88),
         onTapUp: (_) {
           setState(() => _scale = 1.0);
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(
-                'Mood recorded: ${widget.label}',
-                style: GoogleFonts.lexend(fontSize: 16),
-              ),
-              behavior: SnackBarBehavior.floating,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-            ),
-          );
-          // TODO(backend-sprint): persist mood → AI mood log if consent given
+          widget.onSelect();
         },
         onTapCancel: () => setState(() => _scale = 1.0),
         child: AnimatedScale(
           scale: _scale,
           duration: const Duration(milliseconds: 120),
-          child: Container(
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 200),
+            curve: Curves.easeOut,
             decoration: BoxDecoration(
+              color: widget.isSelected
+                  ? ElderColors.primary.withValues(alpha: 0.10)
+                  : Colors.transparent,
               borderRadius: BorderRadius.circular(16),
+              border: widget.isSelected
+                  ? Border.all(color: ElderColors.primary, width: 2.5)
+                  : Border.all(color: Colors.transparent, width: 2.5),
             ),
             padding: const EdgeInsets.symmetric(
               vertical: ElderSpacing.md,
@@ -652,16 +755,31 @@ class _MoodButtonState extends State<_MoodButton> {
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Text(widget.emoji, style: const TextStyle(fontSize: 40)),
+                Text(widget.emoji, style: const TextStyle(fontSize: 32)),
                 const SizedBox(height: ElderSpacing.xs),
                 Text(
                   widget.label,
                   style: GoogleFonts.lexend(
                     fontSize: 16,
-                    fontWeight: FontWeight.w500,
-                    color: ElderColors.onSurface,
+                    fontWeight: widget.isSelected
+                        ? FontWeight.w700
+                        : FontWeight.w500,
+                    color: widget.isSelected
+                        ? ElderColors.primary
+                        : ElderColors.onSurface,
                   ),
                 ),
+                if (widget.isSelected) ...[
+                  const SizedBox(height: 4),
+                  Container(
+                    width: 8,
+                    height: 8,
+                    decoration: const BoxDecoration(
+                      color: ElderColors.primary,
+                      shape: BoxShape.circle,
+                    ),
+                  ),
+                ],
               ],
             ),
           ),
@@ -723,7 +841,7 @@ class _ConnectCard extends ConsumerWidget {
                       child: SizedBox(
                         width: double.infinity,
                         child: ElevatedButton.icon(
-                          onPressed: () => context.go('/feed/elder'),
+                          onPressed: () => _showPhotoComposer(context),
                           icon: const Icon(Icons.add_a_photo, size: 22),
                           label: const Text('Share'),
                           style: ElevatedButton.styleFrom(
@@ -782,6 +900,15 @@ class _ConnectCard extends ConsumerWidget {
   }
 }
 
+void _showPhotoComposer(BuildContext context) {
+  showModalBottomSheet(
+    context: context,
+    isScrollControlled: true,
+    backgroundColor: Colors.transparent,
+    builder: (_) => const _HomePhotoComposerSheet(),
+  );
+}
+
 void _showVoiceRecorder(BuildContext context) {
   showModalBottomSheet(
     context: context,
@@ -792,6 +919,271 @@ void _showVoiceRecorder(BuildContext context) {
 }
 
 // ── Voice Recorder Bottom Sheet ───────────────────────────────────────────────
+
+// ── Home Photo Composer Sheet ────────────────────────────────────────────────
+
+/// Photo post composer launched from the Connect with Family card.
+/// Mirrors the feed's _PhotoPostComposerSheet — camera/gallery + caption + post.
+class _HomePhotoComposerSheet extends ConsumerStatefulWidget {
+  const _HomePhotoComposerSheet();
+
+  @override
+  ConsumerState<_HomePhotoComposerSheet> createState() =>
+      _HomePhotoComposerSheetState();
+}
+
+class _HomePhotoComposerSheetState
+    extends ConsumerState<_HomePhotoComposerSheet> {
+  final _captionCtrl = TextEditingController();
+  XFile? _pickedFile;
+  bool _uploading = false;
+  String? _error;
+
+  @override
+  void dispose() {
+    _captionCtrl.dispose();
+    super.dispose();
+  }
+
+  Future<void> _pickPhoto() async {
+    final source = await showModalBottomSheet<ImageSource>(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (_) => Container(
+        decoration: const BoxDecoration(
+          color: ElderColors.surface,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        ),
+        padding: const EdgeInsets.fromLTRB(
+            ElderSpacing.lg, ElderSpacing.lg, ElderSpacing.lg, ElderSpacing.xxl),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 32, height: 4,
+              decoration: BoxDecoration(
+                color: ElderColors.outlineVariant,
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            const SizedBox(height: ElderSpacing.lg),
+            Text('Add a Photo',
+                style: GoogleFonts.plusJakartaSans(
+                    fontSize: 20,
+                    fontWeight: FontWeight.w700,
+                    color: ElderColors.onSurface),
+                textAlign: TextAlign.center),
+            const SizedBox(height: ElderSpacing.lg),
+            _SourceTile(
+              icon: Icons.camera_alt_rounded,
+              label: 'Take a Photo',
+              onTap: () => Navigator.pop(context, ImageSource.camera),
+            ),
+            const SizedBox(height: ElderSpacing.md),
+            _SourceTile(
+              icon: Icons.photo_library_rounded,
+              label: 'Choose from Gallery',
+              onTap: () => Navigator.pop(context, ImageSource.gallery),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (source == null) return;
+    final service = PhotoUploadService(Supabase.instance.client);
+    final file = await service.pick(source);
+    if (file != null && mounted) setState(() => _pickedFile = file);
+  }
+
+  Future<void> _submit() async {
+    if (_pickedFile == null) return;
+    setState(() { _uploading = true; _error = null; });
+    try {
+      final service = PhotoUploadService(Supabase.instance.client);
+      final url = await service.upload(_pickedFile!);
+      final caption = _captionCtrl.text.trim();
+      await ref.read(postSubmissionProvider.notifier).submitPost(
+            content: caption.isEmpty ? '📷' : caption,
+            photoUrl: url,
+          );
+      if (mounted) Navigator.of(context).pop();
+    } catch (_) {
+      setState(() { _uploading = false; _error = 'Upload failed. Please try again.'; });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final bottomInset = MediaQuery.viewInsetsOf(context).bottom;
+    return Container(
+      margin: EdgeInsets.only(bottom: bottomInset),
+      decoration: const BoxDecoration(
+        color: ElderColors.surfaceContainerLowest,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      padding: const EdgeInsets.fromLTRB(
+          ElderSpacing.lg, ElderSpacing.md, ElderSpacing.lg, ElderSpacing.lg),
+      child: SafeArea(
+        top: false,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Center(
+              child: Container(
+                width: 40, height: 4,
+                decoration: BoxDecoration(
+                  color: ElderColors.outline.withValues(alpha: 0.4),
+                  borderRadius: BorderRadius.circular(9999),
+                ),
+              ),
+            ),
+            const SizedBox(height: ElderSpacing.lg),
+            Text('Share with Family',
+                style: GoogleFonts.plusJakartaSans(
+                    fontSize: 24,
+                    fontWeight: FontWeight.w700,
+                    color: ElderColors.primary)),
+            const SizedBox(height: ElderSpacing.lg),
+
+            // Photo preview / picker
+            GestureDetector(
+              onTap: _uploading ? null : _pickPhoto,
+              child: Container(
+                width: double.infinity,
+                height: 180,
+                decoration: BoxDecoration(
+                  color: ElderColors.surfaceContainerHighest,
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(
+                    color: _pickedFile != null
+                        ? ElderColors.primaryContainer
+                        : ElderColors.outline.withValues(alpha: 0.3),
+                    width: 2,
+                  ),
+                ),
+                child: _pickedFile != null
+                    ? ClipRRect(
+                        borderRadius: BorderRadius.circular(14),
+                        child: Image.file(
+                          File(_pickedFile!.path),
+                          fit: BoxFit.cover,
+                        ),
+                      )
+                    : Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          const Icon(Icons.add_photo_alternate_outlined,
+                              size: 48, color: ElderColors.onSurfaceVariant),
+                          const SizedBox(height: ElderSpacing.sm),
+                          Text('Tap to add a photo',
+                              style: GoogleFonts.lexend(
+                                  fontSize: 16,
+                                  color: ElderColors.onSurfaceVariant)),
+                        ],
+                      ),
+              ),
+            ),
+            const SizedBox(height: ElderSpacing.md),
+
+            TextField(
+              controller: _captionCtrl,
+              maxLines: 2,
+              style: GoogleFonts.lexend(fontSize: 18, color: ElderColors.onSurface),
+              decoration: InputDecoration(
+                hintText: 'Add a caption (optional)',
+                hintStyle: GoogleFonts.lexend(
+                    fontSize: 18, color: ElderColors.onSurfaceVariant),
+                filled: true,
+                fillColor: ElderColors.surfaceContainerHighest,
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(16),
+                  borderSide: BorderSide.none,
+                ),
+                contentPadding: const EdgeInsets.all(ElderSpacing.md),
+              ),
+            ),
+
+            if (_error != null) ...[
+              const SizedBox(height: ElderSpacing.sm),
+              Text(_error!,
+                  style: GoogleFonts.lexend(fontSize: 16, color: ElderColors.error)),
+            ],
+
+            const SizedBox(height: ElderSpacing.lg),
+            SizedBox(
+              width: double.infinity,
+              height: 56,
+              child: ElevatedButton(
+                onPressed: (_pickedFile == null || _uploading) ? null : _submit,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: ElderColors.primary,
+                  foregroundColor: Colors.white,
+                  disabledBackgroundColor: ElderColors.surfaceContainerHighest,
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(16)),
+                  textStyle: GoogleFonts.plusJakartaSans(
+                      fontSize: 18, fontWeight: FontWeight.w700),
+                ),
+                child: _uploading
+                    ? const SizedBox(
+                        width: 24, height: 24,
+                        child: CircularProgressIndicator(
+                            color: Colors.white, strokeWidth: 2.5))
+                    : const Text('Post to Family Feed'),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Simple option row for the camera/gallery source picker bottom sheet.
+class _SourceTile extends StatelessWidget {
+  const _SourceTile({
+    required this.icon,
+    required this.label,
+    required this.onTap,
+  });
+
+  final IconData icon;
+  final String label;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      button: true,
+      label: label,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(16),
+        child: Container(
+          padding: const EdgeInsets.all(ElderSpacing.lg),
+          decoration: BoxDecoration(
+            color: ElderColors.surfaceContainerLow,
+            borderRadius: BorderRadius.circular(16),
+          ),
+          child: Row(
+            children: [
+              Icon(icon, size: 28, color: ElderColors.primary),
+              const SizedBox(width: ElderSpacing.md),
+              Text(label,
+                  style: GoogleFonts.plusJakartaSans(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w600,
+                      color: ElderColors.onSurface)),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ── Voice Recorder Sheet ──────────────────────────────────────────────────────
 
 class _VoiceRecorderSheet extends ConsumerWidget {
   const _VoiceRecorderSheet();
@@ -966,8 +1358,72 @@ class _VoiceStatusLabel extends StatelessWidget {
 
 // ── Emergency Section ─────────────────────────────────────────────────────────
 
-class _EmergencySection extends StatelessWidget {
+class _EmergencySection extends ConsumerStatefulWidget {
   const _EmergencySection();
+
+  @override
+  ConsumerState<_EmergencySection> createState() => _EmergencySectionState();
+}
+
+class _EmergencySectionState extends ConsumerState<_EmergencySection> {
+  bool _sosSending = false;
+
+  Future<void> _onEmergencyDial() async {
+    final user = ref.read(userProvider).valueOrNull;
+    final phone = user?.emergencyContactPhone;
+
+    if (phone == null || phone.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text(
+          'No emergency contact set. Add one in your profile.',
+          style: GoogleFonts.lexend(fontSize: 16),
+        ),
+        behavior: SnackBarBehavior.floating,
+        backgroundColor: ElderColors.secondary,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      ));
+      return;
+    }
+
+    final uri = Uri.parse('tel:$phone');
+    if (await canLaunchUrl(uri)) {
+      await launchUrl(uri);
+    }
+  }
+
+  Future<void> _onSos() async {
+    if (_sosSending) return;
+    setState(() => _sosSending = true);
+
+    try {
+      await Supabase.instance.client.functions.invoke('send-sos-alert');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text(
+            '🆘 SOS alert sent to your caretaker!',
+            style: GoogleFonts.lexend(fontSize: 16, color: Colors.white),
+          ),
+          behavior: SnackBarBehavior.floating,
+          backgroundColor: ElderColors.error,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        ));
+      }
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text(
+            'Could not send SOS. Please call your emergency contact directly.',
+            style: GoogleFonts.lexend(fontSize: 16),
+          ),
+          behavior: SnackBarBehavior.floating,
+          backgroundColor: ElderColors.error,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        ));
+      }
+    } finally {
+      if (mounted) setState(() => _sosSending = false);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -994,9 +1450,8 @@ class _EmergencySection extends StatelessWidget {
           children: [
             Expanded(
               child: Semantics(
-                label: 'Emergency Dial — call for help',
+                label: 'Emergency Dial — call your emergency contact',
                 button: true,
-                // Emergency Dial → secondaryContainer (amber) per CLAUDE.md Emergency Colour rule
                 child: _EmergencyButton(
                   icon: Icons.phone_forwarded,
                   label: 'Emergency\nDial',
@@ -1004,49 +1459,23 @@ class _EmergencySection extends StatelessWidget {
                   foregroundColor: ElderColors.onSecondaryContainer,
                   iconSize: 36,
                   fontSize: 20,
-                  onTap: () {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text(
-                          'Connecting to emergency services...',
-                          style: GoogleFonts.lexend(fontSize: 16),
-                        ),
-                        behavior: SnackBarBehavior.floating,
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                      ),
-                    );
-                    // TODO(backend-sprint): initiate emergency call via url_launcher
-                  },
+                  onTap: _onEmergencyDial,
                 ),
               ),
             ),
             const SizedBox(width: ElderSpacing.md),
             Expanded(
               child: Semantics(
-                label: 'SOS — send emergency alert',
+                label: 'SOS — send emergency alert to caretaker',
                 button: true,
-                // SOS → ElderColors.error only (reserved hard emergency)
                 child: _EmergencyButton(
-                  icon: Icons.emergency,
-                  label: 'SOS',
+                  icon: _sosSending ? Icons.hourglass_top : Icons.emergency,
+                  label: _sosSending ? 'Sending...' : 'SOS',
                   backgroundColor: ElderColors.error,
                   foregroundColor: ElderColors.onError,
                   iconSize: 44,
                   fontSize: 24,
-                  onTap: () {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text(
-                          'SOS alert sent to your caretaker!',
-                          style: GoogleFonts.lexend(fontSize: 16),
-                        ),
-                        behavior: SnackBarBehavior.floating,
-                        backgroundColor: ElderColors.error,
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                      ),
-                    );
-                    // TODO(backend-sprint): push FCM SOS notification to caretaker
-                  },
+                  onTap: _onSos,
                 ),
               ),
             ),
@@ -1132,7 +1561,7 @@ class _BottomNav extends StatelessWidget {
       _NavTabData(tab: _NavTab.feed, icon: Icons.rss_feed, label: 'Feed'),
       _NavTabData(tab: _NavTab.games, icon: Icons.videogame_asset, label: 'Games'),
       if (hasMedication)
-        _NavTabData(tab: _NavTab.medication, icon: Icons.medication, label: 'Medication'),
+        _NavTabData(tab: _NavTab.medication, icon: Icons.medication, label: 'Meds'),
     ];
 
     return Container(

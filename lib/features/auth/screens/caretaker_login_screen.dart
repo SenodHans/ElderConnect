@@ -12,7 +12,9 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../core/constants/elder_colors.dart';
 import '../../../core/constants/elder_spacing.dart';
+import '../../../shared/widgets/elder_connect_logo.dart';
 import '../providers/auth_provider.dart';
+import '../widgets/forgot_password_modal.dart';
 
 // Stitch config: rounded-xl = 0.75rem = 12dp, rounded-lg = 0.5rem = 8dp.
 const double _kButtonRadius = 12.0;
@@ -63,10 +65,12 @@ class _CaretakerLoginScreenState
     if (!_formKey.currentState!.validate()) return;
     setState(() { _isLoading = true; _errorMessage = null; });
     try {
-      await ref.read(authServiceProvider).signInCaretaker(
+      final service = ref.read(authServiceProvider);
+      await service.signInCaretaker(
         email: _emailController.text.trim(),
         password: _passwordController.text,
       );
+      await service.saveLastRole('caretaker');
       if (mounted) context.go('/home/caretaker');
     } on AuthException catch (e) {
       setState(() => _errorMessage = e.message);
@@ -119,39 +123,13 @@ class _CaretakerLoginScreenState
   Widget _buildHeader() {
     return Column(
       children: [
-        // Icon circle — h-14 w-14 = 56dp, rounded-full, surfaceContainerLow bg
-        Container(
-          width: 56,
-          height: 56,
-          decoration: const BoxDecoration(
-            color: ElderColors.surfaceContainerLow,
-            shape: BoxShape.circle,
-          ),
-          child: const Icon(
-            Icons.volunteer_activism,
-            size: 32, // text-[32px]
-            color: ElderColors.primary,
-          ),
-        ),
-        const SizedBox(height: ElderSpacing.md), // mb-4 = 16dp
-
-        // "ElderConnect" wordmark
-        Text(
-          'ElderConnect',
-          style: GoogleFonts.plusJakartaSans(
-            fontSize: 20, // text-xl
-            fontWeight: FontWeight.bold,
-            color: ElderColors.primary,
-            letterSpacing: -0.5, // tracking-tight
-          ),
-        ),
-        const SizedBox(height: ElderSpacing.sm), // mb-2 = 8dp
-
+        const ElderConnectLogo(size: 72),
+        const SizedBox(height: ElderSpacing.md),
         // "Caretaker Sign In" headline
         Text(
           'Caretaker Sign In',
           style: GoogleFonts.plusJakartaSans(
-            fontSize: 30, // text-3xl
+            fontSize: 30,
             fontWeight: FontWeight.bold,
             color: ElderColors.onSurface,
           ),
@@ -263,9 +241,7 @@ class _CaretakerLoginScreenState
           // "Forgot your password?" link
           Center(
             child: GestureDetector(
-              onTap: () {
-                // TODO: show password reset flow — deferred to backend sprint.
-              },
+              onTap: () => showForgotPasswordModal(context, ref),
               child: Text(
                 'Forgot your password?',
                 // HTML: text-sm (14px) → raised to 16sp.

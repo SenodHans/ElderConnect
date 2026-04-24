@@ -58,6 +58,7 @@ function isDiscrepancyFlagged(moodLabel: string, emoji: string | null): boolean 
 }
 
 // Calls HuggingFace with one retry on 503 (model cold start).
+// Logs precise server-side latency for thesis performance measurements.
 async function queryHuggingFace(
   text: string,
   apiKey: string,
@@ -72,17 +73,28 @@ async function queryHuggingFace(
       body: JSON.stringify({ inputs: text }),
     });
 
+  const hfStart = Date.now();
   let res = await call();
 
   if (res.status === 503) {
-    await new Promise((r) => setTimeout(r, 20_000));
+    console.log(`[MOSAIC] HuggingFace cold-start detected. Retrying after 25s... | model: ${HF_MODEL}`);
+    await new Promise((r) => setTimeout(r, 25_000));
     res = await call();
-    if (res.status === 503) return null;
+    if (res.status === 503) {
+      console.log(`[MOSAIC] HuggingFace unavailable after retry | total_wait_ms: ${Date.now() - hfStart}`);
+      return null;
+    }
+    console.log(`[MOSAIC] HuggingFace latency after cold-start: ${Date.now() - hfStart}ms | model: ${HF_MODEL}`);
+  } else {
+    console.log(`[MOSAIC] HuggingFace latency: ${Date.now() - hfStart}ms | model: ${HF_MODEL} | cold_start: false`);
   }
 
   if (!res.ok) throw new Error(`HuggingFace error: ${res.status}`);
 
   const json = await res.json() as [[{ label: string; score: number }]];
+  if (!Array.isArray(json) || !Array.isArray(json[0]) || json[0].length === 0) {
+    throw new Error(`Unexpected HuggingFace response: ${JSON.stringify(json)}`);
+  }
   const candidates = json[0];
   return candidates.reduce((best, c) => (c.score > best.score ? c : best));
 }
@@ -151,6 +163,15 @@ serve(async (req: Request) => {
     if (!["post", "daily_prompt"].includes(source)) {
       return new Response(
         JSON.stringify({ error: "source must be 'post' or 'daily_prompt'" }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
+    }
+
+    // Emoji self-report must be one of the five allowed options or absent.
+    const ALLOWED_EMOJIS = new Set(["😄", "🙂", "😐", "😔", "😢"]);
+    if (emoji_self_report !== null && !ALLOWED_EMOJIS.has(emoji_self_report)) {
+      return new Response(
+        JSON.stringify({ error: "emoji_self_report must be one of: 😄 🙂 😐 😔 😢" }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } },
       );
     }

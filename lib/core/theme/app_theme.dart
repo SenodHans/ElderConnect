@@ -7,6 +7,45 @@ import '../constants/elder_colors.dart';
 class AppTheme {
   AppTheme._();
 
+  /// High-contrast variant: bolder text, black-on-white, increased font sizes.
+  static ThemeData get highContrast {
+    final base = ThemeData.light(useMaterial3: true);
+    return base.copyWith(
+      scaffoldBackgroundColor: Colors.white,
+      colorScheme: ColorScheme.fromSeed(
+        seedColor: Colors.black,
+        surface: Colors.white,
+        onSurface: Colors.black,
+      ),
+      textTheme: GoogleFonts.lexendTextTheme(base.textTheme).copyWith(
+        bodyLarge: GoogleFonts.lexend(
+          fontSize: 20,
+          fontWeight: FontWeight.w600,
+          color: Colors.black,
+        ),
+        bodyMedium: GoogleFonts.lexend(
+          fontSize: 18,
+          fontWeight: FontWeight.w600,
+          color: Colors.black,
+        ),
+        headlineMedium: GoogleFonts.plusJakartaSans(
+          fontSize: 26,
+          fontWeight: FontWeight.w900,
+          color: Colors.black,
+        ),
+      ),
+      dividerColor: Colors.black,
+      cardTheme: CardThemeData(
+        color: Colors.white,
+        elevation: 0,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+          side: const BorderSide(color: Colors.black, width: 2),
+        ),
+      ),
+    );
+  }
+
   static ThemeData get light {
     final base = ThemeData.light(useMaterial3: true);
     return base.copyWith(

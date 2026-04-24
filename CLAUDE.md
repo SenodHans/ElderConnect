@@ -121,6 +121,7 @@ flutter_local_notifications: ^17.x  # On-device FCM notification display
 image_picker: ^1.x                  # Profile photo + feed photo upload
 flutter_secure_storage: ^9.x        # Persistent elder session storage
 bcrypt: ^1.x                        # PIN hashing before storage
+url_launcher: ^6.x                  # Open article URLs in Chrome Custom Tab (LaunchMode.inAppBrowserView)
 ```
 
 ## Installed Skills
@@ -438,18 +439,113 @@ PIN reset:
 
 ## AI Components
 
-### 1. Mood Detection (Hugging Face)
-- **Model:** `j-hartmann/emotion-english-distilroberta-base`
-- **Trigger:** When elderly user submits a post (NOT on voice messages, NOT on keystrokes)
-- **Flow:** Flutter → Supabase Edge Function (proxy) → Hugging Face API → response stored in mood_logs
-- **Response format:**
-```json
-[[{"label": "POSITIVE", "score": 0.9876}, {"label": "NEGATIVE", "score": 0.0124}]]
+### 1. MOSAIC — Mood Intelligence Engine
+**Full name:** Multi-signal Observation of Sentiment and Affect with Intelligent Caretaker alerts
+
+MOSAIC is the mood intelligence engine of ElderConnect. It fuses four behavioural signals into a single weighted daily score, then applies longitudinal trend analysis over a rolling 7-day window to detect deteriorating emotional patterns before they become a crisis. This is NOT point-in-time sentiment detection — it is temporal pattern analysis.
+
+**Academic framing for thesis/IEEE paper:**
+> "MOSAIC employs a two-layer AI architecture. The first layer uses a pre-trained transformer model via the HuggingFace Inference API for real-time emotion classification from natural language. The second layer applies longitudinal statistical analysis — specifically linear regression over a rolling 7-day window — to detect deteriorating emotional trends. Adaptive alert thresholds are derived from each user's personal mood history using mean and standard deviation, ensuring sensitivity is calibrated to the individual rather than a generalised population."
+
+**Critical distinction — do NOT call any part of MOSAIC "training":**
+- Linear regression on 7 data points → statistics, not training
+- Personalised thresholds via mean ± std dev → adaptive calibration, not training
+- If asked at viva: "We utilise inference, not training. The novel contribution is multi-signal fusion and longitudinal trend analysis on top of pre-trained inference."
+
+---
+
+#### The Four Input Signals
+
+| Signal | Source | Academic Basis |
+|--------|--------|---------------|
+| Text Sentiment | HuggingFace Inference API (`j-hartmann/emotion-english-distilroberta-base`) | NLP-inferred emotion across 7 classes; not self-reported |
+| Self-Report Discrepancy | Emoji tap vs AI inference delta | Gap between stated and inferred mood — early indicator of emotional masking |
+| Social Activity | Post and interaction count (app-logged, `posts` table) | Social withdrawal is a clinically validated depression indicator |
+| Routine Adherence | Medication reminders completed (`medication_logs` table) | Routine disruption correlates with mood deterioration in elderly |
+
+**Composite score weights (heuristic, empirically set):**
 ```
-- **Cold start:** Handle 503 with retry after 20 seconds + loading spinner
-- **API key:** NEVER hardcode in Flutter — always route through Supabase Edge Function
-- **Low confidence:** Default to NEUTRAL rather than forcing a classification
-- **This is AI integration, not ML development** — no custom model training
+daily_score = (0.40 × sentiment_score)
+            + (0.20 × discrepancy_penalty)
+            + (0.20 × social_activity_score)
+            + (0.20 × adherence_score)
+```
+
+---
+
+#### HuggingFace Text Sentiment (Signal 1)
+- **Model:** `j-hartmann/emotion-english-distilroberta-base`
+- **Triggers:** (a) Elder submits a social post, (b) Elder submits daily journal prompt response
+- **NOT triggered on:** Voice messages, keystrokes, emoji taps
+- **Response format:** `[[{"label": "joy", "score": 0.61}, {"label": "sadness", "score": 0.28}, ...]]` — 7 emotion classes
+- **Cold start:** 503 → retry after 25 seconds once, then silent fail
+- **API key:** NEVER in Flutter — always proxied via Supabase Edge Function `mood-detection-proxy`
+- **Low confidence:** Default to NEUTRAL
+
+---
+
+#### Daily Journal Prompt (new screen — NOT YET BUILT)
+- **What it is:** A daily morning check-in screen with a warm rotating question ("What's one thing that made you smile today?") + large text input + emoji row
+- **Emoji row purpose:** Self-report discrepancy signal ONLY — not a mood input. 5 options: 😄🙂😐😔😢
+- **Discrepancy detection:** If emoji = positive but HuggingFace inference = sadness/fear → `discrepancy_flagged = true` in mood_logs
+- **Why not emoji-only:** Emoji alone is a switch statement, not AI. The text is what HuggingFace analyses.
+- **Morning FCM trigger:** New Edge Function cron fires at 9am daily → push notification → tap opens journal prompt screen
+- **Route:** `/mood/journal` (to be added to app.dart)
+
+---
+
+#### Nightly MOSAIC Edge Function (NOT YET BUILT — replaces/upgrades compute-mood-alert)
+Runs at midnight via Supabase cron:
+1. For each active elder: pull today's HuggingFace score, discrepancy flag, daily post count, medication adherence %
+2. Compute weighted composite `daily_score` → store in `mood_logs`
+3. Pull last 7 daily scores → fit linear regression using `simple-statistics` (Deno/TypeScript, no Python needed)
+4. Compute personalised thresholds: `warning = user_mean - (1.5 × user_stddev)`, `urgent = user_mean - (2.5 × user_stddev)`
+5. Cold start (< 7 days data): use fixed thresholds (slope < -0.15 = warning, < -0.25 = urgent)
+6. Write result to `alert_states`: stable / warning / urgent
+7. Fire FCM to caretaker if warning or urgent
+
+---
+
+#### Three-Level Alert Logic
+| Level | Condition | Caretaker Action |
+|-------|-----------|-----------------|
+| STABLE | Slope ≥ 0 or mild positive | No alert. Dashboard shows positive weekly summary |
+| WARNING | Negative slope for 3+ consecutive days | Push: "Consider checking in with [Name]" |
+| URGENT | Severe decline 5+ days OR single-day crash below urgent threshold | Urgent FCM with emergency contact prompt |
+
+---
+
+#### Database Schema Changes Required (NOT YET APPLIED)
+Add columns to `mood_logs`:
+```sql
+source               text     -- 'post' | 'daily_prompt'
+emoji_self_report    text     -- nullable: '😄'|'🙂'|'😐'|'😔'|'😢'
+discrepancy_flagged  boolean  DEFAULT false
+composite_score      float    -- weighted daily score (computed nightly)
+```
+New table `daily_prompt_questions`:
+```sql
+id       int  PRIMARY KEY
+question text  -- rotating bank of 7-10 warm questions
+```
+
+---
+
+#### What's Built vs What's Pending (MOSAIC)
+| Component | Status |
+|-----------|--------|
+| HuggingFace inference on post text | ✅ Built — `mood-detection-proxy` Edge Function |
+| `mood_logs` table | ✅ Built — needs 4 new columns |
+| `alert_states` table | ✅ Built — `compute-mood-alert` exists but uses simple logic |
+| `linkedElderSummariesProvider` reads alert_states | ✅ Built |
+| Daily journal prompt screen (`/mood/journal`) | ❌ Not built |
+| Morning FCM cron Edge Function | ❌ Not built |
+| Emoji self-report + discrepancy detection | ❌ Not built |
+| Nightly MOSAIC composite score + linear regression | ❌ Not built |
+| Personalised adaptive thresholds | ❌ Not built |
+| DB schema migration (new mood_logs columns) | ❌ Not applied |
+
+---
 
 ### 2. Content Personalisation
 - Fetch news from NewsAPI using interest tags on user profile
@@ -460,6 +556,7 @@ PIN reset:
 - Mood analysis ONLY runs if mood_sharing_consent = true
 - Consent collected explicitly at registration with plain language explanation
 - Caretaker access to mood logs gated by same consent flag (RLS enforced at DB level)
+- Daily journal prompt respects same consent gate — if consent false, prompt still shown but HuggingFace call is skipped
 
 ---
 
@@ -468,30 +565,47 @@ PIN reset:
 | Sprint | Focus | Status |
 |---|---|---|
 | UI Layer | All 21 screens translated from Stitch designs to Flutter | ✅ COMPLETE |
-| Backend Sprint | Supabase schema, auth wiring, providers, Edge Functions | 🔄 IN PROGRESS |
+| Backend Sprint | Supabase schema, auth wiring, providers, Edge Functions | ✅ COMPLETE |
+| Feature Wiring Sprint | All providers wired to live Supabase data | ✅ COMPLETE |
 
 Note: The original six-sprint plan in the Contextual Report was a planning
 document. Actual implementation followed a UI-first approach — all screens
-built as shells first, now being wired to backend in a dedicated backend sprint.
+built as shells first, then wired to backend in a dedicated sprint.
 
 ---
 
-## Backend Wiring State (as of April 2026)
+## Backend Wiring State (as of 2026-04-22)
 
-Current state of backend connectivity — updated as each step completes:
+All backend wiring is complete. Current live state:
 
-- Supabase client: initialised in main.dart via String.fromEnvironment —
-  credentials not yet configured in .vscode/launch.json
-- GoRouter: no auth guard, no redirect callback, no refreshListenable —
-  all routes currently unguarded
-- Providers: only interest_provider.dart exists (in-memory only,
-  not persisted to Supabase)
-- Auth screens: all submit handlers stubbed with TODO(backend-sprint)
-- Portal screens: all hardcoded/static data, no provider consumption
-- Firebase: firebase_options.dart does not exist, not yet configured
-- Edge Functions: directories exist, all files empty
-- flutter_secure_storage: not yet wired
-- bcrypt: not yet added to pubspec.yaml
+- Supabase client: initialised via `--dart-define` flags in `.vscode/launch.json` ✅
+- GoRouter: auth guard active with `refreshListenable` + redirect callback ✅
+- Auth: elder PIN login, caretaker email/password, session restore after reinstall ✅
+- Feed: posts (realtime), reactions (realtime), photo upload, news (paginated) ✅
+- News: `AsyncNotifierProvider` with pagination — 10 articles/page, infinite scroll ✅
+- Article reader: in-app bottom sheet with TTS + Chrome Custom Tab fallback ✅
+- Home screen: medication card uses live `nextMedicationProvider` data ✅
+- Medications: `activeMedicationsProvider`, `nextMedicationProvider`, `medicationHistoryProvider` all wired ✅
+- Games: all 4 games wired, scores written to `wellness_logs` ✅
+- Sentiment analysis: `postSubmissionProvider` → `mood-detection-proxy` Edge Function → HuggingFace → `mood_logs` → `compute-mood-alert` → `alert_states` ✅
+- Caretaker mood screen: live 7-day chart, activity stream, wellness summary, recent posts from Supabase ✅
+- Caretaker dashboard: live priority alerts from `alert_states`, real linked elder cards ✅
+- Edge Functions: all 6 deployed and ACTIVE ✅
+- Firebase: firebase_options.dart configured ✅
+- flutter_secure_storage: wired for elder session persistence ✅
+- `url_launcher`: added — always use `LaunchMode.inAppBrowserView`, never `externalApplication`
+
+### Caretaker providers (`lib/features/caretaker/providers/caretaker_mood_provider.dart`)
+- `linkedEldersProvider` — accepted-link elders for the signed-in caretaker
+- `selectedElderIndexProvider` — multi-elder selector state (mood logs screen)
+- `elderMoodChartProvider(elderId)` — 7-day intensity bars from `mood_logs`
+- `elderActivitySummaryProvider({elderId, days})` — posts/games/meds counts
+- `elderRecentPostsProvider(elderId)` — 3 most recent elder posts
+- `linkedElderSummariesProvider` — batch: `alert_states` + latest mood + post counts (dashboard)
+
+### Remaining / Pending
+- **MOSAIC sprint** — Daily journal prompt screen, morning FCM cron, nightly composite score + linear regression Edge Function, DB migration (see AI Components section for full detail)
+- NEWS_API_KEY — rotate at newsapi.org (key was exposed in chat history)
 
 ---
 
@@ -520,6 +634,8 @@ wellness/
 medications/
 emergency/
 caretaker/
+screens/
+providers/    ← caretaker_mood_provider.dart (mood chart, activity, alert states)
 shared/
 widgets/      ← reusable ElderButton, ElderCard, ElderInput etc
 models/

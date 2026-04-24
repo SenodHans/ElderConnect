@@ -5,12 +5,16 @@
 /// No email, no password, no phone — per CLAUDE.md elder auth rules.
 library;
 
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../core/constants/elder_colors.dart';
 import '../../../core/constants/elder_spacing.dart';
+import '../providers/auth_provider.dart';
 import '../../../shared/widgets/widgets.dart';
 
 // Stitch design spec: w-48 h-48 = 192dp photo circle.
@@ -33,6 +37,8 @@ class _ElderRegistrationScreenState
 
   final _formKey = GlobalKey<FormState>();
   final _nameController = TextEditingController();
+  bool _isLoading = false;
+  File? _selectedPhoto;
 
   @override
   void initState() {
@@ -74,9 +80,242 @@ class _ElderRegistrationScreenState
     );
   }
 
-  void _onContinue() {
-    if (_formKey.currentState!.validate()) {
-      context.go('/interest-selection');
+  /// Entry point for the Continue button.
+  ///
+  /// Priority order:
+  ///   1. Locally cached credentials match → sign in, skip interest selection.
+  ///   2. No local cache but name exists in DB → show PIN recovery dialog.
+  ///   3. New elder → create account, store credentials, go to interest selection.
+  Future<void> _onContinue() async {
+    if (!_formKey.currentState!.validate()) return;
+    setState(() => _isLoading = true);
+
+    final name = _nameController.text.trim();
+    final authService = ref.read(authServiceProvider);
+
+    // ── 1. Try locally cached credentials ──────────────────────────────────
+    final storedName = await authService.getStoredElderName();
+    if (storedName != null && storedName.toLowerCase() == name.toLowerCase()) {
+      final session = await authService.signInWithCachedCredentials();
+      if (session != null && mounted) {
+        context.go('/home/elder');
+        return;
+      }
+      // Cached credentials stale — show PIN recovery, never try to create
+      // a new account for a name we already know exists on this device.
+      if (mounted) {
+        setState(() => _isLoading = false);
+        _showPinRecoveryDialog(name);
+      }
+      return;
+    }
+
+    // ── 2. Check DB for existing elder with this name ─────────────────────
+    final exists = await _checkElderExists(name);
+    if (exists && mounted) {
+      setState(() => _isLoading = false);
+      _showPinRecoveryDialog(name);
+      return;
+    }
+
+    // ── 3. New elder — create account ──────────────────────────────────────
+    await _createNewElderAccount(name);
+  }
+
+  /// Calls restore-elder-session with a dummy PIN to check if the name exists.
+  /// In Supabase Flutter v2, functions.invoke throws FunctionException for any
+  /// non-200 response — so we catch that and inspect e.status:
+  ///   401 = found but wrong PIN  → exists
+  ///   404 = not found            → does not exist
+  Future<bool> _checkElderExists(String name) async {
+    try {
+      await Supabase.instance.client.functions.invoke(
+        'restore-elder-session',
+        body: {'full_name': name, 'pin': '0000'},
+      );
+      // 200 = found AND pin '0000' happened to match (extremely unlikely).
+      return true;
+    } on FunctionException catch (e) {
+      return e.status == 401;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  /// Shows a dialog explaining the account was found and asking for their PIN.
+  void _showPinRecoveryDialog(String name) {
+    final pinController = TextEditingController();
+    bool recovering = false;
+    String? error;
+
+    showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setDialogState) => AlertDialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(24),
+          ),
+          title: Text(
+            'Welcome back, $name!',
+            style: GoogleFonts.plusJakartaSans(
+              fontSize: 22,
+              fontWeight: FontWeight.w700,
+              color: ElderColors.primary,
+            ),
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Your account was found. Enter your 4-digit PIN to continue.',
+                style: GoogleFonts.lexend(
+                    fontSize: 16, color: ElderColors.onSurfaceVariant),
+              ),
+              const SizedBox(height: 16),
+              TextField(
+                controller: pinController,
+                keyboardType: TextInputType.number,
+                maxLength: 4,
+                obscureText: true,
+                style: GoogleFonts.lexend(
+                    fontSize: 20, color: ElderColors.onSurface),
+                decoration: InputDecoration(
+                  hintText: '• • • •',
+                  filled: true,
+                  fillColor: ElderColors.surfaceContainerHighest,
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide.none,
+                  ),
+                  counterText: '',
+                ),
+              ),
+              if (error != null)
+                Padding(
+                  padding: const EdgeInsets.only(top: 8),
+                  child: Text(error!,
+                      style: GoogleFonts.lexend(
+                          fontSize: 14, color: ElderColors.error)),
+                ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(),
+              child: Text('Cancel',
+                  style: GoogleFonts.lexend(
+                      fontSize: 16, color: ElderColors.onSurfaceVariant)),
+            ),
+            FilledButton(
+              style: FilledButton.styleFrom(
+                backgroundColor: ElderColors.primary,
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12)),
+              ),
+              onPressed: recovering
+                  ? null
+                  : () async {
+                      setDialogState(() { recovering = true; error = null; });
+                      final authService = ref.read(authServiceProvider);
+                      final session =
+                          await authService.restoreSessionWithNameAndPin(
+                        fullName: name,
+                        pin: pinController.text.trim(),
+                      );
+                      if (!ctx.mounted) return;
+                      if (session != null) {
+                        Navigator.of(ctx).pop();
+                        if (mounted) context.go('/home/elder');
+                      } else {
+                        setDialogState(() {
+                          recovering = false;
+                          error = 'Incorrect PIN. Please try again.';
+                        });
+                      }
+                    },
+              child: recovering
+                  ? const SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(
+                          color: Colors.white, strokeWidth: 2))
+                  : Text('Continue',
+                      style: GoogleFonts.lexend(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w700,
+                          color: Colors.white)),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// Creates a new Supabase Auth account for the elder and navigates to
+  /// PIN creation. Stores email + system password locally for future
+  /// reinstall recovery. Uploads profile photo if selected.
+  Future<void> _createNewElderAccount(String name) async {
+    final ts = DateTime.now().millisecondsSinceEpoch;
+    final safe = name.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]'), '');
+    final email = 'elder_${safe}_$ts@elderconnect.internal';
+    final password = '${ts}_${name.hashCode.abs()}';
+
+    try {
+      final res = await Supabase.instance.client.auth.signUp(
+        email: email,
+        password: password,
+        data: {'role': 'elderly', 'full_name': name},
+      );
+
+      final user = res.user;
+      if (user == null) throw Exception('Sign-up returned no user.');
+
+      // Upload profile photo to Supabase Storage if one was selected.
+      String? avatarUrl;
+      if (_selectedPhoto != null) {
+        final path = 'profile-photos/${user.id}/avatar.jpg';
+        await Supabase.instance.client.storage
+            .from('avatars')
+            .upload(path, _selectedPhoto!, fileOptions: const FileOptions(upsert: true));
+        avatarUrl = Supabase.instance.client.storage
+            .from('avatars')
+            .getPublicUrl(path);
+      }
+
+      await Supabase.instance.client.from('users').insert({
+        'id': user.id,
+        'email': email,
+        'role': 'elderly',
+        'full_name': name,
+        'tts_enabled': false,
+        'mood_sharing_consent': false,
+        'system_password': password,
+        if (avatarUrl != null) 'avatar_url': avatarUrl,
+      });
+
+      // Cache credentials locally for fast recovery after reinstall.
+      final authService = ref.read(authServiceProvider);
+      await authService.persistElderCredentials(
+        email: email,
+        password: password,
+        fullName: name,
+      );
+
+      // Route to PIN creation — interest selection follows PIN setup.
+      if (mounted) context.go('/register/elder/pin');
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isLoading = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Registration error: $e'),
+            backgroundColor: ElderColors.error,
+            duration: const Duration(seconds: 10),
+          ),
+        );
+      }
     }
   }
 
@@ -107,7 +346,14 @@ class _ElderRegistrationScreenState
                 const SizedBox(height: ElderSpacing.xxl), // space-y-12 = 48dp
 
                 // ── Photo upload ─────────────────────────────────────────────
-                _animated(1, const _PhotoUploadPlaceholder()),
+                _animated(
+                  1,
+                  _PhotoUploadWidget(
+                    selectedPhoto: _selectedPhoto,
+                    onPhotoSelected: (file) =>
+                        setState(() => _selectedPhoto = file),
+                  ),
+                ),
 
                 const SizedBox(height: ElderSpacing.xxl),
 
@@ -133,9 +379,9 @@ class _ElderRegistrationScreenState
                 _animated(
                   1,
                   ElderButton(
-                    label: 'Continue',
-                    onPressed: _onContinue,
-                    icon: Icons.arrow_forward_rounded,
+                    label: _isLoading ? 'Setting up...' : 'Continue',
+                    onPressed: _isLoading ? null : _onContinue,
+                    icon: _isLoading ? null : Icons.arrow_forward_rounded,
                   ),
                 ),
 
@@ -143,6 +389,36 @@ class _ElderRegistrationScreenState
 
                 // ── Info cards ───────────────────────────────────────────────
                 _animated(2, _buildInfoCards()),
+
+                const SizedBox(height: ElderSpacing.xl),
+
+                // ── Login link ───────────────────────────────────────────────
+                _animated(
+                  2,
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Text(
+                        'Already have an account? ',
+                        style: GoogleFonts.lexend(
+                          fontSize: 16,
+                          color: ElderColors.onSurfaceVariant,
+                        ),
+                      ),
+                      GestureDetector(
+                        onTap: () => context.go('/elder/pin-login'),
+                        child: Text(
+                          'Sign In',
+                          style: GoogleFonts.lexend(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                            color: ElderColors.primary,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
 
                 const SizedBox(height: ElderSpacing.lg),
               ],
@@ -193,12 +469,6 @@ class _ElderRegistrationScreenState
           title: 'Private & Secure',
           body: 'Your data is only shared with your chosen circle.',
         ),
-        SizedBox(height: ElderSpacing.md), // gap-4 = 16dp
-        _InfoCard(
-          icon: Icons.help_center,
-          title: 'Need help?',
-          body: 'Tap the icon in the top corner for assistance.',
-        ),
       ],
     );
   }
@@ -219,17 +489,20 @@ class _BackButton extends StatelessWidget {
       label: 'Go back to role selection',
       child: GestureDetector(
         onTap: onTap,
-        child: Container(
-          width: 56,
-          height: 56,
-          decoration: BoxDecoration(
-            color: ElderColors.surfaceContainerLow,
-            borderRadius: BorderRadius.circular(12),
-          ),
-          child: const Icon(
-            Icons.chevron_left_rounded,
-            size: 28,
-            color: ElderColors.onSurface,
+        child: Align(
+          alignment: Alignment.centerLeft,
+          child: Container(
+            width: 56,
+            height: 56,
+            decoration: BoxDecoration(
+              color: ElderColors.surfaceContainerLow,
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: const Icon(
+              Icons.chevron_left_rounded,
+              size: 28,
+              color: ElderColors.onSurface,
+            ),
           ),
         ),
       ),
@@ -237,13 +510,71 @@ class _BackButton extends StatelessWidget {
   }
 }
 
-// ── _PhotoUploadPlaceholder ──────────────────────────────────────────────────
+// ── _PhotoUploadWidget ───────────────────────────────────────────────────────
 
-/// Circular photo area with camera icon, "Add Photo" label, and + badge.
-///
-/// Tapping is a no-op — file-picker wiring is deferred to a later sprint.
-class _PhotoUploadPlaceholder extends StatelessWidget {
-  const _PhotoUploadPlaceholder();
+/// Circular photo picker — tapping opens a bottom sheet with camera/gallery
+/// options. Displays the selected image once chosen.
+class _PhotoUploadWidget extends StatelessWidget {
+  const _PhotoUploadWidget({
+    required this.selectedPhoto,
+    required this.onPhotoSelected,
+  });
+
+  final File? selectedPhoto;
+  final ValueChanged<File> onPhotoSelected;
+
+  Future<void> _pick(BuildContext context) async {
+    final source = await showModalBottomSheet<ImageSource>(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (_) => Container(
+        decoration: const BoxDecoration(
+          color: ElderColors.surface,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        ),
+        padding: const EdgeInsets.fromLTRB(
+            ElderSpacing.lg, ElderSpacing.lg, ElderSpacing.lg, ElderSpacing.xxl),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 32, height: 4,
+              decoration: BoxDecoration(
+                color: ElderColors.outlineVariant,
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            const SizedBox(height: ElderSpacing.lg),
+            Text('Add Profile Photo',
+                style: GoogleFonts.plusJakartaSans(
+                    fontSize: 20, fontWeight: FontWeight.w700,
+                    color: ElderColors.onSurface)),
+            const SizedBox(height: ElderSpacing.lg),
+            _PickerOption(
+              icon: Icons.camera_alt_rounded,
+              label: 'Take a Photo',
+              onTap: () => Navigator.pop(context, ImageSource.camera),
+            ),
+            const SizedBox(height: ElderSpacing.md),
+            _PickerOption(
+              icon: Icons.photo_library_rounded,
+              label: 'Choose from Gallery',
+              onTap: () => Navigator.pop(context, ImageSource.gallery),
+            ),
+          ],
+        ),
+      ),
+    );
+
+    if (source == null) return;
+    final picked = await ImagePicker().pickImage(
+      source: source,
+      maxWidth: 800,
+      maxHeight: 800,
+      imageQuality: 85,
+    );
+    if (picked != null) onPhotoSelected(File(picked.path));
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -251,81 +582,123 @@ class _PhotoUploadPlaceholder extends StatelessWidget {
       child: Semantics(
         button: true,
         label: 'Add profile photo',
-        child: SizedBox(
-          width: _kPhotoSize,
-          height: _kPhotoSize,
-          child: Stack(
-            // clipBehavior: none allows the + badge to overlap the circle edge.
-            clipBehavior: Clip.none,
-            children: [
-              // ── Main circle ─────────────────────────────────────────────────
-              Container(
-                width: _kPhotoSize,
-                height: _kPhotoSize,
-                decoration: BoxDecoration(
-                  color: ElderColors.surfaceContainerLow,
-                  shape: BoxShape.circle,
-                  // surfaceContainerLowest border creates a white halo — a
-                  // visual lift trick, not a content-section border, so it
-                  // does not violate the design.md No-Line Rule.
-                  border: Border.all(
-                    color: ElderColors.surfaceContainerLowest,
-                    width: 4,
-                  ),
-                  boxShadow: [
-                    BoxShadow(
-                      color: ElderColors.onSurface.withValues(alpha: 0.06),
-                      blurRadius: 8,
-                      offset: const Offset(0, 2),
-                    ),
-                  ],
-                ),
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    const Icon(
-                      Icons.photo_camera_outlined, // closest to camera_enhance
-                      size: 60,
-                      color: ElderColors.outline,
-                    ),
-                    const SizedBox(height: ElderSpacing.xs),
-                    // HTML: text-sm (14px) — raised to 16sp for CLAUDE.md minimum.
-                    Text(
-                      'Add Photo',
-                      style: GoogleFonts.lexend(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w500,
-                        color: ElderColors.onSurfaceVariant,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              // ── + badge — bottom-2 right-2 = 8dp inset from circle edge ────
-              Positioned(
-                bottom: 8,
-                right: 8,
-                child: Container(
-                  width: 48,
-                  height: 48,
+        child: GestureDetector(
+          onTap: () => _pick(context),
+          child: SizedBox(
+            width: _kPhotoSize,
+            height: _kPhotoSize,
+            child: Stack(
+              clipBehavior: Clip.none,
+              children: [
+                // ── Main circle ───────────────────────────────────────────────
+                Container(
+                  width: _kPhotoSize,
+                  height: _kPhotoSize,
                   decoration: BoxDecoration(
-                    color: ElderColors.secondaryContainer,
+                    color: ElderColors.surfaceContainerLow,
                     shape: BoxShape.circle,
+                    border: Border.all(
+                        color: ElderColors.surfaceContainerLowest, width: 4),
                     boxShadow: [
                       BoxShadow(
-                        color: ElderColors.onSurface.withValues(alpha: 0.15),
-                        blurRadius: 12,
-                        offset: const Offset(0, 4),
+                        color: ElderColors.onSurface.withValues(alpha: 0.06),
+                        blurRadius: 8,
+                        offset: const Offset(0, 2),
                       ),
                     ],
+                    image: selectedPhoto != null
+                        ? DecorationImage(
+                            image: FileImage(selectedPhoto!),
+                            fit: BoxFit.cover,
+                          )
+                        : null,
                   ),
-                  child: const Icon(
-                    Icons.add_rounded,
-                    size: 24,
-                    color: ElderColors.onSecondaryContainer,
+                  child: selectedPhoto == null
+                      ? Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            const Icon(Icons.photo_camera_outlined,
+                                size: 60, color: ElderColors.outline),
+                            const SizedBox(height: ElderSpacing.xs),
+                            Text('Add Photo',
+                                style: GoogleFonts.lexend(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.w500,
+                                    color: ElderColors.onSurfaceVariant)),
+                          ],
+                        )
+                      : null,
+                ),
+                // ── + / edit badge ────────────────────────────────────────────
+                Positioned(
+                  bottom: 8,
+                  right: 8,
+                  child: Container(
+                    width: 48,
+                    height: 48,
+                    decoration: BoxDecoration(
+                      color: ElderColors.secondaryContainer,
+                      shape: BoxShape.circle,
+                      boxShadow: [
+                        BoxShadow(
+                          color: ElderColors.onSurface.withValues(alpha: 0.15),
+                          blurRadius: 12,
+                          offset: const Offset(0, 4),
+                        ),
+                      ],
+                    ),
+                    child: Icon(
+                      selectedPhoto != null
+                          ? Icons.edit_rounded
+                          : Icons.add_rounded,
+                      size: 24,
+                      color: ElderColors.onSecondaryContainer,
+                    ),
                   ),
                 ),
-              ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _PickerOption extends StatelessWidget {
+  const _PickerOption({
+    required this.icon,
+    required this.label,
+    required this.onTap,
+  });
+
+  final IconData icon;
+  final String label;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      button: true,
+      label: label,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(16),
+        child: Container(
+          padding: const EdgeInsets.all(ElderSpacing.lg),
+          decoration: BoxDecoration(
+            color: ElderColors.surfaceContainerLow,
+            borderRadius: BorderRadius.circular(16),
+          ),
+          child: Row(
+            children: [
+              Icon(icon, size: 28, color: ElderColors.primary),
+              const SizedBox(width: ElderSpacing.md),
+              Text(label,
+                  style: GoogleFonts.plusJakartaSans(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w600,
+                      color: ElderColors.onSurface)),
             ],
           ),
         ),

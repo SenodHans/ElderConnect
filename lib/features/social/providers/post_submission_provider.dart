@@ -9,6 +9,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../mood/providers/mood_service_provider.dart';
 import '../../mood/services/mood_service.dart';
+import '../providers/posts_provider.dart';
 
 final postSubmissionProvider =
     AsyncNotifierProvider<PostSubmissionNotifier, void>(
@@ -19,12 +20,13 @@ class PostSubmissionNotifier extends AsyncNotifier<void> {
   @override
   Future<void> build() async {}
 
-  /// Inserts a text post for the current user, then triggers mood analysis.
+  /// Inserts a post for the current user, then triggers mood analysis.
   ///
+  /// [photoUrl] is optional — pass the Supabase Storage public URL for photo posts.
   /// Sets state to AsyncLoading while the insert is in flight.
   /// Returns (AsyncData) as soon as the DB write succeeds — mood analysis
   /// continues in the background and never delays the elder's UI.
-  Future<void> submitPost({required String content}) async {
+  Future<void> submitPost({required String content, String? photoUrl}) async {
     state = const AsyncLoading();
 
     try {
@@ -32,14 +34,24 @@ class PostSubmissionNotifier extends AsyncNotifier<void> {
       final userId = client.auth.currentUser?.id;
       if (userId == null) throw Exception('Not authenticated');
 
+      final payload = <String, dynamic>{
+        'user_id': userId,
+        'content': content.trim(),
+        if (photoUrl != null) 'photo_url': photoUrl,
+      };
+
       // Insert and retrieve the generated UUID — needed for mood_logs foreign key.
       final row = await client
           .from('posts')
-          .insert({'user_id': userId, 'content': content.trim()})
+          .insert(payload)
           .select('id')
           .single();
 
       state = const AsyncData(null);
+
+      // Force an immediate feed refresh — don't rely on the realtime callback
+      // alone because the callback fires asynchronously and can race with UI render.
+      ref.invalidate(postsProvider);
 
       // Fire-and-forget mood analysis — never awaited by the UI.
       _analyseMood(postId: row['id'] as String, text: content.trim());

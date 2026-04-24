@@ -19,6 +19,8 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/constants/elder_colors.dart';
 import '../../../core/constants/elder_spacing.dart';
+import '../widgets/caretaker_avatar.dart';
+import '../providers/caretaker_mood_provider.dart';
 
 // Stitch config: rounded-xl = 0.5rem = 8dp (caretaker theme overrides default).
 const double _kCardRadius = 8.0;
@@ -148,15 +150,15 @@ class _CaretakerDashboardScreenState
             child: Row(
               children: [
                 // medical_services icon + wordmark
-                const Icon(
-                  Icons.medical_services_rounded,
-                  size: 24,
-                  color: ElderColors.tertiary,
+                Image.asset(
+                  'assets/images/elderconnect_logo.png',
+                  width: 32,
+                  height: 32,
                 ),
                 const SizedBox(width: ElderSpacing.sm),
                 Text(
                   'ElderConnect',
-                  style: GoogleFonts.plusJakartaSans(
+                  style: GoogleFonts.quicksand(
                     fontSize: 20,
                     fontWeight: FontWeight.w700,
                     color: ElderColors.tertiary,
@@ -164,29 +166,8 @@ class _CaretakerDashboardScreenState
                   ),
                 ),
                 const Spacer(),
-                // Caretaker avatar — 40×40, secondary-container tint
-                Semantics(
-                  label: 'Caretaker profile',
-                  child: Container(
-                    width: 40,
-                    height: 40,
-                    decoration: BoxDecoration(
-                      // secondary-container in caretaker palette (#cae4f1 light
-                      // blue) → nearest elder token: tertiaryFixed (#CCE5FF).
-                      color: ElderColors.tertiaryFixed,
-                      shape: BoxShape.circle,
-                      border: Border.all(
-                        color: ElderColors.surfaceContainerLowest,
-                        width: 2,
-                      ),
-                    ),
-                    child: const Icon(
-                      Icons.person_rounded,
-                      size: 22,
-                      color: ElderColors.onTertiaryFixed,
-                    ),
-                  ),
-                ),
+                // Caretaker avatar
+                const CaretakerAvatar(),
               ],
             ),
           ),
@@ -198,83 +179,154 @@ class _CaretakerDashboardScreenState
   // ── Priority Alerts ─────────────────────────────────────────────────────────
 
   Widget _buildAlertsSection() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+    final summariesAsync = ref.watch(linkedElderSummariesProvider);
+
+    return summariesAsync.when(
+      loading: () => Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text(
+            'PRIORITY ALERTS',
+            style: GoogleFonts.plusJakartaSans(
+              fontSize: 16,
+              fontWeight: FontWeight.w600,
+              color: ElderColors.onSurfaceVariant,
+              letterSpacing: 1.2,
+            ),
+          ),
+          const SizedBox(height: ElderSpacing.md),
+          const SizedBox(
+            height: 80,
+            child: Center(child: CircularProgressIndicator(strokeWidth: 2, color: ElderColors.tertiary)),
+          ),
+        ],
+      ),
+      error: (_, __) => const SizedBox.shrink(),
+      data: (summaries) {
+        // Collect warning and urgent summaries, sorted urgent-first.
+        final active = summaries
+            .where((s) => s.alert != null && !s.alert!.isStable)
+            .toList()
+          ..sort((a, b) {
+            const order = {'urgent': 0, 'warning': 1};
+            return (order[a.alert!.status] ?? 2)
+                .compareTo(order[b.alert!.status] ?? 2);
+          });
+
+        final alertCount = active.length;
+
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            // text-secondary in caretaker palette (#4a626d) → onSurfaceVariant.
-            Text(
-              'PRIORITY ALERTS',
-              style: GoogleFonts.plusJakartaSans(
-                fontSize: 16,
-                fontWeight: FontWeight.w600,
-                color: ElderColors.onSurfaceVariant,
-                letterSpacing: 1.2,
-              ),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  'PRIORITY ALERTS',
+                  style: GoogleFonts.plusJakartaSans(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
+                    color: ElderColors.onSurfaceVariant,
+                    letterSpacing: 1.2,
+                  ),
+                ),
+                Text(
+                  alertCount == 0
+                      ? 'All Clear'
+                      : '$alertCount Active ${alertCount == 1 ? 'Alert' : 'Alerts'}',
+                  style: GoogleFonts.plusJakartaSans(
+                    fontSize: 16,
+                    color: alertCount > 0
+                        ? ElderColors.error
+                        : ElderColors.tertiary,
+                  ),
+                ),
+              ],
             ),
-            Text(
-              '3 Active Alerts',
-              style: GoogleFonts.plusJakartaSans(
-                fontSize: 16,
-                color: ElderColors.onSurfaceVariant,
-              ),
-            ),
+            const SizedBox(height: ElderSpacing.md),
+
+            if (alertCount == 0)
+              Container(
+                padding: const EdgeInsets.all(ElderSpacing.lg),
+                decoration: BoxDecoration(
+                  color: ElderColors.surfaceContainerLow,
+                  borderRadius: BorderRadius.circular(_kCardRadius),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(Icons.check_circle_rounded,
+                        size: 24, color: ElderColors.tertiary),
+                    const SizedBox(width: ElderSpacing.md),
+                    Text(
+                      'All linked elders are stable.',
+                      style: GoogleFonts.plusJakartaSans(
+                        fontSize: 16,
+                        color: ElderColors.tertiary,
+                      ),
+                    ),
+                  ],
+                ),
+              )
+            else
+              for (int i = 0; i < active.length; i++) ...[
+                if (i > 0) const SizedBox(height: ElderSpacing.md),
+                _buildAlertCardForElder(active[i]),
+              ],
           ],
-        ),
-        const SizedBox(height: ElderSpacing.md),
-
-        // SOS — red container, filled error circle.
-        _AlertCard(
-          bg: ElderColors.errorContainer,
-          circleColor: ElderColors.error,
-          icon: Icons.sos_rounded,
-          iconColor: ElderColors.onError,
-          name: 'Margaret S.',
-          badge: 'SOS',
-          badgeBg: ElderColors.error,
-          badgeFg: ElderColors.onError,
-          body: 'Fall detected in Living Room.',
-          timestamp: '2 minutes ago',
-          textColor: ElderColors.onErrorContainer,
-        ),
-
-        const SizedBox(height: ElderSpacing.md),
-
-        // Missed Meds — tonal surface, primaryContainer circle.
-        _AlertCard(
-          bg: ElderColors.surfaceContainerLow,
-          circleColor: ElderColors.tertiaryContainer,
-          icon: Icons.medication_rounded,
-          iconColor: ElderColors.onTertiaryContainer,
-          name: 'Arthur J.',
-          body: 'Missed morning Warfarin dose.',
-          timestamp: 'Scheduled 08:00 AM',
-          textColor: ElderColors.onSurfaceVariant,
-        ),
-
-        const SizedBox(height: ElderSpacing.md),
-
-        // Mood Shift — tonal surface, tertiaryFixed circle (light blue = caretaker
-        // secondary-container #cae4f1 ≈ tertiaryFixed #CCE5FF).
-        _AlertCard(
-          bg: ElderColors.surfaceContainerLow,
-          circleColor: ElderColors.tertiaryFixed,
-          icon: Icons.psychology_rounded,
-          iconColor: ElderColors.onTertiaryFixed,
-          name: 'Elena G.',
-          body: 'Significant decline in morning mood.',
-          timestamp: 'Checked 1 hour ago',
-          textColor: ElderColors.onSurfaceVariant,
-        ),
-      ],
+        );
+      },
     );
+  }
+
+  Widget _buildAlertCardForElder(ElderSummary summary) {
+    final alert = summary.alert!;
+    final isUrgent = alert.isUrgent;
+
+    // Derive alert description from MOSAIC signals.
+    final String body;
+    if (alert.routineAdherence < 0.50 && alert.activityCount < 2) {
+      body = 'Low activity and missed medications detected.';
+    } else if (alert.routineAdherence < 0.70) {
+      body = 'Medication adherence below threshold (${(alert.routineAdherence * 100).round()}%).';
+    } else if (alert.activityCount < 3) {
+      body = 'Low social activity — only ${alert.activityCount} post(s) this week.';
+    } else {
+      body = 'Mood trend shows a declining pattern.';
+    }
+
+    final computedLabel = alert.computedAt != null
+        ? _alertTimestamp(alert.computedAt!)
+        : 'Just computed';
+
+    return _AlertCard(
+      bg: isUrgent ? ElderColors.errorContainer : ElderColors.surfaceContainerLow,
+      circleColor: isUrgent ? ElderColors.error : ElderColors.tertiaryFixed,
+      icon: Icons.psychology_rounded,
+      iconColor: isUrgent ? ElderColors.onError : ElderColors.onTertiaryFixed,
+      name: summary.elder.firstName,
+      badge: isUrgent ? 'URGENT' : null,
+      badgeBg: isUrgent ? ElderColors.error : null,
+      badgeFg: isUrgent ? ElderColors.onError : null,
+      body: body,
+      timestamp: computedLabel,
+      textColor: isUrgent
+          ? ElderColors.onErrorContainer
+          : ElderColors.onSurfaceVariant,
+    );
+  }
+
+  String _alertTimestamp(DateTime dt) {
+    final diff = DateTime.now().difference(dt);
+    if (diff.inMinutes < 60) return 'Updated ${diff.inMinutes}m ago';
+    if (diff.inHours < 24) return 'Updated ${diff.inHours}h ago';
+    return 'Updated ${diff.inDays}d ago';
   }
 
   // ── Linked Elders ───────────────────────────────────────────────────────────
 
   Widget _buildLinkedEldersSection() {
+    final summariesAsync = ref.watch(linkedElderSummariesProvider);
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -288,41 +340,100 @@ class _CaretakerDashboardScreenState
           ),
         ),
         const SizedBox(height: ElderSpacing.lg),
-        _ElderCard(
-          name: 'Margaret Smith',
-          lastLogin: 'Last Login: 15m ago',
-          badgeLabel: 'Stable',
-          // tertiary-container in caretaker palette (#005248 dark teal)
-          // → nearest elder token: tertiaryContainer (#0E6496).
-          badgeBg: ElderColors.tertiaryContainer,
-          badgeFg: ElderColors.onTertiaryContainer,
-          moodLabel: 'Positive (9/10)',
-          activityLabel: '1,240 steps',
-          onViewDetails: () {
-            // TODO: context.go('/elders/caretaker/detail') — Batch 3.
-          },
-          onMessage: () {
-            // TODO: context.go('/elders/caretaker/message') — Batch 3.
-          },
-        ),
-        const SizedBox(height: ElderSpacing.lg),
-        _ElderCard(
-          name: 'Arthur Jenkins',
-          lastLogin: 'Last Login: 2h ago',
-          badgeLabel: 'Warning',
-          badgeBg: ElderColors.errorContainer,
-          badgeFg: ElderColors.onErrorContainer,
-          moodLabel: 'Fatigued (4/10)',
-          activityLabel: '230 steps',
-          onViewDetails: () {
-            // TODO: context.go('/elders/caretaker/detail') — Batch 3.
-          },
-          onMessage: () {
-            // TODO: context.go('/elders/caretaker/message') — Batch 3.
+        summariesAsync.when(
+          loading: () => const SizedBox(
+            height: 80,
+            child: Center(child: CircularProgressIndicator(strokeWidth: 2, color: ElderColors.tertiary)),
+          ),
+          error: (_, __) => Text(
+            'Could not load linked elders.',
+            style: GoogleFonts.plusJakartaSans(
+              fontSize: 16,
+              color: ElderColors.onSurfaceVariant,
+            ),
+          ),
+          data: (summaries) {
+            if (summaries.isEmpty) {
+              return Container(
+                padding: const EdgeInsets.all(ElderSpacing.lg),
+                decoration: BoxDecoration(
+                  color: ElderColors.surfaceContainerLow,
+                  borderRadius: BorderRadius.circular(_kCardRadius),
+                ),
+                child: Text(
+                  'No elders linked yet. Use the Links tab to add an elder.',
+                  style: GoogleFonts.plusJakartaSans(
+                    fontSize: 16,
+                    color: ElderColors.onSurfaceVariant,
+                  ),
+                ),
+              );
+            }
+
+            return Column(
+              children: [
+                for (int i = 0; i < summaries.length; i++) ...[
+                  if (i > 0) const SizedBox(height: ElderSpacing.lg),
+                  _buildElderCard(summaries[i]),
+                ],
+              ],
+            );
           },
         ),
       ],
     );
+  }
+
+  Widget _buildElderCard(ElderSummary summary) {
+    final alert = summary.alert;
+    final isUrgent  = alert?.isUrgent ?? false;
+    final isWarning = alert?.isWarning ?? false;
+
+    final String badgeLabel;
+    final Color badgeBg;
+    final Color badgeFg;
+
+    if (isUrgent) {
+      badgeLabel = 'Urgent';
+      badgeBg = ElderColors.error;
+      badgeFg = ElderColors.onError;
+    } else if (isWarning) {
+      badgeLabel = 'Warning';
+      badgeBg = ElderColors.errorContainer;
+      badgeFg = ElderColors.onErrorContainer;
+    } else {
+      badgeLabel = 'Stable';
+      badgeBg = ElderColors.tertiaryContainer;
+      badgeFg = ElderColors.onTertiaryContainer;
+    }
+
+    final moodLabel = summary.latestMoodLabel ?? 'No data yet';
+    final activityLabel = summary.weeklyPostCount == 0
+        ? 'No posts this week'
+        : '${summary.weeklyPostCount} post${summary.weeklyPostCount == 1 ? '' : 's'} this week';
+
+    return _ElderCard(
+      name: summary.elder.fullName,
+      lastLogin: 'Joined ${_joinedLabel(summary.elder.createdAt)}',
+      badgeLabel: badgeLabel,
+      badgeBg: badgeBg,
+      badgeFg: badgeFg,
+      moodLabel: moodLabel,
+      activityLabel: activityLabel,
+      onViewDetails: () {
+        // TODO: navigate to per-elder detail screen.
+      },
+      onMessage: () {
+        // TODO: navigate to messaging screen.
+      },
+    );
+  }
+
+  String _joinedLabel(DateTime createdAt) {
+    final diff = DateTime.now().difference(createdAt);
+    if (diff.inDays < 7) return '${diff.inDays}d ago';
+    if (diff.inDays < 30) return '${(diff.inDays / 7).floor()}w ago';
+    return '${(diff.inDays / 30).floor()}mo ago';
   }
 
   // ── Medication Snapshot ─────────────────────────────────────────────────────

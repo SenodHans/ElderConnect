@@ -1,10 +1,12 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'core/theme/app_theme.dart';
 import 'core/providers/font_scale_provider.dart';
+import 'core/providers/high_contrast_provider.dart';
 import 'features/auth/screens/splash_screen.dart';
 import 'features/auth/screens/role_selection_screen.dart';
 import 'features/auth/screens/elder_registration_screen.dart';
@@ -13,6 +15,7 @@ import 'features/auth/screens/post_registration_options_screen.dart';
 import 'features/auth/screens/caretaker_registration_screen.dart';
 import 'features/auth/screens/caretaker_login_screen.dart';
 import 'features/auth/screens/elder_pin_login_screen.dart';
+import 'features/auth/screens/elder_pin_creation_screen.dart';
 import 'features/elderly/screens/elder_home_screen.dart';
 import 'features/social/screens/elder_feed_screen.dart';
 import 'features/medications/screens/elder_medication_list_screen.dart';
@@ -31,6 +34,7 @@ import 'features/wellness/screens/breathing_exercise_screen.dart';
 import 'features/wellness/screens/trivia_quiz_screen.dart';
 import 'features/wellness/screens/word_scramble_screen.dart';
 import 'features/auth/screens/elder_login_fallback_screen.dart';
+import 'features/auth/screens/reset_password_screen.dart';
 import 'features/mood/screens/daily_journal_screen.dart';
 
 /// Root application widget.
@@ -40,10 +44,11 @@ class ElderConnectApp extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final highContrast = ref.watch(highContrastProvider);
     return MaterialApp.router(
       title: 'ElderConnect',
       debugShowCheckedModeBanner: false,
-      theme: AppTheme.light,
+      theme: highContrast ? AppTheme.highContrast : AppTheme.light,
       routerConfig: _router,
       // Applies the elder's chosen text scale across the entire app.
       builder: (context, child) => Consumer(
@@ -92,12 +97,28 @@ const _kLoginOnlyRoutes = [
 
 // Listens to Supabase auth state changes and notifies GoRouter to
 // re-evaluate its redirect callback on sign-in / sign-out.
+// Also detects passwordRecovery events from deep links and stores
+// a flag so the router can redirect to /reset-password.
 class _AuthRefreshNotifier extends ChangeNotifier {
   _AuthRefreshNotifier(Stream<AuthState> stream) {
-    _subscription = stream.listen((_) => notifyListeners());
+    _subscription = stream.listen((authState) {
+      if (authState.event == AuthChangeEvent.passwordRecovery) {
+        _isPasswordRecovery = true;
+      }
+      notifyListeners();
+    });
   }
 
   late final StreamSubscription<AuthState> _subscription;
+  bool _isPasswordRecovery = false;
+
+  bool consumePasswordRecovery() {
+    if (_isPasswordRecovery) {
+      _isPasswordRecovery = false;
+      return true;
+    }
+    return false;
+  }
 
   @override
   void dispose() {
@@ -118,6 +139,12 @@ final GoRouter _router = GoRouter(
     final session = Supabase.instance.client.auth.currentSession;
     final loc = state.matchedLocation;
 
+    // If Supabase fired a passwordRecovery event (deep link from email),
+    // redirect to the set-new-password screen immediately.
+    if (_authRefreshNotifier.consumePasswordRecovery()) {
+      return '/reset-password';
+    }
+
     // No session — block portal routes and send to role selection.
     if (session == null) {
       final isProtected = _kProtectedPrefixes.any((p) => loc.startsWith(p));
@@ -135,6 +162,12 @@ final GoRouter _router = GoRouter(
     return null;
   },
   routes: [
+    ShellRoute(
+      builder: (context, state, child) => _GlobalBackNavWrapper(
+        currentPath: state.matchedLocation,
+        child: child,
+      ),
+      routes: [
     // ── Auth flow ──────────────────────────────────────────────────────────
     GoRoute(
       path: '/',
@@ -149,6 +182,10 @@ final GoRouter _router = GoRouter(
     GoRoute(
       path: '/register/elder',
       builder: (context, state) => const ElderRegistrationScreen(),
+    ),
+    GoRoute(
+      path: '/register/elder/pin',
+      builder: (context, state) => const ElderPinCreationScreen(),
     ),
     GoRoute(
       path: '/interest-selection',
@@ -174,52 +211,25 @@ final GoRouter _router = GoRouter(
     ),
 
     // ── Elder portal ───────────────────────────────────────────────────────
-    GoRoute(
-      path: '/feed/elder',
-      builder: (context, state) => const ElderFeedScreen(),
-    ),
-    GoRoute(
-      path: '/games/elder',
-      builder: (context, state) => const ElderGamesScreen(),
-    ),
-    GoRoute(
-      path: '/profile/elder',
-      builder: (context, state) => const ElderProfileScreen(),
-    ),
-    GoRoute(
-      path: '/medications/elder',
-      builder: (context, state) => const ElderMedicationListScreen(),
-    ),
+    _fadeRoute('/feed/elder', const ElderFeedScreen()),
+    _fadeRoute('/games/elder', const ElderGamesScreen()),
+    _fadeRoute('/profile/elder', const ElderProfileScreen()),
+    _fadeRoute('/medications/elder', const ElderMedicationListScreen()),
     GoRoute(
       path: '/medications/elder/detail',
       builder: (context, state) => const ElderMedicationDetailScreen(),
     ),
 
     // ── Portal placeholders (Batch 2 / 3) ─────────────────────────────────
-    GoRoute(
-      path: '/home/elder',
-      builder: (context, state) => const ElderHomeScreen(),
-    ),
-    GoRoute(
-      path: '/home/caretaker',
-      builder: (context, state) => const CaretakerDashboardScreen(),
-    ),
-    GoRoute(
-      path: '/elders/caretaker',
-      builder: (context, state) => const ElderManagementScreen(),
-    ),
-    GoRoute(
-      path: '/links/caretaker',
-      builder: (context, state) => const ManageLinksScreen(),
-    ),
+    _fadeRoute('/home/elder', const ElderHomeScreen()),
+    _fadeRoute('/home/caretaker', const CaretakerDashboardScreen()),
+    _fadeRoute('/elders/caretaker', const ElderManagementScreen()),
+    _fadeRoute('/links/caretaker', const ManageLinksScreen()),
     GoRoute(
       path: '/search/elder',
       builder: (context, state) => const SearchLinkElderScreen(),
     ),
-    GoRoute(
-      path: '/mood-logs/caretaker',
-      builder: (context, state) => const MoodActivityLogsScreen(),
-    ),
+    _fadeRoute('/mood-logs/caretaker', const MoodActivityLogsScreen()),
     GoRoute(
       path: '/score/post-game',
       builder: (context, state) => PostGameScoreScreen(
@@ -250,10 +260,97 @@ final GoRouter _router = GoRouter(
       path: '/mood/journal',
       builder: (context, state) => const DailyJournalScreen(),
     ),
+    _fadeRoute('/profile/caretaker', const CaretakerProfileScreen()),
     GoRoute(
-      path: '/profile/caretaker',
-      builder: (context, state) => const CaretakerProfileScreen(),
+      path: '/reset-password',
+      builder: (context, state) => const ResetPasswordScreen(),
+    ),
+      ],
     ),
   ],
 );
+
+GoRoute _fadeRoute(String path, Widget screen) {
+  return GoRoute(
+    path: path,
+    pageBuilder: (context, state) => CustomTransitionPage(
+      key: state.pageKey,
+      child: screen,
+      transitionsBuilder: (context, animation, secondaryAnimation, child) {
+        return FadeTransition(
+          opacity: CurveTween(curve: Curves.easeInOut).animate(animation),
+          child: child,
+        );
+      },
+    ),
+  );
+}
+
+class _GlobalBackNavWrapper extends StatefulWidget {
+  final String currentPath;
+  final Widget child;
+
+  const _GlobalBackNavWrapper({
+    required this.currentPath,
+    required this.child,
+  });
+
+  @override
+  State<_GlobalBackNavWrapper> createState() => _GlobalBackNavWrapperState();
+}
+
+class _GlobalBackNavWrapperState extends State<_GlobalBackNavWrapper> {
+  DateTime? _lastBackTime;
+
+  @override
+  Widget build(BuildContext context) {
+    final isHome = widget.currentPath == '/home/elder' ||
+        widget.currentPath == '/home/caretaker' ||
+        widget.currentPath == '/role-selection' ||
+        widget.currentPath == '/';
+
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, _) {
+        if (didPop) return;
+
+        if (_router.canPop()) {
+          _router.pop();
+          return;
+        }
+
+        if (!isHome) {
+          final session = Supabase.instance.client.auth.currentSession;
+          if (session != null) {
+            final role = Supabase.instance.client.auth.currentUser?.userMetadata?['role'] as String?;
+            if (role == 'elderly') {
+              _router.go('/home/elder');
+            } else if (role == 'caretaker') {
+              _router.go('/home/caretaker');
+            } else {
+              _router.go('/role-selection');
+            }
+          } else {
+            _router.go('/role-selection');
+          }
+          return;
+        }
+
+        final now = DateTime.now();
+        if (_lastBackTime == null || now.difference(_lastBackTime!) > const Duration(seconds: 2)) {
+          _lastBackTime = now;
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Press back again to exit'),
+              duration: Duration(seconds: 2),
+            ),
+          );
+        } else {
+          SystemNavigator.pop();
+        }
+      },
+      child: widget.child,
+    );
+  }
+}
 

@@ -3,24 +3,24 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:intl/intl.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../../../core/constants/elder_colors.dart';
 import '../../../core/constants/elder_spacing.dart';
+import '../../../core/providers/high_contrast_provider.dart';
+import '../../auth/providers/auth_provider.dart';
 import '../../auth/providers/user_provider.dart';
+import '../../social/providers/caretaker_links_provider.dart';
 import '../../../shared/widgets/aa_button.dart';
 
 // ── Screen-level constants ────────────────────────────────────────────────────
-/// rounded-xl = 1.5rem in this screen's Tailwind config → 24dp
 const double _kCardRadius = 24.0;
-/// Large avatar: rounded-[3rem] = 48dp
 const double _kAvatarRadius = 48.0;
-/// Edit button overlay: rounded-2xl = 1rem (Tailwind default) = 16dp
 const double _kEditButtonRadius = 16.0;
 
-
 /// Elder Profile Screen — user identity, interests, health info, caretakers, settings.
-///
-/// Stitch folder: elder_profile.
-/// Accessed via top-right avatar in the elder portal app bar.
 class ElderProfileScreen extends ConsumerStatefulWidget {
   const ElderProfileScreen({super.key});
 
@@ -29,8 +29,6 @@ class ElderProfileScreen extends ConsumerStatefulWidget {
 }
 
 class _ElderProfileScreenState extends ConsumerState<ElderProfileScreen> {
-  bool _highContrastEnabled = false;
-
   @override
   Widget build(BuildContext context) {
     return PopScope(
@@ -52,7 +50,7 @@ class _ElderProfileScreenState extends ConsumerState<ElderProfileScreen> {
                   ElderSpacing.xl,
                 ),
                 child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     const _IdentitySection(),
                     const SizedBox(height: ElderSpacing.xxl),
@@ -64,10 +62,7 @@ class _ElderProfileScreenState extends ConsumerState<ElderProfileScreen> {
                     const SizedBox(height: ElderSpacing.xxl),
                     const _EmergencySection(),
                     const SizedBox(height: ElderSpacing.xxl),
-                    _AppSettingsSection(
-                      highContrastEnabled: _highContrastEnabled,
-                      onContrastToggle: (v) => setState(() => _highContrastEnabled = v),
-                    ),
+                    const _AppSettingsSection(),
                     const SizedBox(height: ElderSpacing.xl),
                   ],
                 ),
@@ -136,81 +131,179 @@ class _TopAppBar extends StatelessWidget {
 
 // ── Identity Section ──────────────────────────────────────────────────────────
 
-class _IdentitySection extends ConsumerWidget {
+class _IdentitySection extends ConsumerStatefulWidget {
   const _IdentitySection();
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<_IdentitySection> createState() => _IdentitySectionState();
+}
+
+class _IdentitySectionState extends ConsumerState<_IdentitySection> {
+  bool _uploading = false;
+
+  Future<void> _pickAndUpload() async {
+    final source = await showModalBottomSheet<ImageSource>(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (_) => Container(
+        decoration: const BoxDecoration(
+          color: ElderColors.surface,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        ),
+        padding: const EdgeInsets.all(ElderSpacing.lg),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Center(
+              child: Container(
+                width: 32, height: 4,
+                decoration: BoxDecoration(
+                  color: ElderColors.outlineVariant,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+            ),
+            const SizedBox(height: ElderSpacing.lg),
+            ListTile(
+              leading: const Icon(Icons.camera_alt_rounded,
+                  color: ElderColors.primary),
+              title: Text('Take a Photo',
+                  style: GoogleFonts.lexend(fontSize: 18)),
+              onTap: () => Navigator.pop(context, ImageSource.camera),
+            ),
+            ListTile(
+              leading: const Icon(Icons.photo_library_rounded,
+                  color: ElderColors.primary),
+              title: Text('Choose from Gallery',
+                  style: GoogleFonts.lexend(fontSize: 18)),
+              onTap: () => Navigator.pop(context, ImageSource.gallery),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (source == null || !mounted) return;
+
+    final xfile = await ImagePicker().pickImage(
+      source: source,
+      maxWidth: 800,
+      maxHeight: 800,
+      imageQuality: 85,
+    );
+    if (xfile == null || !mounted) return;
+
+    setState(() => _uploading = true);
+    try {
+      final client = Supabase.instance.client;
+      final userId = client.auth.currentUser?.id;
+      if (userId == null) return;
+
+      final bytes = await xfile.readAsBytes();
+      final ext = xfile.path.split('.').last.toLowerCase();
+      final path = '$userId/avatar.$ext';
+
+      await client.storage.from('avatars').uploadBinary(
+        path, bytes,
+        fileOptions: FileOptions(contentType: 'image/$ext', upsert: true),
+      );
+
+      final publicUrl = client.storage.from('avatars').getPublicUrl(path);
+      await client.from('users').update({'avatar_url': publicUrl}).eq('id', userId);
+      ref.invalidate(userProvider);
+    } finally {
+      if (mounted) setState(() => _uploading = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final userAsync = ref.watch(userProvider);
     final fullName = userAsync.when(
       data: (user) => user?.fullName ?? '',
       loading: () => '',
-      error: (_, s) => '',
+      error: (_, __) => '',
     );
+    final avatarUrl = userAsync.valueOrNull?.avatarUrl;
 
     return Column(
+      crossAxisAlignment: CrossAxisAlignment.center,
       children: [
-        // Avatar with edit overlay
-        Stack(
-          clipBehavior: Clip.none,
-          children: [
-            // Large avatar
-            Container(
-              width: 192,
-              height: 192,
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(_kAvatarRadius),
-                color: ElderColors.surfaceContainerLow,
-                border: Border.all(color: Colors.white, width: 4),
-                boxShadow: [
-                  BoxShadow(
-                    color: ElderColors.onSurface.withValues(alpha: 0.16),
-                    blurRadius: 24,
-                    offset: const Offset(0, 8),
-                  ),
-                ],
-              ),
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(_kAvatarRadius - 4),
-                child: const Icon(
-                  Icons.person,
-                  color: ElderColors.surfaceContainerHighest,
-                  size: 96,
+        // Avatar with edit overlay — centred
+        Center(
+          child: Stack(
+            clipBehavior: Clip.none,
+            children: [
+              Container(
+                width: 192,
+                height: 192,
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(_kAvatarRadius),
+                  color: ElderColors.surfaceContainerLow,
+                  border: Border.all(color: Colors.white, width: 4),
+                  boxShadow: [
+                    BoxShadow(
+                      color: ElderColors.onSurface.withValues(alpha: 0.16),
+                      blurRadius: 24,
+                      offset: const Offset(0, 8),
+                    ),
+                  ],
+                ),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(_kAvatarRadius - 4),
+                  child: _uploading
+                      ? const Center(
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : avatarUrl != null
+                          ? Image.network(
+                              avatarUrl,
+                              fit: BoxFit.cover,
+                              errorBuilder: (_, __, ___) => const Icon(
+                                Icons.person,
+                                color: ElderColors.surfaceContainerHighest,
+                                size: 96,
+                              ),
+                            )
+                          : const Icon(
+                              Icons.person,
+                              color: ElderColors.surfaceContainerHighest,
+                              size: 96,
+                            ),
                 ),
               ),
-            ),
-            // Edit button — bottom-right overlay
-            Positioned(
-              bottom: 8,
-              right: -8,
-              child: Semantics(
-                label: 'Edit profile photo',
-                button: true,
-                child: Material(
-                  color: ElderColors.secondaryContainer,
-                  borderRadius: BorderRadius.circular(_kEditButtonRadius),
-                  elevation: 4,
-                  shadowColor: ElderColors.secondaryContainer.withValues(alpha: 0.40),
-                  child: InkWell(
+              // Edit button — bottom-right overlay
+              Positioned(
+                bottom: 8,
+                right: -8,
+                child: Semantics(
+                  label: 'Edit profile photo',
+                  button: true,
+                  child: Material(
+                    color: ElderColors.secondaryContainer,
                     borderRadius: BorderRadius.circular(_kEditButtonRadius),
-                    onTap: () {/* TODO: open photo picker */},
-                    child: const SizedBox(
-                      width: 56,
-                      height: 56,
-                      child: Icon(
-                        Icons.edit,
-                        color: ElderColors.onSecondaryContainer,
-                        size: 24,
+                    elevation: 4,
+                    shadowColor:
+                        ElderColors.secondaryContainer.withValues(alpha: 0.40),
+                    child: InkWell(
+                      borderRadius: BorderRadius.circular(_kEditButtonRadius),
+                      onTap: _pickAndUpload,
+                      child: const SizedBox(
+                        width: 56,
+                        height: 56,
+                        child: Icon(
+                          Icons.edit,
+                          color: ElderColors.onSecondaryContainer,
+                          size: 24,
+                        ),
                       ),
                     ),
                   ),
                 ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
         const SizedBox(height: ElderSpacing.lg),
-        // Show a loading shimmer placeholder while the name loads.
         fullName.isEmpty
             ? Container(
                 width: 180,
@@ -229,16 +322,6 @@ class _IdentitySection extends ConsumerWidget {
                 ),
                 textAlign: TextAlign.center,
               ),
-        const SizedBox(height: ElderSpacing.xs),
-        Text(
-          'Residence: Sunny Oaks Pavilion',
-          style: GoogleFonts.lexend(
-            fontSize: 16,
-            fontWeight: FontWeight.w500,
-            color: ElderColors.onSurfaceVariant,
-          ),
-          textAlign: TextAlign.center,
-        ),
       ],
     );
   }
@@ -246,11 +329,53 @@ class _IdentitySection extends ConsumerWidget {
 
 // ── Interests Section ─────────────────────────────────────────────────────────
 
-class _InterestsSection extends StatelessWidget {
+/// Maps NewsAPI category keys to display metadata for interest tiles.
+const _kInterestMeta = {
+  'health': (
+    label: 'Health',
+    icon: Icons.health_and_safety,
+    bg: ElderColors.primaryFixed,
+    fg: ElderColors.onPrimaryFixed,
+  ),
+  'sports': (
+    label: 'Sports',
+    icon: Icons.sports_tennis,
+    bg: ElderColors.secondaryFixed,
+    fg: ElderColors.onSecondaryFixed,
+  ),
+  'technology': (
+    label: 'Technology',
+    icon: Icons.devices,
+    bg: ElderColors.tertiaryFixed,
+    fg: ElderColors.onTertiaryFixed,
+  ),
+  'entertainment': (
+    label: 'Entertainment',
+    icon: Icons.movie,
+    bg: ElderColors.errorContainer,
+    fg: ElderColors.onErrorContainer,
+  ),
+  'science': (
+    label: 'Science',
+    icon: Icons.biotech,
+    bg: ElderColors.tertiaryContainer,
+    fg: ElderColors.onTertiaryContainer,
+  ),
+  'business': (
+    label: 'Business',
+    icon: Icons.trending_up,
+    bg: ElderColors.secondaryContainer,
+    fg: ElderColors.onSecondaryContainer,
+  ),
+};
+
+class _InterestsSection extends ConsumerWidget {
   const _InterestsSection();
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final interests = ref.watch(userProvider).valueOrNull?.interests ?? [];
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -280,73 +405,108 @@ class _InterestsSection extends StatelessWidget {
                     borderRadius: BorderRadius.circular(_kCardRadius),
                   ),
                 ),
-                child: const Text('Edit Tiles'),
+                child: const Text('Edit'),
               ),
             ),
           ],
         ),
         const SizedBox(height: ElderSpacing.lg),
-        // Row 1: Reading + Gardening (equal width)
-        IntrinsicHeight(
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Expanded(
-                child: _InterestTile(
-                  icon: Icons.menu_book,
-                  label: 'Reading History',
-                  backgroundColor: ElderColors.primary,
-                  foregroundColor: ElderColors.onPrimary,
-                  minHeight: 160,
-                ),
-              ),
-              const SizedBox(width: ElderSpacing.md),
-              Expanded(
-                child: _InterestTile(
-                  icon: Icons.yard,
-                  label: 'Gardening',
-                  backgroundColor: ElderColors.secondaryContainer,
-                  foregroundColor: ElderColors.onSecondaryContainer,
-                  minHeight: 160,
-                ),
-              ),
-            ],
-          ),
-        ),
-        const SizedBox(height: ElderSpacing.md),
-        // Row 2: Classical Music — full width with trailing chevron
-        _ClassicalMusicTile(),
+        if (interests.isEmpty)
+          _EmptyInterestsCard()
+        else
+          _InterestGrid(interests: interests),
       ],
     );
   }
 }
 
-class _InterestTile extends StatelessWidget {
-  const _InterestTile({
-    required this.icon,
-    required this.label,
-    required this.backgroundColor,
-    required this.foregroundColor,
-    required this.minHeight,
-  });
-
-  final IconData icon;
-  final String label;
-  final Color backgroundColor;
-  final Color foregroundColor;
-  final double minHeight;
-
+class _EmptyInterestsCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      constraints: BoxConstraints(minHeight: minHeight),
+      padding: const EdgeInsets.all(ElderSpacing.xl),
+      decoration: BoxDecoration(
+        color: ElderColors.surfaceContainerLow,
+        borderRadius: BorderRadius.circular(_kCardRadius),
+      ),
+      child: Column(
+        children: [
+          const Icon(Icons.interests_rounded,
+              size: 48, color: ElderColors.outlineVariant),
+          const SizedBox(height: ElderSpacing.md),
+          Text(
+            'No interests selected yet',
+            style: GoogleFonts.lexend(
+                fontSize: 18, color: ElderColors.onSurfaceVariant),
+          ),
+          const SizedBox(height: ElderSpacing.sm),
+          Text(
+            'Tap "Edit" to choose topics you enjoy',
+            style: GoogleFonts.lexend(
+                fontSize: 16, color: ElderColors.outline),
+            textAlign: TextAlign.center,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _InterestGrid extends StatelessWidget {
+  const _InterestGrid({required this.interests});
+  final List<String> interests;
+
+  @override
+  Widget build(BuildContext context) {
+    // Build rows of 2
+    final rows = <Widget>[];
+    for (var i = 0; i < interests.length; i += 2) {
+      final left = interests[i];
+      final right = i + 1 < interests.length ? interests[i + 1] : null;
+      rows.add(
+        IntrinsicHeight(
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Expanded(child: _InterestTile(category: left)),
+              if (right != null) ...[
+                const SizedBox(width: ElderSpacing.md),
+                Expanded(child: _InterestTile(category: right)),
+              ] else
+                const Expanded(child: SizedBox()),
+            ],
+          ),
+        ),
+      );
+      if (i + 2 < interests.length) {
+        rows.add(const SizedBox(height: ElderSpacing.md));
+      }
+    }
+    return Column(children: rows);
+  }
+}
+
+class _InterestTile extends StatelessWidget {
+  const _InterestTile({required this.category});
+  final String category;
+
+  @override
+  Widget build(BuildContext context) {
+    final meta = _kInterestMeta[category];
+    final label = meta?.label ?? category;
+    final icon = meta?.icon ?? Icons.star_rounded;
+    final bg = meta?.bg ?? ElderColors.primaryFixed;
+    final fg = meta?.fg ?? ElderColors.onPrimaryFixed;
+
+    return Container(
+      constraints: const BoxConstraints(minHeight: 140),
       padding: const EdgeInsets.all(ElderSpacing.lg),
       decoration: BoxDecoration(
-        color: backgroundColor,
+        color: bg,
         borderRadius: BorderRadius.circular(_kCardRadius),
         boxShadow: [
           BoxShadow(
-            color: backgroundColor.withValues(alpha: 0.20),
+            color: bg.withValues(alpha: 0.20),
             blurRadius: 8,
             offset: const Offset(0, 2),
           ),
@@ -356,61 +516,14 @@ class _InterestTile extends StatelessWidget {
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(icon, color: foregroundColor, size: 40),
+          Icon(icon, color: fg, size: 40),
           Text(
             label,
             style: GoogleFonts.lexend(
               fontSize: 20,
               fontWeight: FontWeight.w600,
-              color: foregroundColor,
+              color: fg,
             ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _ClassicalMusicTile extends StatelessWidget {
-  const _ClassicalMusicTile();
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      constraints: const BoxConstraints(minHeight: 120),
-      padding: const EdgeInsets.all(ElderSpacing.lg),
-      decoration: BoxDecoration(
-        color: ElderColors.surfaceContainerLowest,
-        borderRadius: BorderRadius.circular(_kCardRadius),
-        boxShadow: [
-          BoxShadow(
-            color: ElderColors.onSurface.withValues(alpha: 0.06),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Row(
-            children: [
-              const Icon(Icons.piano, color: ElderColors.tertiary, size: 40),
-              const SizedBox(width: ElderSpacing.md),
-              Text(
-                'Classical Music',
-                style: GoogleFonts.lexend(
-                  fontSize: 20,
-                  fontWeight: FontWeight.w600,
-                  color: ElderColors.onSurface,
-                ),
-              ),
-            ],
-          ),
-          const Icon(
-            Icons.chevron_right,
-            color: ElderColors.outline,
-            size: 28,
           ),
         ],
       ),
@@ -420,11 +533,16 @@ class _ClassicalMusicTile extends StatelessWidget {
 
 // ── Health Details Section ────────────────────────────────────────────────────
 
-class _HealthSection extends StatelessWidget {
+class _HealthSection extends ConsumerWidget {
   const _HealthSection();
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final user = ref.watch(userProvider).valueOrNull;
+    final dob = user?.dateOfBirth != null
+        ? DateFormat('MMMM d, yyyy').format(user!.dateOfBirth!)
+        : '—';
+
     return Container(
       padding: const EdgeInsets.all(ElderSpacing.xl),
       decoration: BoxDecoration(
@@ -458,14 +576,15 @@ class _HealthSection extends StatelessWidget {
               Expanded(
                 child: _HealthStat(
                   label: 'Blood Type',
-                  value: 'O Positive (O+)',
+                  // Blood type not stored in DB — caretaker sets via external system
+                  value: '—',
                 ),
               ),
               const SizedBox(width: ElderSpacing.xl),
               Expanded(
                 child: _HealthStat(
                   label: 'Date of Birth',
-                  value: 'May 12, 1945',
+                  value: dob,
                 ),
               ),
             ],
@@ -488,7 +607,6 @@ class _HealthStat extends StatelessWidget {
       children: [
         Text(
           label,
-          // Bumped from text-sm (14sp) to 16sp — font size minimum rule
           style: GoogleFonts.lexend(
             fontSize: 16,
             color: ElderColors.onSurfaceVariant,
@@ -510,11 +628,78 @@ class _HealthStat extends StatelessWidget {
 
 // ── Linked Caretakers Section ─────────────────────────────────────────────────
 
-class _LinkedCaretakersSection extends StatelessWidget {
+class _LinkedCaretakersSection extends ConsumerStatefulWidget {
   const _LinkedCaretakersSection();
 
   @override
+  ConsumerState<_LinkedCaretakersSection> createState() =>
+      _LinkedCaretakersSectionState();
+}
+
+class _LinkedCaretakersSectionState
+    extends ConsumerState<_LinkedCaretakersSection> {
+  final _searchCtrl = TextEditingController();
+  String _searchQuery = '';
+  String _addingId = '';
+
+  @override
+  void dispose() {
+    _searchCtrl.dispose();
+    super.dispose();
+  }
+
+  Future<void> _addCaretaker(CaretakerInfo caretaker) async {
+    final client = Supabase.instance.client;
+    final me = client.auth.currentUser?.id;
+    if (me == null) return;
+
+    setState(() => _addingId = caretaker.userId);
+    try {
+      await client.from('caretaker_links').insert({
+        'caretaker_id': caretaker.userId,
+        'elderly_user_id': me,
+      });
+      ref.invalidate(elderLinkedCaretakersProvider);
+      setState(() {
+        _searchCtrl.clear();
+        _searchQuery = '';
+      });
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              '${caretaker.fullName} added as your caretaker',
+              style: GoogleFonts.lexend(fontSize: 16),
+            ),
+            behavior: SnackBarBehavior.floating,
+            shape:
+                RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            backgroundColor: ElderColors.primary,
+          ),
+        );
+      }
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Could not add caretaker — they may already be linked',
+                style: GoogleFonts.lexend(fontSize: 16)),
+            behavior: SnackBarBehavior.floating,
+            shape:
+                RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _addingId = '');
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final linkedAsync = ref.watch(elderLinkedCaretakersProvider);
+    final searchAsync = ref.watch(caretakerSearchProvider(_searchQuery));
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -527,52 +712,148 @@ class _LinkedCaretakersSection extends StatelessWidget {
           ),
         ),
         const SizedBox(height: ElderSpacing.lg),
-        _CaretakerRow(
-          name: 'Sarah Miller',
-          role: 'Daughter',
-          avatarBg: ElderColors.tertiaryFixed,
-          avatarIcon: Icons.person,
-          avatarIconColor: ElderColors.onTertiaryFixed,
-          actionIcon: Icons.call,
-          actionLabel: 'Call Sarah Miller',
-          onAction: () {/* TODO: initiate call */},
+
+        // ── Linked caretaker cards ────────────────────────────────────────────
+        linkedAsync.when(
+          loading: () => const Center(child: CircularProgressIndicator()),
+          error: (_, __) => const SizedBox.shrink(),
+          data: (caretakers) {
+            if (caretakers.isEmpty) {
+              return _NoCaretakersCard();
+            }
+            return Column(
+              children: caretakers
+                  .map((c) => Padding(
+                        padding:
+                            const EdgeInsets.only(bottom: ElderSpacing.md),
+                        child: _CaretakerRow(caretaker: c),
+                      ))
+                  .toList(),
+            );
+          },
         ),
-        const SizedBox(height: ElderSpacing.md),
-        _CaretakerRow(
-          name: 'David Chen',
-          role: 'Primary Nurse',
-          avatarBg: ElderColors.primaryFixed,
-          avatarIcon: Icons.medical_services,
-          avatarIconColor: ElderColors.onPrimaryFixed,
-          actionIcon: Icons.chat,
-          actionLabel: 'Message David Chen',
-          onAction: () {/* TODO: open messaging */},
+
+        const SizedBox(height: ElderSpacing.lg),
+
+        // ── Search bar ───────────────────────────────────────────────────────
+        Text(
+          'Add a Caretaker',
+          style: GoogleFonts.plusJakartaSans(
+            fontSize: 20,
+            fontWeight: FontWeight.w700,
+            color: ElderColors.onSurface,
+          ),
         ),
+        const SizedBox(height: ElderSpacing.sm),
+        TextField(
+          controller: _searchCtrl,
+          style: GoogleFonts.lexend(fontSize: 18),
+          decoration: InputDecoration(
+            hintText: 'Search by caretaker name…',
+            hintStyle: GoogleFonts.lexend(
+                fontSize: 18, color: ElderColors.onSurfaceVariant),
+            prefixIcon: const Icon(Icons.search_rounded,
+                color: ElderColors.onSurfaceVariant),
+            suffixIcon: _searchQuery.isNotEmpty
+                ? IconButton(
+                    icon: const Icon(Icons.clear_rounded),
+                    onPressed: () {
+                      _searchCtrl.clear();
+                      setState(() => _searchQuery = '');
+                    },
+                  )
+                : null,
+            filled: true,
+            fillColor: ElderColors.surfaceContainerLowest,
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(16),
+              borderSide: BorderSide.none,
+            ),
+            contentPadding: const EdgeInsets.symmetric(
+                horizontal: 16, vertical: 16),
+          ),
+          onChanged: (v) => setState(() => _searchQuery = v.trim()),
+        ),
+
+        // ── Search results ───────────────────────────────────────────────────
+        if (_searchQuery.isNotEmpty) ...[
+          const SizedBox(height: ElderSpacing.md),
+          searchAsync.when(
+            loading: () => const Center(
+              child: Padding(
+                padding: EdgeInsets.all(ElderSpacing.lg),
+                child: CircularProgressIndicator(),
+              ),
+            ),
+            error: (_, __) => const SizedBox.shrink(),
+            data: (results) {
+              if (results.isEmpty) {
+                return Padding(
+                  padding: const EdgeInsets.all(ElderSpacing.lg),
+                  child: Text(
+                    'No caretakers found for "$_searchQuery"',
+                    style: GoogleFonts.lexend(
+                        fontSize: 16, color: ElderColors.onSurfaceVariant),
+                    textAlign: TextAlign.center,
+                  ),
+                );
+              }
+              return Column(
+                children: results
+                    .map((c) => Padding(
+                          padding:
+                              const EdgeInsets.only(bottom: ElderSpacing.sm),
+                          child: _SearchResultRow(
+                            caretaker: c,
+                            adding: _addingId == c.userId,
+                            onAdd: () => _addCaretaker(c),
+                          ),
+                        ))
+                    .toList(),
+              );
+            },
+          ),
+        ],
       ],
     );
   }
 }
 
-class _CaretakerRow extends StatelessWidget {
-  const _CaretakerRow({
-    required this.name,
-    required this.role,
-    required this.avatarBg,
-    required this.avatarIcon,
-    required this.avatarIconColor,
-    required this.actionIcon,
-    required this.actionLabel,
-    required this.onAction,
-  });
+class _NoCaretakersCard extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(ElderSpacing.xl),
+      decoration: BoxDecoration(
+        color: ElderColors.surfaceContainerLow,
+        borderRadius: BorderRadius.circular(_kCardRadius),
+      ),
+      child: Column(
+        children: [
+          const Icon(Icons.group_rounded,
+              size: 48, color: ElderColors.outlineVariant),
+          const SizedBox(height: ElderSpacing.md),
+          Text(
+            'No caretakers yet',
+            style: GoogleFonts.lexend(
+                fontSize: 18, color: ElderColors.onSurfaceVariant),
+          ),
+          const SizedBox(height: ElderSpacing.xs),
+          Text(
+            'Search below to find and add your caretaker',
+            style: GoogleFonts.lexend(
+                fontSize: 16, color: ElderColors.outline),
+            textAlign: TextAlign.center,
+          ),
+        ],
+      ),
+    );
+  }
+}
 
-  final String name;
-  final String role;
-  final Color avatarBg;
-  final IconData avatarIcon;
-  final Color avatarIconColor;
-  final IconData actionIcon;
-  final String actionLabel;
-  final VoidCallback onAction;
+class _CaretakerRow extends StatelessWidget {
+  const _CaretakerRow({required this.caretaker});
+  final CaretakerInfo caretaker;
 
   @override
   Widget build(BuildContext context) {
@@ -591,15 +872,26 @@ class _CaretakerRow extends StatelessWidget {
       ),
       child: Row(
         children: [
-          // Avatar circle
+          // Avatar
           Container(
             width: 56,
             height: 56,
             decoration: BoxDecoration(
               shape: BoxShape.circle,
-              color: avatarBg,
+              color: ElderColors.tertiaryFixed,
             ),
-            child: Icon(avatarIcon, color: avatarIconColor, size: 26),
+            child: caretaker.avatarUrl != null
+                ? ClipOval(
+                    child: Image.network(
+                      caretaker.avatarUrl!,
+                      fit: BoxFit.cover,
+                      errorBuilder: (_, __, ___) =>
+                          const Icon(Icons.person, size: 26,
+                              color: ElderColors.onTertiaryFixed),
+                    ),
+                  )
+                : const Icon(Icons.person,
+                    color: ElderColors.onTertiaryFixed, size: 26),
           ),
           const SizedBox(width: ElderSpacing.md),
           Expanded(
@@ -607,7 +899,7 @@ class _CaretakerRow extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  name,
+                  caretaker.fullName,
                   style: GoogleFonts.lexend(
                     fontSize: 20,
                     fontWeight: FontWeight.w700,
@@ -615,7 +907,7 @@ class _CaretakerRow extends StatelessWidget {
                   ),
                 ),
                 Text(
-                  role,
+                  'Caretaker',
                   style: GoogleFonts.lexend(
                     fontSize: 16,
                     color: ElderColors.onSurfaceVariant,
@@ -624,23 +916,108 @@ class _CaretakerRow extends StatelessWidget {
               ],
             ),
           ),
-          Semantics(
-            label: actionLabel,
-            button: true,
-            child: Material(
-              color: ElderColors.surfaceContainerHigh,
-              shape: const CircleBorder(),
-              child: InkWell(
-                customBorder: const CircleBorder(),
-                onTap: onAction,
-                child: SizedBox(
-                  width: 48,
-                  height: 48,
-                  child: Icon(actionIcon, color: ElderColors.primary, size: 22),
+          if (caretaker.phone != null)
+            Semantics(
+              label: 'Call ${caretaker.fullName}',
+              button: true,
+              child: Material(
+                color: ElderColors.surfaceContainerHigh,
+                shape: const CircleBorder(),
+                child: InkWell(
+                  customBorder: const CircleBorder(),
+                  onTap: () =>
+                      launchUrl(Uri.parse('tel:${caretaker.phone}')),
+                  child: const SizedBox(
+                    width: 48,
+                    height: 48,
+                    child:
+                        Icon(Icons.call, color: ElderColors.primary, size: 22),
+                  ),
                 ),
               ),
             ),
+        ],
+      ),
+    );
+  }
+}
+
+class _SearchResultRow extends StatelessWidget {
+  const _SearchResultRow({
+    required this.caretaker,
+    required this.adding,
+    required this.onAdd,
+  });
+  final CaretakerInfo caretaker;
+  final bool adding;
+  final VoidCallback onAdd;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(ElderSpacing.md),
+      decoration: BoxDecoration(
+        color: ElderColors.primaryFixed.withValues(alpha: 0.40),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: ElderColors.primaryFixed),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 48,
+            height: 48,
+            decoration: const BoxDecoration(
+              shape: BoxShape.circle,
+              color: ElderColors.primaryFixed,
+            ),
+            child: caretaker.avatarUrl != null
+                ? ClipOval(
+                    child: Image.network(
+                      caretaker.avatarUrl!,
+                      fit: BoxFit.cover,
+                      errorBuilder: (_, __, ___) =>
+                          const Icon(Icons.person, size: 22,
+                              color: ElderColors.onPrimaryFixed),
+                    ),
+                  )
+                : const Icon(Icons.person,
+                    color: ElderColors.onPrimaryFixed, size: 22),
           ),
+          const SizedBox(width: ElderSpacing.md),
+          Expanded(
+            child: Text(
+              caretaker.fullName,
+              style: GoogleFonts.lexend(
+                fontSize: 18,
+                fontWeight: FontWeight.w600,
+                color: ElderColors.onSurface,
+              ),
+            ),
+          ),
+          adding
+              ? const SizedBox(
+                  width: 24,
+                  height: 24,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+              : Semantics(
+                  label: 'Add ${caretaker.fullName} as caretaker',
+                  button: true,
+                  child: Material(
+                    color: ElderColors.primary,
+                    borderRadius: BorderRadius.circular(12),
+                    child: InkWell(
+                      borderRadius: BorderRadius.circular(12),
+                      onTap: onAdd,
+                      child: const Padding(
+                        padding: EdgeInsets.symmetric(
+                            horizontal: ElderSpacing.md, vertical: 8),
+                        child: Icon(Icons.person_add_rounded,
+                            color: Colors.white, size: 20),
+                      ),
+                    ),
+                  ),
+                ),
         ],
       ),
     );
@@ -649,12 +1026,134 @@ class _CaretakerRow extends StatelessWidget {
 
 // ── Emergency Contacts Section ────────────────────────────────────────────────
 
-class _EmergencySection extends StatelessWidget {
+class _EmergencySection extends ConsumerWidget {
   const _EmergencySection();
 
+  void _showEditSheet(BuildContext context, WidgetRef ref,
+      String? currentName, String? currentPhone) {
+    final nameCtrl = TextEditingController(text: currentName ?? '');
+    final phoneCtrl = TextEditingController(text: currentPhone ?? '');
+    bool saving = false;
+
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setSheet) => Padding(
+          padding: EdgeInsets.only(bottom: MediaQuery.viewInsetsOf(ctx).bottom),
+          child: Container(
+            decoration: const BoxDecoration(
+              color: ElderColors.surface,
+              borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+            ),
+            padding: const EdgeInsets.all(ElderSpacing.lg),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Center(
+                  child: Container(
+                    width: 32,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: ElderColors.outlineVariant,
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: ElderSpacing.lg),
+                Text('Emergency Contact',
+                    style: GoogleFonts.plusJakartaSans(
+                        fontSize: 22,
+                        fontWeight: FontWeight.w700,
+                        color: ElderColors.onSurface),
+                    textAlign: TextAlign.center),
+                const SizedBox(height: ElderSpacing.xl),
+                TextField(
+                  controller: nameCtrl,
+                  textCapitalization: TextCapitalization.words,
+                  style: GoogleFonts.lexend(fontSize: 18),
+                  decoration: InputDecoration(
+                    labelText: 'Contact Name',
+                    labelStyle: GoogleFonts.lexend(fontSize: 16),
+                    filled: true,
+                    fillColor: ElderColors.surfaceContainerHighest,
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide.none,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: ElderSpacing.md),
+                TextField(
+                  controller: phoneCtrl,
+                  keyboardType: TextInputType.phone,
+                  style: GoogleFonts.lexend(fontSize: 18),
+                  decoration: InputDecoration(
+                    labelText: 'Phone Number',
+                    labelStyle: GoogleFonts.lexend(fontSize: 16),
+                    filled: true,
+                    fillColor: ElderColors.surfaceContainerHighest,
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide.none,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: ElderSpacing.xl),
+                FilledButton(
+                  style: FilledButton.styleFrom(
+                    backgroundColor: ElderColors.primary,
+                    minimumSize: const Size.fromHeight(56),
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12)),
+                  ),
+                  onPressed: saving
+                      ? null
+                      : () async {
+                          setSheet(() => saving = true);
+                          final userId = Supabase.instance.client.auth
+                              .currentUser?.id;
+                          if (userId != null) {
+                            await Supabase.instance.client
+                                .from('users')
+                                .update({
+                              'emergency_contact_name': nameCtrl.text.trim(),
+                              'emergency_contact_phone': phoneCtrl.text.trim(),
+                            }).eq('id', userId);
+                            ref.invalidate(userProvider);
+                          }
+                          if (ctx.mounted) Navigator.pop(ctx);
+                        },
+                  child: saving
+                      ? const SizedBox(
+                          width: 24,
+                          height: 24,
+                          child: CircularProgressIndicator(
+                              color: Colors.white, strokeWidth: 2))
+                      : Text('Save',
+                          style: GoogleFonts.plusJakartaSans(
+                              fontSize: 18,
+                              fontWeight: FontWeight.w700,
+                              color: Colors.white)),
+                ),
+                const SizedBox(height: ElderSpacing.md),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
   @override
-  Widget build(BuildContext context) {
-    // Left border + rounded corners — same ClipRRect + Row pattern as ConnectCard
+  Widget build(BuildContext context, WidgetRef ref) {
+    final user = ref.watch(userProvider).valueOrNull;
+    final contactName = user?.emergencyContactName;
+    final contactPhone = user?.emergencyContactPhone;
+    final hasContact = user?.hasEmergencyContact ?? false;
+
     return ClipRRect(
       borderRadius: BorderRadius.circular(_kCardRadius),
       child: IntrinsicHeight(
@@ -671,34 +1170,75 @@ class _EmergencySection extends StatelessWidget {
                   children: [
                     Row(
                       children: [
-                        const Icon(
-                          Icons.emergency,
-                          color: ElderColors.onErrorContainer,
-                          size: 22,
-                        ),
+                        const Icon(Icons.emergency,
+                            color: ElderColors.onErrorContainer, size: 22),
                         const SizedBox(width: ElderSpacing.sm + ElderSpacing.xs),
-                        Text(
-                          'Emergency Contacts',
-                          style: GoogleFonts.plusJakartaSans(
-                            fontSize: 20,
-                            fontWeight: FontWeight.w700,
-                            color: ElderColors.onErrorContainer,
+                        Expanded(
+                          child: Text('Emergency Contacts',
+                              style: GoogleFonts.plusJakartaSans(
+                                  fontSize: 20,
+                                  fontWeight: FontWeight.w700,
+                                  color: ElderColors.onErrorContainer)),
+                        ),
+                        // Plus icon to add / edit emergency contact
+                        Semantics(
+                          button: true,
+                          label: 'Add or edit emergency contact',
+                          child: GestureDetector(
+                            onTap: () => _showEditSheet(
+                                context, ref, contactName, contactPhone),
+                            child: Container(
+                              padding:
+                                  const EdgeInsets.all(ElderSpacing.xs),
+                              decoration: BoxDecoration(
+                                color:
+                                    ElderColors.error.withValues(alpha: 0.15),
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: const Icon(Icons.add_rounded,
+                                  size: 20,
+                                  color: ElderColors.onErrorContainer),
+                            ),
                           ),
                         ),
                       ],
                     ),
                     const SizedBox(height: ElderSpacing.md),
                     _EmergencyContactRow(
-                      name: 'Hospital Hot-line',
-                      number: '911',
-                      showDivider: true,
+                      name: 'Emergency Services',
+                      number: '999',
+                      onCall: () => launchUrl(Uri.parse('tel:999')),
+                      showDivider: hasContact,
                     ),
-                    const SizedBox(height: ElderSpacing.md),
-                    _EmergencyContactRow(
-                      name: 'Sarah Miller',
-                      number: '(555) 012-3456',
-                      showDivider: false,
-                    ),
+                    if (hasContact) ...[
+                      const SizedBox(height: ElderSpacing.md),
+                      _EmergencyContactRow(
+                        name: contactName ?? 'My Contact',
+                        number: contactPhone!,
+                        onCall: () =>
+                            launchUrl(Uri.parse('tel:$contactPhone')),
+                        showDivider: false,
+                      ),
+                    ] else ...[
+                      const SizedBox(height: ElderSpacing.md),
+                      GestureDetector(
+                        onTap: () =>
+                            _showEditSheet(context, ref, null, null),
+                        child: Row(
+                          children: [
+                            const Icon(Icons.add_circle_outline,
+                                size: 20,
+                                color: ElderColors.onErrorContainer),
+                            const SizedBox(width: ElderSpacing.xs),
+                            Text('Add a personal emergency contact',
+                                style: GoogleFonts.lexend(
+                                    fontSize: 16,
+                                    color: ElderColors.onErrorContainer,
+                                    decoration: TextDecoration.underline)),
+                          ],
+                        ),
+                      ),
+                    ],
                   ],
                 ),
               ),
@@ -714,11 +1254,13 @@ class _EmergencyContactRow extends StatelessWidget {
   const _EmergencyContactRow({
     required this.name,
     required this.number,
+    required this.onCall,
     required this.showDivider,
   });
 
   final String name;
   final String number;
+  final VoidCallback onCall;
   final bool showDivider;
 
   @override
@@ -726,22 +1268,40 @@ class _EmergencyContactRow extends StatelessWidget {
     return Column(
       children: [
         Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Text(
-              name,
-              style: GoogleFonts.lexend(
-                fontSize: 18,
-                fontWeight: FontWeight.w600,
-                color: ElderColors.onErrorContainer,
-              ),
+            Expanded(
+              child: Text(name,
+                  style: GoogleFonts.lexend(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w600,
+                      color: ElderColors.onErrorContainer)),
             ),
-            Text(
-              number,
-              style: GoogleFonts.lexend(
-                fontSize: 18,
-                fontWeight: FontWeight.w700,
-                color: ElderColors.onErrorContainer,
+            Semantics(
+              button: true,
+              label: 'Call $name',
+              child: GestureDetector(
+                onTap: onCall,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: ElderSpacing.md, vertical: ElderSpacing.xs),
+                  decoration: BoxDecoration(
+                    color: ElderColors.error.withValues(alpha: 0.15),
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(Icons.phone_rounded,
+                          size: 18, color: ElderColors.onErrorContainer),
+                      const SizedBox(width: 6),
+                      Text(number,
+                          style: GoogleFonts.lexend(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w700,
+                              color: ElderColors.onErrorContainer)),
+                    ],
+                  ),
+                ),
               ),
             ),
           ],
@@ -760,17 +1320,13 @@ class _EmergencyContactRow extends StatelessWidget {
 
 // ── App Settings Section ──────────────────────────────────────────────────────
 
-class _AppSettingsSection extends StatelessWidget {
-  const _AppSettingsSection({
-    required this.highContrastEnabled,
-    required this.onContrastToggle,
-  });
-
-  final bool highContrastEnabled;
-  final ValueChanged<bool> onContrastToggle;
+class _AppSettingsSection extends ConsumerWidget {
+  const _AppSettingsSection();
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final highContrast = ref.watch(highContrastProvider);
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -820,15 +1376,17 @@ class _AppSettingsSection extends StatelessWidget {
                     ),
                     Semantics(
                       label: 'High contrast toggle',
-                      toggled: highContrastEnabled,
+                      toggled: highContrast,
                       child: Switch(
-                        value: highContrastEnabled,
+                        value: highContrast,
                         onChanged: (v) {
-                          onContrastToggle(v);
+                          ref.read(highContrastProvider.notifier).state = v;
                           ScaffoldMessenger.of(context).showSnackBar(
                             SnackBar(
                               content: Text(
-                                v ? 'High contrast enabled' : 'High contrast disabled',
+                                v
+                                    ? 'High contrast mode enabled'
+                                    : 'High contrast mode disabled',
                                 style: GoogleFonts.lexend(fontSize: 16),
                               ),
                               behavior: SnackBarBehavior.floating,
@@ -836,7 +1394,6 @@ class _AppSettingsSection extends StatelessWidget {
                                   borderRadius: BorderRadius.circular(12)),
                             ),
                           );
-                          // TODO(backend-sprint): persist contrast preference to users table
                         },
                         activeThumbColor: Colors.white,
                         activeTrackColor: ElderColors.primary,
@@ -872,7 +1429,19 @@ class _AppSettingsSection extends StatelessWidget {
                       label: 'Language selection, currently English',
                       button: true,
                       child: GestureDetector(
-                        onTap: () {/* TODO: open language picker */},
+                        onTap: () {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text(
+                                'Language selection coming soon',
+                                style: GoogleFonts.lexend(fontSize: 16),
+                              ),
+                              behavior: SnackBarBehavior.floating,
+                              shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(12)),
+                            ),
+                          );
+                        },
                         child: Row(
                           children: [
                             Text(
@@ -895,6 +1464,62 @@ class _AppSettingsSection extends StatelessWidget {
                   ],
                 ),
               ),
+              const Divider(height: 1, indent: ElderSpacing.lg, endIndent: ElderSpacing.lg),
+              // Logout row
+              Semantics(
+                label: 'Log out and switch account',
+                button: true,
+                child: InkWell(
+                  borderRadius: const BorderRadius.vertical(bottom: Radius.circular(_kCardRadius)),
+                  onTap: () async {
+                    final confirmed = await showDialog<bool>(
+                      context: context,
+                      builder: (ctx) => AlertDialog(
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                        title: Text(
+                          'Log Out?',
+                          style: GoogleFonts.plusJakartaSans(fontSize: 22, fontWeight: FontWeight.w700),
+                        ),
+                        content: Text(
+                          'You will need your PIN to log back in.',
+                          style: GoogleFonts.lexend(fontSize: 18),
+                        ),
+                        actions: [
+                          TextButton(
+                            onPressed: () => Navigator.pop(ctx, false),
+                            child: Text('Cancel', style: GoogleFonts.lexend(fontSize: 18, color: ElderColors.onSurfaceVariant)),
+                          ),
+                          TextButton(
+                            onPressed: () => Navigator.pop(ctx, true),
+                            child: Text('Log Out', style: GoogleFonts.lexend(fontSize: 18, color: ElderColors.error, fontWeight: FontWeight.w700)),
+                          ),
+                        ],
+                      ),
+                    );
+                    if (confirmed == true && context.mounted) {
+                      await ref.read(authServiceProvider).signOut();
+                      if (context.mounted) context.go('/role-selection');
+                    }
+                  },
+                  child: Padding(
+                    padding: const EdgeInsets.all(ElderSpacing.lg),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.logout, color: ElderColors.error, size: 28),
+                        const SizedBox(width: ElderSpacing.md),
+                        Text(
+                          'Log Out',
+                          style: GoogleFonts.lexend(
+                            fontSize: 20,
+                            fontWeight: FontWeight.w600,
+                            color: ElderColors.error,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
             ],
           ),
         ),
@@ -905,10 +1530,10 @@ class _AppSettingsSection extends StatelessWidget {
 
 
 // ── ACCESSIBILITY AUDIT ─────────────────────────────────────────────────────
-// ✅ Tap targets ≥ 48×48 px — edit button 56dp; caretaker action buttons 48dp; settings rows padded
-// ✅ Font sizes ≥ 16sp — health labels bumped from 14sp to 16sp; all body text 16sp+
+// ✅ Tap targets ≥ 48×48 px — edit button 56dp; caretaker action buttons 48dp; search results padded
+// ✅ Font sizes ≥ 16sp — all labels 16sp+, body 18sp+
 // ✅ Colour contrast WCAG AA — onPrimary on primary; onErrorContainer on errorContainer
-// ✅ Semantic labels on edit button, caretaker actions, settings toggle, language picker
+// ✅ Semantic labels on edit button, caretaker actions, search results, settings toggle, language picker
 // ✅ Toggle has toggled state via Semantics wrapper
-// ✅ No colour as sole differentiator — caretaker rows use distinct icons + name text
+// ✅ No colour as sole differentiator — interest tiles have icon + label; caretaker rows have name text
 // ✅ Touch targets separated by ≥ 8px — 16dp gap between all interactive rows

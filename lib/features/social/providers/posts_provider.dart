@@ -21,7 +21,7 @@ final postsProvider = StreamProvider<List<PostModel>>((ref) {
     try {
       final rows = await client
           .from('posts')
-          .select('*, users!user_id(full_name)')
+          .select('*, users!user_id(full_name, avatar_url)')
           .order('created_at', ascending: false);
       if (!controller.isClosed) {
         controller.add(rows.map(PostModel.fromJson).toList());

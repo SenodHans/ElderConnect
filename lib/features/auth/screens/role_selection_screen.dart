@@ -84,16 +84,13 @@ class RoleSelectionScreen extends ConsumerWidget {
                 crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
                   // ── Branding ───────────────────────────────────────────────
-                  // Wordmark: HTML uses text-xs (12px) which violates the 16sp
-                  // project minimum. Raised to 16sp; uppercase + wide tracking
-                  // preserves the visual intent from the Stitch design.
                   Text(
-                    'ELDERCONNECT',
-                    style: GoogleFonts.plusJakartaSans(
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
+                    'ElderConnect',
+                    style: GoogleFonts.quicksand(
+                      fontSize: 24,
+                      fontWeight: FontWeight.w700,
                       color: ElderColors.primary,
-                      letterSpacing: 3.0, // tracking-widest
+                      letterSpacing: -0.5,
                     ),
                   ),
 
@@ -116,7 +113,7 @@ class RoleSelectionScreen extends ConsumerWidget {
                   ConstrainedBox(
                     constraints: const BoxConstraints(maxWidth: 448), // max-w-md
                     child: Text(
-                      'Select your profile to personalize your experience and connect with your circle.',
+                      'Select your profile...',
                       style: GoogleFonts.lexend(
                         fontSize: 18,
                         fontWeight: FontWeight.w300,
@@ -138,7 +135,9 @@ class RoleSelectionScreen extends ConsumerWidget {
                     iconContainerColor: ElderColors.primaryFixed,
                     iconColor: ElderColors.primary,
                     titleColor: ElderColors.primary,
-                    onTap: () => context.go('/register/elder'),
+                    // Returning elders go to PIN login; first-time elders
+                    // can tap "New here?" on that screen to register.
+                    onTap: () => context.go('/elder/pin-login'),
                   ),
 
                   const SizedBox(height: ElderSpacing.lg), // space-y-6 = 24dp
@@ -185,36 +184,167 @@ class RoleSelectionScreen extends ConsumerWidget {
 
                   const SizedBox(height: ElderSpacing.xl),
 
-                  // Community link — no route defined yet; visual only.
-                  Semantics(
-                    button: true,
-                    label: 'Learn more about our community',
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Text(
-                          'Learn more about our community',
-                          style: GoogleFonts.lexend(
-                            fontSize: 18,
-                            fontWeight: FontWeight.w600,
+                  // "Already have an account? Sign In"
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Text(
+                        'Already have an account? ',
+                        style: GoogleFonts.plusJakartaSans(
+                          fontSize: 16,
+                          color: ElderColors.onSurfaceVariant,
+                        ),
+                      ),
+                      GestureDetector(
+                        onTap: () => _showLoginSelection(context),
+                        child: Text(
+                          'Sign In',
+                          style: GoogleFonts.plusJakartaSans(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
                             color: ElderColors.primary,
                           ),
                         ),
-                        const SizedBox(width: ElderSpacing.sm),
-                        const Icon(
-                          Icons.arrow_forward,
-                          size: 20,
-                          color: ElderColors.primary,
-                        ),
-                      ],
-                    ),
+                      ),
+                    ],
                   ),
                 ],
               ),
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  void _showLoginSelection(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent, // Let the sheet's container handle bg
+      isScrollControlled: true,
+      builder: (context) => const _LoginSelectionSheet(),
+    );
+  }
+}
+
+class _LoginSelectionSheet extends StatelessWidget {
+  const _LoginSelectionSheet();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: const BoxDecoration(
+        color: ElderColors.surface,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      padding: EdgeInsets.only(
+        left: ElderSpacing.lg,
+        right: ElderSpacing.lg,
+        top: ElderSpacing.lg,
+        bottom: ElderSpacing.xxl + MediaQuery.paddingOf(context).bottom,
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          // Drag handle
+          Center(
+            child: Container(
+              width: 32,
+              height: 4,
+              decoration: BoxDecoration(
+                color: ElderColors.outlineVariant,
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+          ),
+          const SizedBox(height: ElderSpacing.xl),
+          Text(
+            'Welcome Back',
+            style: GoogleFonts.plusJakartaSans(
+              fontSize: 24,
+              fontWeight: FontWeight.bold,
+              color: ElderColors.onSurface,
+            ),
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: ElderSpacing.xs),
+          Text(
+            'Choose how you want to log in.',
+            style: GoogleFonts.lexend(
+              fontSize: 16,
+              color: ElderColors.onSurfaceVariant,
+            ),
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: ElderSpacing.xl),
+          _LoginOptionCard(
+            label: 'Elder Login',
+            icon: Icons.dialpad_rounded,
+            onTap: () {
+              Navigator.pop(context);
+              context.go('/elder/pin-login');
+            },
+          ),
+          const SizedBox(height: ElderSpacing.md),
+          _LoginOptionCard(
+            label: 'Caretaker Login',
+            icon: Icons.password_rounded,
+            onTap: () {
+              Navigator.pop(context);
+              context.go('/caretaker/login');
+            },
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _LoginOptionCard extends StatelessWidget {
+  const _LoginOptionCard({
+    required this.label,
+    required this.icon,
+    required this.onTap,
+  });
+
+  final String label;
+  final IconData icon;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      button: true,
+      label: label,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(16),
+        child: Container(
+          padding: const EdgeInsets.all(ElderSpacing.lg),
+          decoration: BoxDecoration(
+            color: ElderColors.surfaceContainerLow,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: ElderColors.surfaceContainerHighest),
+          ),
+          child: Row(
+            children: [
+              Icon(icon, color: ElderColors.primary, size: 28),
+              const SizedBox(width: ElderSpacing.md),
+              Expanded(
+                child: Text(
+                  label,
+                  style: GoogleFonts.plusJakartaSans(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w600,
+                    color: ElderColors.onSurface,
+                  ),
+                ),
+              ),
+              const Icon(Icons.chevron_right_rounded, color: ElderColors.outline),
+            ],
+          ),
+        ),
       ),
     );
   }
@@ -303,7 +433,7 @@ class _RoleCardState extends State<_RoleCard> {
                       Text(
                         widget.label,
                         style: GoogleFonts.plusJakartaSans(
-                          fontSize: 30, // text-3xl
+                          fontSize: 24, // reduced to fit without breaking mid-word
                           fontWeight: FontWeight.bold,
                           color: widget.titleColor,
                           height: 1.25,
