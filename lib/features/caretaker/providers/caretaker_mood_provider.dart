@@ -122,7 +122,7 @@ final linkedEldersProvider = FutureProvider<List<UserModel>>((ref) async {
       .select(
         'users!elderly_user_id(id, email, role, full_name, phone, date_of_birth, '
         'interests, tts_enabled, mood_sharing_consent, created_at, pin_hash, '
-        'pin_plain, avatar_url, emergency_contact_name, emergency_contact_phone)',
+        'avatar_url, emergency_contact_name, emergency_contact_phone)',
       )
       .eq('caretaker_id', uid)
       .eq('status', 'accepted');

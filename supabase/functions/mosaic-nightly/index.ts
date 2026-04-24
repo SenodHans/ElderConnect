@@ -38,7 +38,7 @@ function arrayStddev(values: number[], avg: number): number {
 
 function linearSlope(values: number[]): number {
   const n = values.length;
-  if (n < 3) return 0;
+  if (n < 2) return 0; // need at least 2 points for a meaningful slope
   const sumX = (n * (n - 1)) / 2;
   const sumX2 = (n * (n - 1) * (2 * n - 1)) / 6;
   const sumY = values.reduce((a, b) => a + b, 0);
@@ -174,14 +174,27 @@ async function processElder(
 
   const moodLabel = composite >= 0.6 ? "POSITIVE" : composite >= 0.4 ? "NEUTRAL" : "NEGATIVE";
 
-  // Write nightly composite log
-  await supabase.from("mood_logs").insert({
-    user_id: elderId,
-    label: moodLabel,
-    score: composite,
-    source: "nightly_composite",
-    composite_score: composite,
-  });
+  // Guard against duplicate runs (cron edge cases / manual re-triggers).
+  // If a nightly_composite row already exists for today, skip the insert
+  // to avoid polluting the 7-day regression history.
+  const { data: existing } = await supabase
+    .from("mood_logs")
+    .select("id")
+    .eq("user_id", elderId)
+    .eq("source", "nightly_composite")
+    .gte("created_at", today.toISOString())
+    .lte("created_at", todayEnd.toISOString())
+    .maybeSingle();
+
+  if (!existing) {
+    await supabase.from("mood_logs").insert({
+      user_id: elderId,
+      label: moodLabel,
+      score: composite,
+      source: "nightly_composite",
+      composite_score: composite,
+    });
+  }
 
   // Trend analysis — last 7 nightly composites
   const { data: history } = await supabase
@@ -255,8 +268,15 @@ serve(async (req: Request) => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
     );
 
+    // Only process elders who have explicitly consented to mood sharing.
+    // alert_states carries mood-derived information — writing it for
+    // non-consenting elders would expose that data via the DB even if RLS
+    // blocks the read, and contradicts the stated consent architecture.
     const { data: elders, error } = await supabase
-      .from("users").select("id, full_name").eq("role", "elderly");
+      .from("users")
+      .select("id, full_name")
+      .eq("role", "elderly")
+      .eq("mood_sharing_consent", true);
 
     if (error) throw error;
     if (!elders || elders.length === 0) {

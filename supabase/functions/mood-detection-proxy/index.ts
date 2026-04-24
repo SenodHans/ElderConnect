@@ -59,19 +59,25 @@ function isDiscrepancyFlagged(moodLabel: string, emoji: string | null): boolean 
 
 // Calls HuggingFace with one retry on 503 (model cold start).
 // Logs precise server-side latency for thesis performance measurements.
+// Each attempt has a 20s hard timeout via AbortController to prevent
+// hanging the Edge Function slot on slow/partial TCP responses.
 async function queryHuggingFace(
   text: string,
   apiKey: string,
 ): Promise<{ label: string; score: number } | null> {
-  const call = () =>
-    fetch(HF_API_URL, {
+  const call = () => {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 20_000);
+    return fetch(HF_API_URL, {
+      signal: controller.signal,
       method: "POST",
       headers: {
         Authorization: `Bearer ${apiKey}`,
         "Content-Type": "application/json",
       },
       body: JSON.stringify({ inputs: text }),
-    });
+    }).finally(() => clearTimeout(timer));
+  };
 
   const hfStart = Date.now();
   let res = await call();

@@ -195,7 +195,7 @@ class AuthService {
     final hashed = BCrypt.hashpw(pin, BCrypt.gensalt());
     await _supabase
         .from('users')
-        .update({'pin_hash': hashed, 'pin_plain': pin})
+        .update({'pin_hash': hashed})
         .eq('id', elderId);
   }
 
