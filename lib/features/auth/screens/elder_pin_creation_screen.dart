@@ -101,9 +101,20 @@ class _ElderPinCreationScreenState
         'pin_plain': pin,
       }).eq('id', userId);
 
-      // Cache hash locally so session-expiry PIN screen works offline.
+      // Persist session with elderId and hash so the PIN login screen can
+      // always identify this elder for the DB fallback, even after reinstall.
       final authService = ref.read(authServiceProvider);
-      await authService.updateStoredPinHash(hash);
+      final session = Supabase.instance.client.auth.currentSession;
+      if (session != null) {
+        await authService.persistElderSession(
+          session,
+          elderId: userId,
+          pinHash: hash,
+        );
+      } else {
+        // Fallback: at minimum cache the hash.
+        await authService.updateStoredPinHash(hash);
+      }
 
       if (mounted) context.go('/interest-selection');
     } catch (e) {

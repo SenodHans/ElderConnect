@@ -39,11 +39,42 @@ import 'features/mood/screens/daily_journal_screen.dart';
 
 /// Root application widget.
 /// Role-based routing: elderly → ElderlyShell, caretaker → CaretakerShell
-class ElderConnectApp extends ConsumerWidget {
+class ElderConnectApp extends ConsumerStatefulWidget {
   const ElderConnectApp({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<ElderConnectApp> createState() => _ElderConnectAppState();
+}
+
+class _ElderConnectAppState extends ConsumerState<ElderConnectApp>
+    with WidgetsBindingObserver {
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  // When the app returns to the foreground with no active session, reset to
+  // the Welcome screen so navigation never strands the user mid-flow.
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      final session = Supabase.instance.client.auth.currentSession;
+      if (session == null) {
+        _router.go('/role-selection');
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final highContrast = ref.watch(highContrastProvider);
     return MaterialApp.router(
       title: 'ElderConnect',
@@ -89,8 +120,11 @@ const _kProtectedPrefixes = [
 
 // Routes that are only meaningful when NOT authenticated.
 // Visiting these while logged in redirects to the appropriate portal.
+// NOTE: /role-selection and /elder/pin-login are intentionally excluded —
+// users can reach the Welcome screen at any time (e.g. after logout or when
+// switching elders on a shared device). The PIN screen also handles its own
+// sign-out before initiating a new PIN-based sign-in.
 const _kLoginOnlyRoutes = [
-  '/role-selection',
   '/register/caretaker',
   '/caretaker/login',
 ];

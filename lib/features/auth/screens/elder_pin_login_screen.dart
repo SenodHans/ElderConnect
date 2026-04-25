@@ -38,10 +38,6 @@ class _ElderPinLoginScreenState extends ConsumerState<ElderPinLoginScreen>
   bool _hasError = false;
   bool _sendingHelp = false;
 
-  // Elder's display name — loaded from secure storage, shown below "Welcome Back".
-  // Also used as fallback for the name+PIN session recovery Edge Function.
-  String? _storedName;
-
   @override
   void initState() {
     super.initState();
@@ -50,12 +46,6 @@ class _ElderPinLoginScreenState extends ConsumerState<ElderPinLoginScreen>
       vsync: this,
     )..forward();
     _fadeIn = CurvedAnimation(parent: _anim, curve: Curves.easeOut);
-    _loadStoredName();
-  }
-
-  Future<void> _loadStoredName() async {
-    final name = await ref.read(authServiceProvider).getStoredElderName();
-    if (mounted) setState(() => _storedName = name);
   }
 
   @override
@@ -84,59 +74,60 @@ class _ElderPinLoginScreenState extends ConsumerState<ElderPinLoginScreen>
     });
 
     final service = ref.read(authServiceProvider);
-    final enteredPin = _pin.join();
+    final enteredPin = _pin.join().trim();
 
     try {
-      // Read identifiers FIRST — restoreElderSession() calls _clearElderSession()
-      // on expired tokens, which deletes elderId and makes the DB fallback impossible.
-      final elderId = await service.getStoredElderId();
-      final storedHash = await service.getStoredPinHash();
+      // Sign out any existing session first so switching elders on a shared
+      // device works cleanly. `signOut()` clears secure storage + Supabase
+      // session — the new session is written immediately after PIN matches.
+      await service.signOut();
 
-      bool pinVerified = false;
+      // Global DB lookup — find any elder whose pin_plain matches.
+      // This works regardless of which device/session was last used.
+      final elder = await service.findElderByPin(enteredPin);
 
-      // Step 1: fast local hash check — offline, covers the normal daily case.
-      if (storedHash != null && service.verifyPinLocal(enteredPin, storedHash)) {
-        pinVerified = true;
+      if (elder == null) {
+        if (mounted) {
+          setState(() {
+            _pin.clear();
+            _hasError = true;
+            _isVerifying = false;
+          });
+        }
+        return;
       }
 
-      // Step 2: DB fallback — runs when local hash is missing or stale (after PIN reset).
-      if (!pinVerified && elderId != null) {
-        final dbMatch = await service.verifyElderPin(
-          elderId: elderId,
-          pin: enteredPin,
-        );
-        if (dbMatch) {
-          pinVerified = true;
-          await service.fetchAndCachePinHash(elderId);
-        }
+      // Sign in with the elder's system-generated credentials.
+      final session = await service.signInWithEmailAndPassword(
+        email: elder['email'] as String,
+        password: elder['system_password'] as String,
+      );
+
+      if (session != null) {
+        await service.saveLastRole('elderly');
+        if (mounted) context.go('/home/elder');
+        return;
       }
 
-      if (pinVerified) {
-        // Session restoration cascade — three layers of fallback:
-        // 1. Refresh token (fast, covers normal session-expiry case)
-        // 2. Cached email+password (handles token rotation issues)
-        // 3. Name+PIN Edge Function (covers full reinstall / wiped storage)
-        var session = await service.restoreElderSession();
-        session ??= await service.signInWithCachedCredentials();
-        if (session == null && _storedName != null) {
-          session = await service.restoreSessionWithNameAndPin(
-            fullName: _storedName!,
-            pin: enteredPin,
-          );
-        }
-        if (mounted && session != null) {
-          await service.saveLastRole('elderly');
-          if (mounted) context.go('/home/elder');
-          return;
-        }
-      }
-
+      // Elder found but sign-in failed (network/server issue).
       if (mounted) {
         setState(() {
           _pin.clear();
-          _hasError = true;
           _isVerifying = false;
         });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'Could not sign in. Please check your connection and try again.',
+              style: GoogleFonts.lexend(fontSize: 16),
+            ),
+            backgroundColor: ElderColors.error,
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12)),
+            duration: const Duration(seconds: 6),
+          ),
+        );
       }
     } catch (_) {
       if (mounted) {
@@ -300,12 +291,12 @@ class _ElderPinLoginScreenState extends ConsumerState<ElderPinLoginScreen>
                     _buildHeader(),
                     const SizedBox(height: ElderSpacing.sm),
 
-                    // "Welcome Back"
+                    // Welcome heading — generic, never shows a cached name.
                     Padding(
                       padding: const EdgeInsets.symmetric(
                           horizontal: ElderSpacing.lg),
                       child: Text(
-                        'Welcome Back',
+                        'Welcome',
                         style: GoogleFonts.plusJakartaSans(
                           fontSize: 36,
                           fontWeight: FontWeight.bold,
@@ -316,32 +307,13 @@ class _ElderPinLoginScreenState extends ConsumerState<ElderPinLoginScreen>
                       ),
                     ),
 
-                    // Elder's name — shown when we have it in secure storage.
-                    if (_storedName != null) ...[
-                      const SizedBox(height: ElderSpacing.xs),
-                      Padding(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: ElderSpacing.lg),
-                        child: Text(
-                          _storedName!,
-                          style: GoogleFonts.plusJakartaSans(
-                            fontSize: 26,
-                            fontWeight: FontWeight.w600,
-                            color: ElderColors.primary,
-                            height: 1.3,
-                          ),
-                          textAlign: TextAlign.center,
-                        ),
-                      ),
-                    ],
-
                     const SizedBox(height: ElderSpacing.md),
 
                     Padding(
                       padding: const EdgeInsets.symmetric(
                           horizontal: ElderSpacing.lg),
                       child: Text(
-                        'Enter your PIN to continue.',
+                        'Enter your PIN to sign in.',
                         style: GoogleFonts.lexend(
                           fontSize: 20,
                           fontWeight: FontWeight.w500,

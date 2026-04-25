@@ -23,6 +23,7 @@ import '../../../shared/models/user_model.dart';
 import '../providers/caretaker_mood_provider.dart';
 import '../widgets/caretaker_avatar.dart';
 import '../widgets/reset_elder_pin_sheet.dart';
+import '../../../shared/widgets/elder_connect_logo.dart';
 
 const double _kCardRadius = 8.0;
 const double _kContactRadius = 16.0;
@@ -107,7 +108,11 @@ class _ElderManagementScreenState
 
               return CustomScrollView(
                 slivers: [
-                  const SliverToBoxAdapter(child: SizedBox(height: 72)),
+                  SliverToBoxAdapter(
+                    child: SizedBox(
+                      height: 72 + MediaQuery.of(context).padding.top,
+                    ),
+                  ),
                   SliverPadding(
                     padding: const EdgeInsets.fromLTRB(
                       ElderSpacing.lg,
@@ -224,11 +229,7 @@ class _ElderManagementScreenState
             padding: const EdgeInsets.symmetric(horizontal: ElderSpacing.lg),
             child: Row(
               children: [
-                Image.asset(
-                  'assets/images/elderconnect_logo.png',
-                  width: 32,
-                  height: 32,
-                ),
+                const ElderConnectLogo(size: 32),
                 const SizedBox(width: ElderSpacing.sm),
                 Text(
                   'ElderConnect',

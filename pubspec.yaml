@@ -79,6 +79,11 @@ dependencies:
   # Open article URLs in the system browser (fallback from in-app reader)
   url_launcher: ^6.3.1
 
+  # PDF generation + share/print sheet — Full Report export (Mood screen)
+  # NEW packages — added for ISSUE 2 (Full Report button) 2026-04-25
+  pdf: ^3.11.1
+  printing: ^5.13.1
+
   # Audio recording for voice messages
   record: ^6.0.0
 
@@ -132,7 +137,6 @@ flutter:
 
   # To add assets to your application, add an assets section, like this:
   assets:
-    - assets/images/elderconnect_logo.png
     - assets/images/elderconnect_icon.png
 
   # An image asset can refer to one or more resolution-specific "variants", see

@@ -669,7 +669,7 @@ class _MoodCardState extends State<_MoodCard> {
             button: true,
             label: 'Write in journal',
             child: GestureDetector(
-              onTap: () => context.go('/mood/journal'),
+              onTap: () => context.push('/mood/journal'),
               child: Container(
                 height: 56,
                 decoration: BoxDecoration(

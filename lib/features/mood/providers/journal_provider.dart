@@ -39,7 +39,7 @@ class JournalState {
   }
 }
 
-class JournalNotifier extends Notifier<JournalState> {
+class JournalNotifier extends AutoDisposeNotifier<JournalState> {
   @override
   JournalState build() => const JournalState();
 
@@ -85,7 +85,7 @@ class JournalNotifier extends Notifier<JournalState> {
 }
 
 final journalNotifierProvider =
-    NotifierProvider<JournalNotifier, JournalState>(JournalNotifier.new);
+    NotifierProvider.autoDispose<JournalNotifier, JournalState>(JournalNotifier.new);
 
 /// Fetches today's rotating question from daily_prompt_questions.
 /// Index = dayOfYear % totalQuestions. Falls back to hardcoded question on error.

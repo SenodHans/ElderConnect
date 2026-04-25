@@ -18,6 +18,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../core/constants/elder_colors.dart';
 import '../../../core/constants/elder_spacing.dart';
 import '../widgets/caretaker_avatar.dart';
+import '../../../shared/widgets/elder_connect_logo.dart';
 
 // Stitch config: rounded-xl = 0.5rem = 8dp.
 const double _kCardRadius = 8.0;
@@ -109,13 +110,11 @@ class _SearchLinkElderScreenState
       final uid = Supabase.instance.client.auth.currentUser?.id;
       if (uid == null) return;
 
-      // Search for the elder by name or ID.
+      // Use SECURITY DEFINER RPC (search_elderly_users) to search across all
+      // elder profiles — direct table query would be blocked by RLS since the
+      // caretaker can only read their already-linked elders.
       final rows = await Supabase.instance.client
-          .from('users')
-          .select('id, full_name')
-          .eq('role', 'elderly')
-          .or('full_name.ilike.%$query%,id.ilike.%$query%')
-          .limit(1);
+          .rpc('search_elderly_users', params: {'search_query': query}) as List;
 
       if (rows.isEmpty || !mounted) {
         if (mounted) {
@@ -126,13 +125,14 @@ class _SearchLinkElderScreenState
         return;
       }
 
-      final elderId = rows.first['id'] as String;
+      final elderId   = rows.first['id'] as String;
       final elderName = rows.first['full_name'] as String? ?? 'Elder';
 
       await Supabase.instance.client.from('caretaker_links').insert({
-        'caretaker_id': uid,
+        'caretaker_id':    uid,
         'elderly_user_id': elderId,
-        'status': 'pending',
+        'requested_by':    uid,
+        'status':          'pending',
       });
 
       if (mounted) {
@@ -172,7 +172,11 @@ class _SearchLinkElderScreenState
         children: [
           CustomScrollView(
             slivers: [
-              const SliverToBoxAdapter(child: SizedBox(height: 72)),
+              SliverToBoxAdapter(
+                child: SizedBox(
+                  height: 72 + MediaQuery.of(context).padding.top,
+                ),
+              ),
               SliverPadding(
                 padding: const EdgeInsets.fromLTRB(
                   ElderSpacing.lg,
@@ -222,11 +226,7 @@ class _SearchLinkElderScreenState
             padding: const EdgeInsets.symmetric(horizontal: ElderSpacing.lg),
             child: Row(
               children: [
-                Image.asset(
-                  'assets/images/elderconnect_logo.png',
-                  width: 32,
-                  height: 32,
-                ),
+                const ElderConnectLogo(size: 32),
                 const SizedBox(width: ElderSpacing.sm),
                 Text(
                   'ElderConnect',

@@ -95,11 +95,15 @@ async function queryHuggingFace(
     console.log(`[MOSAIC] HuggingFace latency: ${Date.now() - hfStart}ms | model: ${HF_MODEL} | cold_start: false`);
   }
 
-  if (!res.ok) throw new Error(`HuggingFace error: ${res.status}`);
+  if (!res.ok) {
+    console.error(`[MOSAIC] HuggingFace returned ${res.status} — falling back to NEUTRAL`);
+    return null;
+  }
 
   const json = await res.json() as [[{ label: string; score: number }]];
   if (!Array.isArray(json) || !Array.isArray(json[0]) || json[0].length === 0) {
-    throw new Error(`Unexpected HuggingFace response: ${JSON.stringify(json)}`);
+    console.error(`[MOSAIC] Unexpected HuggingFace response shape — falling back to NEUTRAL`);
+    return null;
   }
   const candidates = json[0];
   return candidates.reduce((best, c) => (c.score > best.score ? c : best));
@@ -193,18 +197,16 @@ serve(async (req: Request) => {
     // ── 4. Call HuggingFace ───────────────────────────────────────────────
     const topEmotion = await queryHuggingFace(
       text.trim(),
-      Deno.env.get("HUGGINGFACE_API_KEY")!,
+      Deno.env.get("HUGGINGFACE_API_KEY") ?? "",
     );
 
-    if (!topEmotion) {
-      return new Response(
-        JSON.stringify({ status: "loading" }),
-        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } },
-      );
-    }
-
-    const moodLabel = toMoodLabel(topEmotion.label, topEmotion.score);
+    // If HuggingFace is unavailable or returns no result, fall back to NEUTRAL.
+    // The entry is still saved — the elder gets confirmation, AI label is just neutral.
+    const moodLabel = topEmotion
+      ? toMoodLabel(topEmotion.label, topEmotion.score)
+      : "NEUTRAL";
     const discrepancyFlagged = isDiscrepancyFlagged(moodLabel, emoji_self_report);
+    const moodScore = topEmotion?.score ?? 0.5;
 
     // ── 5. Write to mood_logs ─────────────────────────────────────────────
     const supabaseAdmin = createClient(
@@ -217,7 +219,7 @@ serve(async (req: Request) => {
       .insert({
         user_id: user.id,
         label: moodLabel,
-        score: topEmotion.score,
+        score: moodScore,
         source_post_id: post_id ?? null,
         source,
         emoji_self_report: emoji_self_report ?? null,
@@ -243,7 +245,7 @@ serve(async (req: Request) => {
       JSON.stringify({
         status: "ok",
         label: moodLabel,
-        score: topEmotion.score,
+        score: moodScore,
         discrepancy_flagged: discrepancyFlagged,
       }),
       { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } },

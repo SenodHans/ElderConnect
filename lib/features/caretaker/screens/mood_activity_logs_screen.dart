@@ -13,10 +13,14 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
+import 'package:pdf/pdf.dart';
+import 'package:pdf/widgets.dart' as pw;
+import 'package:printing/printing.dart';
 import '../../../core/constants/elder_colors.dart';
 import '../../../core/constants/elder_spacing.dart';
 import '../providers/caretaker_mood_provider.dart';
 import '../widgets/caretaker_avatar.dart';
+import '../../../shared/widgets/elder_connect_logo.dart';
 
 // Stitch config: caretaker rounded overrides (same as caretaker_dashboard_screen).
 // rounded-xl = 0.5rem = 8dp; rounded-2xl = 16dp; rounded-lg = 0.25rem = 4dp.
@@ -114,8 +118,12 @@ class _MoodActivityLogsScreenState
           // ── Scrollable content (sits beneath sticky top bar) ───────────────
           CustomScrollView(
             slivers: [
-              // Reserve space for the 72dp sticky top bar.
-              const SliverToBoxAdapter(child: SizedBox(height: 72)),
+              // Reserve space for sticky top bar (72dp content + status bar).
+              SliverToBoxAdapter(
+                child: SizedBox(
+                  height: 72 + MediaQuery.of(context).padding.top,
+                ),
+              ),
               SliverPadding(
                 padding: const EdgeInsets.fromLTRB(
                   ElderSpacing.lg,
@@ -162,11 +170,7 @@ class _MoodActivityLogsScreenState
             padding: const EdgeInsets.symmetric(horizontal: ElderSpacing.lg),
             child: Row(
               children: [
-                Image.asset(
-                  'assets/images/elderconnect_logo.png',
-                  width: 32,
-                  height: 32,
-                ),
+                const ElderConnectLogo(size: 32),
                 const SizedBox(width: ElderSpacing.sm),
                 Text(
                   'ElderConnect',
@@ -264,6 +268,210 @@ class _MoodActivityLogsScreenState
           },
         ),
       ],
+    );
+  }
+
+  // ── Full Report Export ───────────────────────────────────────────────────────
+
+  Future<void> _exportFullReport() async {
+    final elderId = _getSelectedElderId();
+    if (elderId.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Link an elder to export their report.')),
+      );
+      return;
+    }
+
+    // Gather all data concurrently.
+    final results = await Future.wait([
+      ref.read(linkedEldersProvider.future),
+      ref.read(elderMoodChartProvider(elderId).future),
+      ref.read(elderActivitySummaryProvider((elderId: elderId, days: 7)).future),
+      ref.read(elderRecentPostsProvider(elderId).future),
+    ]);
+
+    final elders   = results[0] as List;
+    final chart    = results[1] as List<DayMoodData>;
+    final activity = results[2] as ElderActivitySummary;
+    final posts    = results[3] as List;
+
+    final selectedIdx = ref.read(selectedElderIndexProvider);
+    final elderName = selectedIdx < elders.length
+        ? (elders[selectedIdx] as dynamic).fullName as String
+        : 'Elder';
+    final reportDate = DateFormat('d MMMM yyyy').format(DateTime.now());
+
+    // ── Build PDF ──────────────────────────────────────────────────────────────
+    final doc = pw.Document();
+
+    final headerStyle = pw.TextStyle(
+      fontSize: 22,
+      fontWeight: pw.FontWeight.bold,
+      color: PdfColor.fromHex('#00364c'),
+    );
+    final sectionStyle = pw.TextStyle(
+      fontSize: 14,
+      fontWeight: pw.FontWeight.bold,
+      color: PdfColor.fromHex('#005050'),
+    );
+    final bodyStyle = const pw.TextStyle(fontSize: 11);
+    final mutedStyle = pw.TextStyle(
+      fontSize: 10,
+      color: PdfColor.fromHex('#5f6d6c'),
+    );
+
+    doc.addPage(
+      pw.MultiPage(
+        pageFormat: PdfPageFormat.a4,
+        margin: const pw.EdgeInsets.all(36),
+        build: (ctx) => [
+          // ── Header ──────────────────────────────────────────────────────────
+          pw.Text('ElderConnect — Wellness Report', style: headerStyle),
+          pw.SizedBox(height: 4),
+          pw.Text('$elderName  •  Generated $reportDate', style: mutedStyle),
+          pw.Divider(height: 20, thickness: 1),
+
+          // ── 7-Day Mood Trend ─────────────────────────────────────────────────
+          pw.Text('7-Day Mood Trend', style: sectionStyle),
+          pw.SizedBox(height: 8),
+          pw.Table(
+            border: pw.TableBorder.all(
+              color: PdfColor.fromHex('#e0e4e3'),
+              width: 0.5,
+            ),
+            children: [
+              // Header row
+              pw.TableRow(
+                decoration: const pw.BoxDecoration(
+                  color: PdfColor.fromInt(0xFFe8f0ef),
+                ),
+                children: [
+                  _pdfCell('Day', bold: true),
+                  _pdfCell('Status', bold: true),
+                  _pdfCell('Intensity', bold: true),
+                ],
+              ),
+              // Data rows
+              for (final d in chart)
+                pw.TableRow(
+                  children: [
+                    _pdfCell(d.dayLabel),
+                    _pdfCell(switch (d.barStatus) {
+                      MoodBarStatus.stable  => 'Stable',
+                      MoodBarStatus.warning => 'Warning',
+                      MoodBarStatus.urgent  => 'Urgent',
+                    }),
+                    _pdfCell('${((d.barHeight - 40) / 168 * 100).round()}%'),
+                  ],
+                ),
+            ],
+          ),
+
+          pw.SizedBox(height: 16),
+
+          // ── Activity Summary ─────────────────────────────────────────────────
+          pw.Text('Activity Summary (Last 7 Days)', style: sectionStyle),
+          pw.SizedBox(height: 8),
+          pw.Row(children: [
+            pw.Expanded(child: _pdfStat('Last Seen', activity.lastActiveLabel)),
+            pw.SizedBox(width: 8),
+            pw.Expanded(child: _pdfStat('Posts Made', '${activity.postCount}')),
+            pw.SizedBox(width: 8),
+            pw.Expanded(child: _pdfStat('Games Played', '${activity.gamesPlayed}')),
+            pw.SizedBox(width: 8),
+            pw.Expanded(child: _pdfStat(
+              'Medication',
+              activity.hasPendingMeds ? activity.pendingMedLabel : 'All doses confirmed',
+            )),
+          ]),
+          pw.SizedBox(height: 8),
+          pw.Text(
+            'Medication adherence: ${(activity.medicationAdherence * 100).round()}%',
+            style: bodyStyle,
+          ),
+
+          pw.SizedBox(height: 16),
+
+          // ── Recent Posts ─────────────────────────────────────────────────────
+          pw.Text('Recent Posts', style: sectionStyle),
+          pw.SizedBox(height: 8),
+          if (posts.isEmpty)
+            pw.Text('No posts in the selected period.', style: mutedStyle)
+          else
+            for (final p in posts) ...[
+              pw.Container(
+                padding: const pw.EdgeInsets.all(8),
+                decoration: pw.BoxDecoration(
+                  border: pw.Border.all(
+                    color: PdfColor.fromHex('#e0e4e3'),
+                    width: 0.5,
+                  ),
+                  borderRadius: const pw.BorderRadius.all(pw.Radius.circular(4)),
+                ),
+                child: pw.Column(
+                  crossAxisAlignment: pw.CrossAxisAlignment.start,
+                  children: [
+                    pw.Text(
+                      (p as dynamic).content as String,
+                      style: bodyStyle,
+                    ),
+                    pw.SizedBox(height: 4),
+                    pw.Text(
+                      DateFormat('d MMM yyyy, hh:mm a').format((p as dynamic).createdAt as DateTime),
+                      style: mutedStyle,
+                    ),
+                  ],
+                ),
+              ),
+              pw.SizedBox(height: 6),
+            ],
+
+          pw.SizedBox(height: 16),
+          pw.Divider(thickness: 0.5),
+          pw.Text(
+            'This report was generated automatically by ElderConnect. '
+            'It is intended for caretaker review only.',
+            style: mutedStyle,
+          ),
+        ],
+      ),
+    );
+
+    await Printing.layoutPdf(
+      onLayout: (_) => doc.save(),
+      name: 'ElderConnect_Report_${elderName.replaceAll(' ', '_')}_$reportDate',
+    );
+  }
+
+  // Builds a single PDF table cell.
+  pw.Widget _pdfCell(String text, {bool bold = false}) {
+    return pw.Padding(
+      padding: const pw.EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+      child: pw.Text(
+        text,
+        style: bold
+            ? pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold)
+            : const pw.TextStyle(fontSize: 10),
+      ),
+    );
+  }
+
+  // Builds a labelled stat box for the activity section of the PDF.
+  pw.Widget _pdfStat(String label, String value) {
+    return pw.Container(
+      padding: const pw.EdgeInsets.all(6),
+      decoration: pw.BoxDecoration(
+        color: PdfColor.fromHex('#e8f0ef'),
+        borderRadius: const pw.BorderRadius.all(pw.Radius.circular(4)),
+      ),
+      child: pw.Column(
+        crossAxisAlignment: pw.CrossAxisAlignment.start,
+        children: [
+          pw.Text(label, style: pw.TextStyle(fontSize: 9, color: PdfColor.fromHex('#5f6d6c'))),
+          pw.SizedBox(height: 2),
+          pw.Text(value, style: pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold)),
+        ],
+      ),
     );
   }
 
@@ -578,9 +786,7 @@ class _MoodActivityLogsScreenState
             button: true,
             label: 'Export full report',
             child: GestureDetector(
-              onTap: () {
-                // TODO: PDF/CSV export — planned for a future sprint.
-              },
+              onTap: _exportFullReport,
               child: Container(
                 width: double.infinity,
                 padding: const EdgeInsets.symmetric(vertical: ElderSpacing.sm),

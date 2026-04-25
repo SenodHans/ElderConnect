@@ -140,6 +140,8 @@ void main() {
     });
 
     testWidgets('calls signInCaretaker when form is valid', (tester) async {
+      // signOut() is called before signInCaretaker — must be stubbed.
+      when(() => mockAuthService.signOut()).thenAnswer((_) async {});
       when(() => mockAuthService.signInCaretaker(
             email: any(named: 'email'),
             password: any(named: 'password'),

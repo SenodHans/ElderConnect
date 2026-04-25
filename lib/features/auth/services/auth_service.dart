@@ -89,10 +89,14 @@ class AuthService {
     return user;
   }
 
-  /// Signs out the current user and clears all session storage.
+  /// Signs out the current user and wipes all cached session data.
+  ///
+  /// Clears the entire secure storage so no stale identity (name, PIN hash,
+  /// credentials) persists. The next app open lands on the welcome screen,
+  /// and the elder must re-enter their PIN to sign back in.
   Future<void> signOut() async {
     await _supabase.auth.signOut();
-    await _clearElderSession();
+    await _storage.deleteAll();
   }
 
   // ── Role tracking ───────────────────────────────────────────────────────
@@ -258,10 +262,6 @@ class AuthService {
       }
       return session;
     } on AuthException {
-      // Tokens expired or revoked — clear tokens only.
-      // Identity/credential data is kept so the PIN screen can verify and
-      // restore the session without needing the caretaker again.
-      await _clearElderTokensOnly();
       return null;
     }
   }
@@ -284,6 +284,23 @@ class AuthService {
 
   /// Returns stored elder name, or null if never registered on this device.
   Future<String?> getStoredElderName() => _storage.read(key: _kElderName);
+
+  /// Signs in with explicitly provided email and password.
+  /// Used by the PIN login screen after a global DB lookup returns credentials.
+  Future<Session?> signInWithEmailAndPassword({
+    required String email,
+    required String password,
+  }) async {
+    try {
+      final res = await _supabase.auth.signInWithPassword(
+        email: email,
+        password: password,
+      );
+      return res.session;
+    } on AuthException {
+      return null;
+    }
+  }
 
   /// Attempts to sign in using locally cached email + password.
   /// Returns the [Session] on success, null if credentials are missing or stale.
@@ -383,34 +400,23 @@ class AuthService {
     }
   }
 
+  /// Looks up an elder by plain PIN across ALL elders in the database.
+  ///
+  /// Calls the SECURITY DEFINER function find_elder_by_pin which bypasses
+  /// RLS and returns id, full_name, email, system_password for the matching
+  /// elder. Returns null if no elder has this PIN.
+  Future<Map<String, dynamic>?> findElderByPin(String pin) async {
+    final result = await _supabase.rpc(
+      'find_elder_by_pin',
+      params: {'pin_input': pin},
+    ) as List<dynamic>;
+    if (result.isEmpty) return null;
+    return result.first as Map<String, dynamic>;
+  }
+
   // ── Private helpers ─────────────────────────────────────────────────────
 
-  /// Clears only the JWT token pair. Called on session expiry so that
-  /// identity/credential data survives for PIN verification and recovery.
-  Future<void> _clearElderTokensOnly() async {
-    await Future.wait([
-      _storage.delete(key: _kAccessToken),
-      _storage.delete(key: _kRefreshToken),
-    ]);
-  }
-
-  /// Full wipe — called only on explicit sign-out. Clears everything so the
-  /// next user of this device starts completely fresh.
-  Future<void> _clearElderSession() async {
-    await Future.wait([
-      _storage.delete(key: _kAccessToken),
-      _storage.delete(key: _kRefreshToken),
-      _storage.delete(key: _kElderId),
-      _storage.delete(key: _kElderPhone),
-      _storage.delete(key: _kElderPinHash),
-      _storage.delete(key: _kElderEmail),
-      _storage.delete(key: _kElderPassword),
-      _storage.delete(key: _kElderName),
-      _storage.delete(key: _kLastRole),
-    ]);
-  }
-
-  /// Verifies a PIN against a locally supplied hash without a DB query.
+/// Verifies a PIN against a locally supplied hash without a DB query.
   ///
   /// Used on the PIN fallback screen when the session has expired and the
   /// pin_hash was cached in flutter_secure_storage during initial setup.

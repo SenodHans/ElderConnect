@@ -21,6 +21,7 @@ import '../../../core/constants/elder_colors.dart';
 import '../../../core/constants/elder_spacing.dart';
 import '../widgets/caretaker_avatar.dart';
 import '../providers/caretaker_mood_provider.dart';
+import '../../../shared/widgets/elder_connect_logo.dart';
 
 // Stitch config: rounded-xl = 0.5rem = 8dp (caretaker theme overrides default).
 const double _kCardRadius = 8.0;
@@ -105,7 +106,11 @@ class _CaretakerDashboardScreenState
           CustomScrollView(
             slivers: [
               // Reserve space for the 72dp sticky top bar.
-              const SliverToBoxAdapter(child: SizedBox(height: 72)),
+              SliverToBoxAdapter(
+                child: SizedBox(
+                  height: 72 + MediaQuery.of(context).padding.top,
+                ),
+              ),
               SliverPadding(
                 // Extra bottom padding so content clears the bottom nav.
                 padding: const EdgeInsets.fromLTRB(
@@ -149,12 +154,7 @@ class _CaretakerDashboardScreenState
             padding: const EdgeInsets.symmetric(horizontal: ElderSpacing.lg),
             child: Row(
               children: [
-                // medical_services icon + wordmark
-                Image.asset(
-                  'assets/images/elderconnect_logo.png',
-                  width: 32,
-                  height: 32,
-                ),
+                const ElderConnectLogo(size: 32),
                 const SizedBox(width: ElderSpacing.sm),
                 Text(
                   'ElderConnect',

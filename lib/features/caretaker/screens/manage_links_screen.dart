@@ -21,6 +21,7 @@ import '../../../core/constants/elder_spacing.dart';
 import '../../../shared/models/user_model.dart';
 import '../providers/caretaker_mood_provider.dart';
 import '../widgets/caretaker_avatar.dart';
+import '../../../shared/widgets/elder_connect_logo.dart';
 
 const double _kCardRadius = 8.0;
 const double _kConnectionRadius = 16.0;
@@ -28,8 +29,17 @@ const double _kAvatarSize = 64.0;
 const double _kDotSize = 16.0;
 const double _kSmallAvatarSize = 40.0;
 
+// Labels describe who the elder IS to the caretaker (caretaker is typically younger).
 const List<String> _kRelationshipOptions = [
-  'Son', 'Daughter', 'Spouse', 'Friend', 'Professional Carer', 'Other',
+  'Father',
+  'Mother',
+  'Grandfather',
+  'Grandmother',
+  'Spouse / Partner',
+  'Sibling',
+  'Friend',
+  'Professional Client',
+  'Other',
 ];
 
 class ManageLinksScreen extends ConsumerStatefulWidget {
@@ -47,8 +57,13 @@ class _ManageLinksScreenState
 
   final _searchController = TextEditingController();
   final _searchFocus = FocusNode();
-  List<Map<String, dynamic>>? _searchResults;
-  bool _isSearching = false;
+
+  // Preloaded elder roster — filtered locally on every keystroke.
+  List<Map<String, dynamic>> _allElders = [];
+  List<Map<String, dynamic>> _filteredElders = [];
+  Map<String, dynamic>? _selectedElder;
+  bool _loadingElders = true;
+  bool _searchActive = false;
 
   List<Map<String, dynamic>> _pendingLinks = [];
 
@@ -67,6 +82,7 @@ class _ManageLinksScreenState
       ),
     );
     _loadPendingLinks();
+    _loadAllElders();
   }
 
   @override
@@ -100,26 +116,48 @@ class _ManageLinksScreenState
     }
   }
 
-  Future<void> _doSearch() async {
-    final q = _searchController.text.trim();
-    if (q.isEmpty) return;
-    _searchFocus.unfocus();
-    setState(() => _isSearching = true);
+  /// Fetches all elderly users via a SECURITY DEFINER RPC that bypasses the
+  /// users-table RLS (which only lets caretakers read profiles of elders they
+  /// are already linked to — blocking discovery of new elders to link).
+  Future<void> _loadAllElders() async {
     try {
       final rows = await Supabase.instance.client
-          .from('users')
-          .select('id, full_name, phone, avatar_url')
-          .eq('role', 'elderly')
-          .or('full_name.ilike.%$q%,id.ilike.%$q%')
-          .limit(10);
+          .rpc('search_elderly_users', params: {'search_query': ''});
       if (mounted) {
-        setState(() => _searchResults = List<Map<String, dynamic>>.from(rows));
+        setState(() {
+          _allElders = List<Map<String, dynamic>>.from(rows as List);
+          _loadingElders = false;
+        });
       }
-    } catch (_) {
-      if (mounted) setState(() => _searchResults = []);
-    } finally {
-      if (mounted) setState(() => _isSearching = false);
+    } catch (e) {
+      if (mounted) setState(() => _loadingElders = false);
     }
+  }
+
+  /// Filters the preloaded list synchronously — instant, no network round-trip.
+  void _filterElders(String query) {
+    final q = query.toLowerCase().trim();
+    if (q.isEmpty) {
+      setState(() {
+        _filteredElders = [];
+        _searchActive = false;
+        _selectedElder = null;
+      });
+      return;
+    }
+    setState(() {
+      _searchActive = true;
+      _selectedElder = null;
+      _filteredElders = _allElders
+          .where((e) =>
+              (e['full_name'] as String? ?? '').toLowerCase().contains(q))
+          .toList();
+    });
+  }
+
+  void _clearSearch() {
+    _searchController.clear();
+    _filterElders('');
   }
 
   Future<void> _unlink(UserModel elder) async {
@@ -202,13 +240,13 @@ class _ManageLinksScreenState
         'caretaker_id': uid,
         'elderly_user_id': elder['id'] as String,
         'status': 'pending',
+        'requested_by': uid,
       });
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Link request sent to $name')),
         );
-        setState(() => _searchResults = null);
-        _searchController.clear();
+        _clearSearch();
         _loadPendingLinks();
       }
     } catch (e) {
@@ -243,7 +281,11 @@ class _ManageLinksScreenState
         children: [
           CustomScrollView(
             slivers: [
-              const SliverToBoxAdapter(child: SizedBox(height: 72)),
+              SliverToBoxAdapter(
+                child: SizedBox(
+                  height: 72 + MediaQuery.of(context).padding.top,
+                ),
+              ),
               SliverPadding(
                 padding: const EdgeInsets.fromLTRB(
                   ElderSpacing.lg,
@@ -257,8 +299,8 @@ class _ManageLinksScreenState
                     _animated(1, _buildHeroSection()),
                     const SizedBox(height: ElderSpacing.xxl),
 
-                    // Search results (shown only after a search)
-                    if (_searchResults != null) ...[
+                    // Search results (shown while search bar has content)
+                    if (_searchActive) ...[
                       _animated(2, _buildSearchResultsSection()),
                       const SizedBox(height: ElderSpacing.xxl),
                     ],
@@ -311,11 +353,7 @@ class _ManageLinksScreenState
             padding: const EdgeInsets.symmetric(horizontal: ElderSpacing.lg),
             child: Row(
               children: [
-                Image.asset(
-                  'assets/images/elderconnect_logo.png',
-                  width: 32,
-                  height: 32,
-                ),
+                const ElderConnectLogo(size: 32),
                 const SizedBox(width: ElderSpacing.sm),
                 Text(
                   'ElderConnect',
@@ -385,11 +423,18 @@ class _ManageLinksScreenState
                 ),
                 const SizedBox(height: ElderSpacing.xl),
 
-                // Search bar — fixed borders prevent shape change on focus
+                // Search bar — white background for text visibility
                 Container(
                   decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: 0.10),
+                    color: Colors.white,
                     borderRadius: BorderRadius.circular(_kCardRadius),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: 0.08),
+                        blurRadius: 8,
+                        offset: const Offset(0, 2),
+                      ),
+                    ],
                   ),
                   child: Row(
                     children: [
@@ -398,7 +443,7 @@ class _ManageLinksScreenState
                         child: Icon(
                           Icons.person_search_rounded,
                           size: 22,
-                          color: ElderColors.tertiaryFixed,
+                          color: ElderColors.tertiary,
                         ),
                       ),
                       Expanded(
@@ -407,44 +452,53 @@ class _ManageLinksScreenState
                           focusNode: _searchFocus,
                           style: GoogleFonts.plusJakartaSans(
                             fontSize: 16,
-                            color: ElderColors.onTertiary,
+                            color: ElderColors.onSurface,
                           ),
-                          onSubmitted: (_) => _doSearch(),
+                          onChanged: _filterElders,
+                          onSubmitted: (_) => _searchFocus.unfocus(),
                           decoration: InputDecoration(
-                            hintText: 'Search by elder name or ID...',
+                            hintText: 'Search by elder name...',
                             hintStyle: GoogleFonts.plusJakartaSans(
                               fontSize: 16,
-                              color: ElderColors.onTertiary.withValues(alpha: 0.70),
+                              color: ElderColors.onSurfaceVariant,
                             ),
                             border: InputBorder.none,
                             enabledBorder: InputBorder.none,
                             focusedBorder: InputBorder.none,
-                            contentPadding: const EdgeInsets.symmetric(vertical: ElderSpacing.md),
+                            contentPadding: const EdgeInsets.symmetric(
+                              vertical: ElderSpacing.md,
+                            ),
                           ),
                         ),
                       ),
-                      // Search icon button
+                      // Clear button when active, search icon otherwise
                       Semantics(
                         button: true,
-                        label: 'Search',
+                        label: _searchActive ? 'Clear search' : 'Search',
                         child: GestureDetector(
-                          onTap: _doSearch,
+                          onTap: _searchActive
+                              ? _clearSearch
+                              : () => _searchFocus.requestFocus(),
                           child: Container(
                             height: 52,
-                            padding: const EdgeInsets.symmetric(horizontal: ElderSpacing.md),
-                            child: _isSearching
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: ElderSpacing.md,
+                            ),
+                            child: _loadingElders
                                 ? const SizedBox(
-                                    width: 20,
-                                    height: 20,
+                                    width: 18,
+                                    height: 18,
                                     child: CircularProgressIndicator(
-                                      color: ElderColors.tertiaryFixed,
+                                      color: ElderColors.tertiary,
                                       strokeWidth: 2,
                                     ),
                                   )
-                                : const Icon(
-                                    Icons.search_rounded,
+                                : Icon(
+                                    _searchActive
+                                        ? Icons.close_rounded
+                                        : Icons.search_rounded,
                                     size: 22,
-                                    color: ElderColors.tertiaryFixed,
+                                    color: ElderColors.tertiary,
                                   ),
                           ),
                         ),
@@ -463,7 +517,7 @@ class _ManageLinksScreenState
   // ── Search Results ───────────────────────────────────────────────────────────
 
   Widget _buildSearchResultsSection() {
-    final results = _searchResults!;
+    final results = _filteredElders;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -472,7 +526,9 @@ class _ManageLinksScreenState
             const Icon(Icons.search_rounded, size: 20, color: ElderColors.onSurfaceVariant),
             const SizedBox(width: ElderSpacing.sm),
             Text(
-              'SEARCH RESULTS',
+              results.isEmpty
+                  ? 'NO RESULTS'
+                  : '${results.length} RESULT${results.length == 1 ? '' : 'S'}',
               style: GoogleFonts.plusJakartaSans(
                 fontSize: 16,
                 fontWeight: FontWeight.w800,
@@ -483,12 +539,9 @@ class _ManageLinksScreenState
             const Spacer(),
             Semantics(
               button: true,
-              label: 'Clear search results',
+              label: 'Clear search',
               child: GestureDetector(
-                onTap: () => setState(() {
-                  _searchResults = null;
-                  _searchController.clear();
-                }),
+                onTap: _clearSearch,
                 child: const Icon(Icons.close_rounded, size: 20, color: ElderColors.onSurfaceVariant),
               ),
             ),
@@ -507,7 +560,7 @@ class _ManageLinksScreenState
                 const Icon(Icons.search_off_rounded, size: 40, color: ElderColors.outline),
                 const SizedBox(height: ElderSpacing.md),
                 Text(
-                  'No elders found',
+                  'No users found',
                   style: GoogleFonts.plusJakartaSans(
                     fontSize: 18,
                     fontWeight: FontWeight.bold,
@@ -516,7 +569,7 @@ class _ManageLinksScreenState
                 ),
                 const SizedBox(height: ElderSpacing.sm),
                 Text(
-                  'Try searching by their full name or account ID.',
+                  'Try a different name or check the spelling.',
                   style: GoogleFonts.plusJakartaSans(
                     fontSize: 16,
                     color: ElderColors.onSurfaceVariant,
@@ -527,13 +580,20 @@ class _ManageLinksScreenState
             ),
           )
         else
-          ...results.map((elder) => Padding(
-            padding: const EdgeInsets.only(bottom: ElderSpacing.md),
-            child: _SearchResultCard(
-              elder: elder,
-              onLink: () => _sendLinkRequest(elder),
-            ),
-          )),
+          ...results.map((elder) {
+            final isSelected =
+                _selectedElder != null &&
+                _selectedElder!['id'] == elder['id'];
+            return Padding(
+              padding: const EdgeInsets.only(bottom: ElderSpacing.md),
+              child: _SearchResultCard(
+                elder: elder,
+                isSelected: isSelected,
+                onSelect: () => setState(() => _selectedElder = elder),
+                onLink: () => _sendLinkRequest(elder),
+              ),
+            );
+          }),
       ],
     );
   }
@@ -737,9 +797,16 @@ class _EmptyStateCard extends StatelessWidget {
 // ── _SearchResultCard ─────────────────────────────────────────────────────────
 
 class _SearchResultCard extends StatelessWidget {
-  const _SearchResultCard({required this.elder, required this.onLink});
+  const _SearchResultCard({
+    required this.elder,
+    required this.isSelected,
+    required this.onSelect,
+    required this.onLink,
+  });
 
   final Map<String, dynamic> elder;
+  final bool isSelected;
+  final VoidCallback onSelect;
   final VoidCallback onLink;
 
   @override
@@ -751,20 +818,32 @@ class _SearchResultCard extends StatelessWidget {
         ? name.split(' ').map((w) => w.isNotEmpty ? w[0] : '').take(2).join().toUpperCase()
         : '?';
 
-    return Container(
-      padding: const EdgeInsets.all(ElderSpacing.lg),
-      decoration: BoxDecoration(
-        color: ElderColors.surfaceContainerLowest,
-        borderRadius: BorderRadius.circular(_kConnectionRadius),
-        boxShadow: [
-          BoxShadow(
-            color: ElderColors.onSurface.withValues(alpha: 0.06),
-            blurRadius: 15,
-            spreadRadius: -3,
-            offset: const Offset(0, 2),
+    return Semantics(
+      button: true,
+      label: 'Select $name',
+      selected: isSelected,
+      child: GestureDetector(
+        onTap: onSelect,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 150),
+          padding: const EdgeInsets.all(ElderSpacing.lg),
+          decoration: BoxDecoration(
+            color: isSelected
+                ? ElderColors.tertiaryFixed.withValues(alpha: 0.30)
+                : ElderColors.surfaceContainerLowest,
+            borderRadius: BorderRadius.circular(_kConnectionRadius),
+            border: isSelected
+                ? Border.all(color: ElderColors.tertiary, width: 1.5)
+                : null,
+            boxShadow: [
+              BoxShadow(
+                color: ElderColors.onSurface.withValues(alpha: 0.06),
+                blurRadius: 15,
+                spreadRadius: -3,
+                offset: const Offset(0, 2),
+              ),
+            ],
           ),
-        ],
-      ),
       child: Row(
         children: [
           // Avatar
@@ -836,7 +915,9 @@ class _SearchResultCard extends StatelessWidget {
           ),
         ],
       ),
-    );
+        ),   // AnimatedContainer
+      ),     // GestureDetector
+    );       // Semantics
   }
 }
 

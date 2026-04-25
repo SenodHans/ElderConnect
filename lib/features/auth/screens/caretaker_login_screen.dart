@@ -66,6 +66,9 @@ class _CaretakerLoginScreenState
     setState(() { _isLoading = true; _errorMessage = null; });
     try {
       final service = ref.read(authServiceProvider);
+      // Sign out any previous session (e.g. an elder was logged in on this device)
+      // before attempting caretaker sign-in so sessions don't bleed across roles.
+      await service.signOut();
       await service.signInCaretaker(
         email: _emailController.text.trim(),
         password: _passwordController.text,

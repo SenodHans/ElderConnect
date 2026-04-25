@@ -11,11 +11,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../core/constants/elder_colors.dart';
 import '../../../core/constants/elder_spacing.dart';
 import '../../../shared/widgets/elder_connect_logo.dart';
-import '../providers/auth_provider.dart';
 
 class SplashScreen extends ConsumerStatefulWidget {
   const SplashScreen({super.key});
@@ -75,55 +73,15 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
     );
     _progressController.forward();
 
-    // Navigate after 2.5 s. Returning users bypass role-selection.
-    Timer(const Duration(milliseconds: 2500), () async {
+    // Navigate after 2.5 s.
+    // Always lands on the Welcome ("Who are you?") screen so every app open
+    // starts from a clean, known state. Users must re-identify themselves via
+    // PIN (elders) or email/password (caretakers) after each cold start.
+    // Sessions are still persisted internally — the PIN screen restores them —
+    // but we never silently bypass the Welcome screen.
+    Timer(const Duration(milliseconds: 2500), () {
       if (!mounted) return;
-      final client  = Supabase.instance.client;
-      final session = client.auth.currentSession;
-      if (session != null) {
-        // Active session — send to correct portal immediately.
-        final role =
-            client.auth.currentUser?.userMetadata?['role'] as String?;
-        if (role == 'elderly') {
-          if (mounted) context.go('/home/elder');
-        } else if (role == 'caretaker') {
-          if (mounted) context.go('/home/caretaker');
-        } else {
-          if (mounted) context.go('/role-selection');
-        }
-        return;
-      }
-
-      // No active session — check if this is a returning elder whose tokens
-      // are stored in flutter_secure_storage (e.g. after phone restart).
-      final authService = ref.read(authServiceProvider);
-      final pinHash = await authService.getStoredPinHash();
-
-      if (!mounted) return;
-
-      if (pinHash != null) {
-        // Returning elder: tokens exist — try silent session restore first.
-        final restored = await authService.restoreElderSession();
-        if (!mounted) return;
-        if (restored != null) {
-          // Session refreshed successfully — go straight to home.
-          context.go('/home/elder');
-        } else {
-          // Refresh token expired — ask for PIN to re-authenticate.
-          context.go('/elder/pin-login');
-        }
-      } else {
-        // No elder tokens — check if a caretaker was previously signed in
-        // so we route to their login screen rather than role-selection.
-        final lastRole = await authService.getLastRole();
-        if (!mounted) return;
-        if (lastRole == 'caretaker') {
-          context.go('/caretaker/login');
-        } else {
-          // Genuinely new device or first launch.
-          context.go('/role-selection');
-        }
-      }
+      context.go('/role-selection');
     });
   }
 
