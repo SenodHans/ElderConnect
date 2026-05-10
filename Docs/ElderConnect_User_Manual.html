@@ -1,0 +1,1889 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ElderConnect — User Manual</title>
+  <style>
+    /* ── Fonts ──────────────────────────────────────────────────────────── */
+    @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=Lexend:wght@300;400;500;600&display=swap');
+
+    /* ── Design tokens (mirrors ElderColors) ──────────────────────────── */
+    :root {
+      --primary:            #005050;
+      --primary-container:  #006A6A;
+      --primary-fixed:      #A0F0F0;
+      --on-primary:         #FFFFFF;
+      --secondary:          #8E4E00;
+      --secondary-container:#FDA54F;
+      --tertiary:           #004B74;
+      --tertiary-container: #0E6496;
+      --on-tertiary:        #FFFFFF;
+      --error:              #BA1A1A;
+      --surface:            #F8FAF9;
+      --surface-container:  #FFFFFF;
+      --on-surface:         #1A1C1C;
+      --on-surface-variant: #3F4948;
+      --outline:            #6F7978;
+      --outline-variant:    #BEC8C7;
+
+      --radius-sm: 8px;
+      --radius-md: 16px;
+      --radius-lg: 24px;
+      --radius-xl: 32px;
+
+      --shadow-card: 0 2px 12px rgba(0,80,80,0.10);
+      --shadow-elevated: 0 8px 32px rgba(0,80,80,0.14);
+    }
+
+    /* ── Reset ──────────────────────────────────────────────────────────── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    html { scroll-behavior: smooth; font-size: 16px; }
+
+    body {
+      font-family: 'Lexend', system-ui, sans-serif;
+      background: var(--surface);
+      color: var(--on-surface);
+      line-height: 1.7;
+    }
+
+    /* ── Sidebar nav ───────────────────────────────────────────────────── */
+    .sidebar {
+      position: fixed;
+      top: 0; left: 0;
+      width: 260px;
+      height: 100vh;
+      background: linear-gradient(170deg, var(--primary-container) 0%, var(--primary) 100%);
+      padding: 32px 0 24px;
+      overflow-y: auto;
+      z-index: 100;
+      box-shadow: 4px 0 24px rgba(0,0,0,0.15);
+    }
+
+    .sidebar-logo {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 0 24px 28px;
+      border-bottom: 1px solid rgba(255,255,255,0.15);
+    }
+
+    .sidebar-logo-icon {
+      width: 40px; height: 40px;
+      background: rgba(255,255,255,0.20);
+      border-radius: 12px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 20px;
+    }
+
+    .sidebar-logo-text {
+      color: #FFFFFF;
+      font-family: 'Plus Jakarta Sans', sans-serif;
+      font-size: 17px;
+      font-weight: 800;
+      letter-spacing: -0.3px;
+      line-height: 1.2;
+    }
+
+    .sidebar-logo-sub {
+      color: rgba(255,255,255,0.65);
+      font-size: 11px;
+      font-weight: 400;
+      font-family: 'Lexend', sans-serif;
+      letter-spacing: 0.5px;
+      text-transform: uppercase;
+    }
+
+    .nav-section-label {
+      padding: 20px 24px 6px;
+      color: rgba(255,255,255,0.50);
+      font-size: 10px;
+      font-family: 'Plus Jakarta Sans', sans-serif;
+      font-weight: 700;
+      letter-spacing: 1.5px;
+      text-transform: uppercase;
+    }
+
+    .nav-item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 10px 24px;
+      color: rgba(255,255,255,0.75);
+      text-decoration: none;
+      font-size: 14px;
+      font-weight: 500;
+      border-left: 3px solid transparent;
+      transition: all 0.2s;
+    }
+
+    .nav-item:hover {
+      color: #FFFFFF;
+      background: rgba(255,255,255,0.10);
+      border-left-color: rgba(255,255,255,0.5);
+    }
+
+    .nav-item.active {
+      color: #FFFFFF;
+      background: rgba(255,255,255,0.15);
+      border-left-color: var(--primary-fixed);
+    }
+
+    .nav-dot {
+      width: 6px; height: 6px;
+      border-radius: 50%;
+      background: rgba(255,255,255,0.40);
+      flex-shrink: 0;
+    }
+
+    /* ── Main content ───────────────────────────────────────────────────── */
+    .main {
+      margin-left: 260px;
+      min-height: 100vh;
+    }
+
+    /* ── Hero ───────────────────────────────────────────────────────────── */
+    .hero {
+      background: linear-gradient(135deg, var(--primary-container) 0%, var(--primary) 60%, #003838 100%);
+      padding: 72px 64px 80px;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .hero::before {
+      content: '';
+      position: absolute;
+      right: -80px; top: -80px;
+      width: 400px; height: 400px;
+      border-radius: 50%;
+      background: rgba(160,240,240,0.10);
+    }
+
+    .hero::after {
+      content: '';
+      position: absolute;
+      right: 120px; bottom: -100px;
+      width: 280px; height: 280px;
+      border-radius: 50%;
+      background: rgba(255,255,255,0.05);
+    }
+
+    .hero-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      background: rgba(255,255,255,0.15);
+      border: 1px solid rgba(255,255,255,0.25);
+      border-radius: 100px;
+      padding: 6px 16px;
+      color: rgba(255,255,255,0.90);
+      font-size: 12px;
+      font-family: 'Plus Jakarta Sans', sans-serif;
+      font-weight: 600;
+      letter-spacing: 0.5px;
+      margin-bottom: 20px;
+    }
+
+    .hero h1 {
+      font-family: 'Plus Jakarta Sans', sans-serif;
+      font-size: 52px;
+      font-weight: 800;
+      color: #FFFFFF;
+      line-height: 1.1;
+      letter-spacing: -1.5px;
+      margin-bottom: 16px;
+    }
+
+    .hero h1 span {
+      color: var(--primary-fixed);
+    }
+
+    .hero-subtitle {
+      font-size: 18px;
+      color: rgba(255,255,255,0.75);
+      max-width: 520px;
+      margin-bottom: 36px;
+      font-weight: 300;
+    }
+
+    .hero-meta {
+      display: flex;
+      gap: 32px;
+      flex-wrap: wrap;
+    }
+
+    .hero-meta-item {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+
+    .hero-meta-label {
+      font-size: 11px;
+      color: rgba(255,255,255,0.50);
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      font-family: 'Plus Jakarta Sans', sans-serif;
+      font-weight: 600;
+    }
+
+    .hero-meta-value {
+      font-size: 15px;
+      color: rgba(255,255,255,0.90);
+      font-weight: 500;
+    }
+
+    /* ── Sections ───────────────────────────────────────────────────────── */
+    .content {
+      padding: 64px;
+    }
+
+    .section {
+      margin-bottom: 72px;
+    }
+
+    .section-header {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      margin-bottom: 32px;
+      padding-bottom: 20px;
+      border-bottom: 2px solid var(--outline-variant);
+    }
+
+    .section-icon {
+      width: 48px; height: 48px;
+      border-radius: 14px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 22px;
+      flex-shrink: 0;
+    }
+
+    .icon-teal   { background: rgba(0,106,106,0.12); }
+    .icon-amber  { background: rgba(253,165,79,0.18); }
+    .icon-blue   { background: rgba(14,100,150,0.12); }
+    .icon-green  { background: rgba(46,125,50,0.12); }
+    .icon-red    { background: rgba(186,26,26,0.12); }
+    .icon-purple { background: rgba(103,58,183,0.12); }
+
+    .section-title {
+      font-family: 'Plus Jakarta Sans', sans-serif;
+      font-size: 28px;
+      font-weight: 800;
+      color: var(--on-surface);
+      letter-spacing: -0.5px;
+    }
+
+    .section-subtitle {
+      font-size: 15px;
+      color: var(--on-surface-variant);
+      margin-top: 2px;
+    }
+
+    /* ── Intro text ─────────────────────────────────────────────────────── */
+    .intro-text {
+      font-size: 16px;
+      color: var(--on-surface-variant);
+      max-width: 720px;
+      margin-bottom: 28px;
+      line-height: 1.8;
+    }
+
+    /* ── Cards ──────────────────────────────────────────────────────────── */
+    .card-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+      gap: 20px;
+      margin-bottom: 32px;
+    }
+
+    .card {
+      background: var(--surface-container);
+      border: 1px solid var(--outline-variant);
+      border-radius: var(--radius-lg);
+      padding: 24px;
+      box-shadow: var(--shadow-card);
+    }
+
+    .card-icon {
+      font-size: 28px;
+      margin-bottom: 12px;
+      display: block;
+    }
+
+    .card h3 {
+      font-family: 'Plus Jakarta Sans', sans-serif;
+      font-size: 16px;
+      font-weight: 700;
+      color: var(--on-surface);
+      margin-bottom: 6px;
+    }
+
+    .card p {
+      font-size: 14px;
+      color: var(--on-surface-variant);
+      line-height: 1.6;
+    }
+
+    /* ── Feature cards with accent line ─────────────────────────────────── */
+    .feature-card {
+      background: var(--surface-container);
+      border: 1px solid var(--outline-variant);
+      border-radius: var(--radius-lg);
+      padding: 0;
+      overflow: hidden;
+      box-shadow: var(--shadow-card);
+    }
+
+    .feature-card-header {
+      padding: 20px 24px 16px;
+      border-bottom: 1px solid var(--outline-variant);
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .feature-card-body {
+      padding: 20px 24px;
+    }
+
+    .feature-number {
+      width: 32px; height: 32px;
+      border-radius: 10px;
+      background: var(--primary-container);
+      color: var(--on-primary);
+      font-family: 'Plus Jakarta Sans', sans-serif;
+      font-weight: 800;
+      font-size: 14px;
+      display: flex; align-items: center; justify-content: center;
+      flex-shrink: 0;
+    }
+
+    /* ── Step list ──────────────────────────────────────────────────────── */
+    .step-list {
+      list-style: none;
+      counter-reset: steps;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    .step-item {
+      counter-increment: steps;
+      display: flex;
+      gap: 16px;
+      align-items: flex-start;
+    }
+
+    .step-item::before {
+      content: counter(steps);
+      width: 30px; height: 30px;
+      border-radius: 50%;
+      background: var(--primary-container);
+      color: var(--on-primary);
+      font-family: 'Plus Jakarta Sans', sans-serif;
+      font-weight: 800;
+      font-size: 13px;
+      display: flex; align-items: center; justify-content: center;
+      flex-shrink: 0;
+      margin-top: 2px;
+    }
+
+    .step-text {
+      font-size: 15px;
+      color: var(--on-surface);
+      line-height: 1.7;
+    }
+
+    .step-text strong {
+      color: var(--primary-container);
+      font-weight: 700;
+    }
+
+    /* ── Credential table ───────────────────────────────────────────────── */
+    .cred-table-wrapper {
+      border-radius: var(--radius-lg);
+      overflow: hidden;
+      border: 1px solid var(--outline-variant);
+      box-shadow: var(--shadow-card);
+      margin-bottom: 28px;
+    }
+
+    .cred-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 14px;
+    }
+
+    .cred-table thead {
+      background: linear-gradient(90deg, var(--primary-container), var(--primary));
+    }
+
+    .cred-table thead th {
+      padding: 14px 20px;
+      text-align: left;
+      color: var(--on-primary);
+      font-family: 'Plus Jakarta Sans', sans-serif;
+      font-weight: 700;
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+    }
+
+    .cred-table tbody tr {
+      border-bottom: 1px solid var(--outline-variant);
+      transition: background 0.15s;
+    }
+
+    .cred-table tbody tr:last-child {
+      border-bottom: none;
+    }
+
+    .cred-table tbody tr:hover {
+      background: rgba(0,106,106,0.04);
+    }
+
+    .cred-table tbody td {
+      padding: 14px 20px;
+      color: var(--on-surface);
+      vertical-align: middle;
+    }
+
+    .cred-table tbody tr:nth-child(even) td {
+      background: rgba(0,0,0,0.015);
+    }
+
+    .badge {
+      display: inline-block;
+      padding: 3px 10px;
+      border-radius: 100px;
+      font-size: 11px;
+      font-family: 'Plus Jakarta Sans', sans-serif;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .badge-elder     { background: rgba(0,106,106,0.12); color: var(--primary-container); }
+    .badge-caretaker { background: rgba(14,100,150,0.12); color: var(--tertiary-container); }
+
+    .pin-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      background: var(--primary-fixed);
+      color: var(--primary);
+      padding: 4px 12px;
+      border-radius: 8px;
+      font-family: 'Plus Jakarta Sans', sans-serif;
+      font-weight: 800;
+      font-size: 15px;
+      letter-spacing: 3px;
+    }
+
+    .mono {
+      font-family: 'SF Mono', 'Fira Code', monospace;
+      background: rgba(0,0,0,0.06);
+      padding: 2px 7px;
+      border-radius: 6px;
+      font-size: 13px;
+      color: var(--on-surface);
+    }
+
+    /* ── Callout boxes ──────────────────────────────────────────────────── */
+    .callout {
+      border-radius: var(--radius-md);
+      padding: 18px 22px;
+      margin: 24px 0;
+      display: flex;
+      gap: 14px;
+      align-items: flex-start;
+    }
+
+    .callout-icon { font-size: 22px; flex-shrink: 0; margin-top: 1px; }
+
+    .callout-body { flex: 1; }
+
+    .callout-title {
+      font-family: 'Plus Jakarta Sans', sans-serif;
+      font-weight: 700;
+      font-size: 14px;
+      margin-bottom: 4px;
+    }
+
+    .callout-text { font-size: 14px; line-height: 1.6; }
+
+    .callout-info    { background: rgba(0,106,106,0.08); border-left: 4px solid var(--primary-container); }
+    .callout-info    .callout-title { color: var(--primary-container); }
+    .callout-info    .callout-text  { color: var(--on-surface-variant); }
+
+    .callout-warning { background: rgba(253,165,79,0.12); border-left: 4px solid var(--secondary-container); }
+    .callout-warning .callout-title { color: var(--secondary); }
+    .callout-warning .callout-text  { color: var(--on-surface-variant); }
+
+    .callout-success { background: rgba(46,125,50,0.08); border-left: 4px solid #2E7D32; }
+    .callout-success .callout-title { color: #2E7D32; }
+    .callout-success .callout-text  { color: var(--on-surface-variant); }
+
+    .callout-danger  { background: rgba(186,26,26,0.08); border-left: 4px solid var(--error); }
+    .callout-danger  .callout-title { color: var(--error); }
+    .callout-danger  .callout-text  { color: var(--on-surface-variant); }
+
+    /* ── Two-column layout ──────────────────────────────────────────────── */
+    .two-col {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 24px;
+    }
+
+    /* ── Feature grid ───────────────────────────────────────────────────── */
+    .feature-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+      gap: 20px;
+      margin: 24px 0;
+    }
+
+    .feature-item {
+      background: var(--surface-container);
+      border: 1px solid var(--outline-variant);
+      border-radius: var(--radius-md);
+      padding: 20px;
+      display: flex;
+      gap: 14px;
+    }
+
+    .feature-item-icon {
+      width: 44px; height: 44px;
+      border-radius: 12px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 20px;
+      flex-shrink: 0;
+    }
+
+    .feature-item-text h4 {
+      font-family: 'Plus Jakarta Sans', sans-serif;
+      font-weight: 700;
+      font-size: 15px;
+      color: var(--on-surface);
+      margin-bottom: 4px;
+    }
+
+    .feature-item-text p {
+      font-size: 13px;
+      color: var(--on-surface-variant);
+      line-height: 1.5;
+    }
+
+    /* ── Portal header banner ────────────────────────────────────────────── */
+    .portal-banner {
+      border-radius: var(--radius-xl);
+      padding: 32px 36px;
+      margin-bottom: 32px;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .portal-banner-elder {
+      background: linear-gradient(135deg, var(--primary-container) 0%, var(--primary) 100%);
+    }
+
+    .portal-banner-caretaker {
+      background: linear-gradient(135deg, var(--tertiary-container) 0%, var(--tertiary) 100%);
+    }
+
+    .portal-banner::before {
+      content: '';
+      position: absolute;
+      right: -60px; top: -60px;
+      width: 260px; height: 260px;
+      border-radius: 50%;
+      background: rgba(255,255,255,0.08);
+    }
+
+    .portal-banner h2 {
+      font-family: 'Plus Jakarta Sans', sans-serif;
+      font-size: 26px;
+      font-weight: 800;
+      color: #FFFFFF;
+      letter-spacing: -0.5px;
+      margin-bottom: 6px;
+    }
+
+    .portal-banner p {
+      color: rgba(255,255,255,0.75);
+      font-size: 15px;
+    }
+
+    /* ── TOC pills ──────────────────────────────────────────────────────── */
+    .toc-pills {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin: 28px 0;
+    }
+
+    .toc-pill {
+      background: var(--surface-container);
+      border: 1px solid var(--outline-variant);
+      border-radius: 100px;
+      padding: 8px 18px;
+      font-size: 13px;
+      color: var(--primary-container);
+      text-decoration: none;
+      font-weight: 600;
+      font-family: 'Plus Jakarta Sans', sans-serif;
+      transition: all 0.2s;
+    }
+
+    .toc-pill:hover {
+      background: var(--primary-container);
+      color: var(--on-primary);
+      border-color: var(--primary-container);
+    }
+
+    /* ── Divider ────────────────────────────────────────────────────────── */
+    .divider {
+      height: 1px;
+      background: var(--outline-variant);
+      margin: 48px 0;
+    }
+
+    /* ── Footer ─────────────────────────────────────────────────────────── */
+    .footer {
+      background: var(--on-surface);
+      color: rgba(255,255,255,0.5);
+      padding: 40px 64px;
+      font-size: 13px;
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      flex-wrap: wrap;
+      gap: 24px;
+    }
+
+    .footer-brand {
+      font-family: 'Plus Jakarta Sans', sans-serif;
+      font-size: 18px;
+      font-weight: 800;
+      color: #FFFFFF;
+      margin-bottom: 6px;
+    }
+
+    .footer a {
+      color: var(--primary-fixed);
+      text-decoration: none;
+    }
+
+    /* ── Responsive ─────────────────────────────────────────────────────── */
+    @media (max-width: 900px) {
+      .sidebar { display: none; }
+      .main { margin-left: 0; }
+      .hero, .content { padding: 40px 24px; }
+      .hero h1 { font-size: 36px; }
+      .two-col { grid-template-columns: 1fr; }
+      .footer { padding: 32px 24px; }
+    }
+
+    /* ── Print ──────────────────────────────────────────────────────────── */
+    @media print {
+      .sidebar { display: none; }
+      .main { margin-left: 0; }
+    }
+
+    /* ── Anchor scroll offset for fixed sidebar ────────────────────────── */
+    [id] { scroll-margin-top: 24px; }
+
+    /* ── Sub-steps (nested) ─────────────────────────────────────────────── */
+    .substep-list {
+      list-style: none;
+      margin-top: 10px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .substep-list li {
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+      font-size: 14px;
+      color: var(--on-surface-variant);
+      line-height: 1.6;
+    }
+
+    .substep-list li::before {
+      content: '→';
+      color: var(--primary-container);
+      font-weight: 700;
+      flex-shrink: 0;
+    }
+
+    h2.inline-title {
+      font-family: 'Plus Jakarta Sans', sans-serif;
+      font-size: 20px;
+      font-weight: 800;
+      color: var(--on-surface);
+      margin: 28px 0 12px;
+    }
+
+    .tag {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 6px;
+      font-size: 11px;
+      font-weight: 700;
+      font-family: 'Plus Jakarta Sans', sans-serif;
+      text-transform: uppercase;
+    }
+
+    .tag-new  { background: rgba(0,106,106,0.15); color: var(--primary-container); }
+    .tag-ai   { background: rgba(103,58,183,0.12); color: #6A1B9A; }
+    .tag-beta { background: rgba(253,165,79,0.18); color: var(--secondary); }
+  </style>
+</head>
+<body>
+
+<!-- ─────────────────────────────────────────────────────────────────────── -->
+<!-- SIDEBAR -->
+<!-- ─────────────────────────────────────────────────────────────────────── -->
+<nav class="sidebar">
+  <div class="sidebar-logo">
+    <div class="sidebar-logo-icon">🌿</div>
+    <div>
+      <div class="sidebar-logo-text">ElderConnect</div>
+      <div class="sidebar-logo-sub">User Manual</div>
+    </div>
+  </div>
+
+  <div class="nav-section-label">Getting Started</div>
+  <a class="nav-item" href="#overview"><span class="nav-dot"></span> Overview</a>
+  <a class="nav-item" href="#installation"><span class="nav-dot"></span> Installation</a>
+  <a class="nav-item" href="#test-accounts"><span class="nav-dot"></span> Test Accounts</a>
+  <a class="nav-item" href="#first-launch"><span class="nav-dot"></span> First Launch</a>
+
+  <div class="nav-section-label">Elder Portal</div>
+  <a class="nav-item" href="#elder-pin-login"><span class="nav-dot"></span> PIN Login</a>
+  <a class="nav-item" href="#elder-home"><span class="nav-dot"></span> Home Screen</a>
+  <a class="nav-item" href="#elder-feed"><span class="nav-dot"></span> Social Feed</a>
+  <a class="nav-item" href="#elder-games"><span class="nav-dot"></span> Wellness Games</a>
+  <a class="nav-item" href="#elder-medications"><span class="nav-dot"></span> Medications</a>
+  <a class="nav-item" href="#elder-news"><span class="nav-dot"></span> News Feed</a>
+  <a class="nav-item" href="#elder-tts"><span class="nav-dot"></span> Text-to-Speech</a>
+  <a class="nav-item" href="#elder-emergency"><span class="nav-dot"></span> Emergency &amp; SOS</a>
+  <a class="nav-item" href="#elder-profile"><span class="nav-dot"></span> Profile</a>
+
+  <div class="nav-section-label">Caretaker Portal</div>
+  <a class="nav-item" href="#caretaker-login"><span class="nav-dot"></span> Login &amp; Registration</a>
+  <a class="nav-item" href="#caretaker-dashboard"><span class="nav-dot"></span> Dashboard</a>
+  <a class="nav-item" href="#caretaker-medications"><span class="nav-dot"></span> Medication Manager</a>
+  <a class="nav-item" href="#caretaker-mood"><span class="nav-dot"></span> Mood History</a>
+  <a class="nav-item" href="#caretaker-links"><span class="nav-dot"></span> Elder Links</a>
+
+  <div class="nav-section-label">Reference</div>
+  <a class="nav-item" href="#ai-features"><span class="nav-dot"></span> AI Features (MOSAIC)</a>
+  <a class="nav-item" href="#accessibility"><span class="nav-dot"></span> Accessibility</a>
+  <a class="nav-item" href="#troubleshooting"><span class="nav-dot"></span> Troubleshooting</a>
+</nav>
+
+
+<!-- ─────────────────────────────────────────────────────────────────────── -->
+<!-- MAIN -->
+<!-- ─────────────────────────────────────────────────────────────────────── -->
+<main class="main">
+
+  <!-- Hero -->
+  <div class="hero">
+    <div class="hero-badge">📖 &nbsp; Version 1.0 &nbsp;·&nbsp; April 2026</div>
+    <h1>Elder<span>Connect</span><br>User Manual</h1>
+    <p class="hero-subtitle">
+      A complete guide to the Social Engagement and Wellness Platform
+      built for elderly users and their caretakers.
+    </p>
+    <div class="hero-meta">
+      <div class="hero-meta-item">
+        <span class="hero-meta-label">Platform</span>
+        <span class="hero-meta-value">Android (iOS-ready)</span>
+      </div>
+      <div class="hero-meta-item">
+        <span class="hero-meta-label">Student</span>
+        <span class="hero-meta-value">Senod Hansindu Weerathunga</span>
+      </div>
+      <div class="hero-meta-item">
+        <span class="hero-meta-label">Degree</span>
+        <span class="hero-meta-value">BSc (Hons) Computer Science</span>
+      </div>
+      <div class="hero-meta-item">
+        <span class="hero-meta-label">University</span>
+        <span class="hero-meta-value">University of Bedfordshire / SLIIT</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="content">
+
+    <!-- Quick navigation pills -->
+    <div class="toc-pills">
+      <a class="toc-pill" href="#overview">Overview</a>
+      <a class="toc-pill" href="#test-accounts">Test Accounts</a>
+      <a class="toc-pill" href="#elder-pin-login">Elder Login</a>
+      <a class="toc-pill" href="#elder-home">Elder Home</a>
+      <a class="toc-pill" href="#caretaker-login">Caretaker Login</a>
+      <a class="toc-pill" href="#caretaker-dashboard">Dashboard</a>
+      <a class="toc-pill" href="#ai-features">AI Features</a>
+      <a class="toc-pill" href="#troubleshooting">Troubleshooting</a>
+    </div>
+
+    <!-- ── OVERVIEW ───────────────────────────────────────────────────── -->
+    <section class="section" id="overview">
+      <div class="section-header">
+        <div class="section-icon icon-teal">🌿</div>
+        <div>
+          <h2 class="section-title">What Is ElderConnect?</h2>
+          <p class="section-subtitle">Project overview and dual-portal architecture</p>
+        </div>
+      </div>
+
+      <p class="intro-text">
+        ElderConnect is a cross-platform mobile application designed for elderly users aged 60 and above.
+        It combines social connection, AI-powered mood detection, personalised news, health management,
+        and a caretaker monitoring dashboard — all in one app with an elderly-first accessible design.
+      </p>
+
+      <div class="two-col">
+        <div class="portal-banner portal-banner-elder">
+          <h2>🏠 Elder Portal</h2>
+          <p>Simplified interface designed for zero digital literacy. Accessible by 4-digit PIN only — no email, no password to remember.</p>
+        </div>
+        <div class="portal-banner portal-banner-caretaker">
+          <h2>👨‍⚕️ Caretaker Portal</h2>
+          <p>Full monitoring dashboard. Manage medications, view mood trends, receive alerts, and manage elder links.</p>
+        </div>
+      </div>
+
+      <div class="card-grid">
+        <div class="card">
+          <span class="card-icon">🧠</span>
+          <h3>AI Mood Detection</h3>
+          <p>MOSAIC engine analyses elder posts using Hugging Face NLP and tracks mood trends over 7 days.</p>
+        </div>
+        <div class="card">
+          <span class="card-icon">💊</span>
+          <h3>Medication Reminders</h3>
+          <p>Caretakers set schedules; elders confirm or miss doses with one tap. Logged for the caretaker.</p>
+        </div>
+        <div class="card">
+          <span class="card-icon">📰</span>
+          <h3>Personalised News</h3>
+          <p>Articles filtered by each elder's interests (cricket, gardening, music etc.) and current mood.</p>
+        </div>
+        <div class="card">
+          <span class="card-icon">🎮</span>
+          <h3>Wellness Games</h3>
+          <p>Memory, trivia, and relaxation games. Scores are tracked and contribute to the activity summary.</p>
+        </div>
+        <div class="card">
+          <span class="card-icon">🆘</span>
+          <h3>Emergency Button</h3>
+          <p>One-tap emergency contact — always visible. Separate high-visibility SOS for real emergencies.</p>
+        </div>
+        <div class="card">
+          <span class="card-icon">🔊</span>
+          <h3>Text-to-Speech</h3>
+          <p>Reads feed content and news articles aloud for visually impaired elders.</p>
+        </div>
+      </div>
+    </section>
+
+    <div class="divider"></div>
+
+    <!-- ── INSTALLATION ───────────────────────────────────────────────── -->
+    <section class="section" id="installation">
+      <div class="section-header">
+        <div class="section-icon icon-teal">📲</div>
+        <div>
+          <h2 class="section-title">Installation</h2>
+          <p class="section-subtitle">Installing the app on an Android device</p>
+        </div>
+      </div>
+
+      <p class="intro-text">The app is distributed as a pre-built APK. No Play Store listing is required for testing.</p>
+
+      <ol class="step-list">
+        <li>
+          <div class="step-text">
+            <strong>Enable Unknown Sources.</strong> On the Android device, go to
+            <em>Settings → Apps → Special App Access → Install Unknown Apps</em>
+            and allow your file manager or browser.
+          </div>
+        </li>
+        <li>
+          <div class="step-text">
+            <strong>Transfer the APK.</strong> Copy <span class="mono">app-release.apk</span>
+            to the device via USB, Google Drive, or email.
+          </div>
+        </li>
+        <li>
+          <div class="step-text">
+            <strong>Install.</strong> Open the APK from your file manager and tap
+            <strong>Install</strong>. The app icon labelled <em>ElderConnect</em> will appear on the home screen.
+          </div>
+        </li>
+        <li>
+          <div class="step-text">
+            <strong>Grant permissions.</strong> On first launch the app requests
+            microphone (Talk Button) and notification (medication reminders) permissions.
+            Tap <strong>Allow</strong> for both.
+          </div>
+        </li>
+      </ol>
+
+      <div class="callout callout-info" style="margin-top:24px">
+        <span class="callout-icon">ℹ️</span>
+        <div class="callout-body">
+          <div class="callout-title">Internet Required</div>
+          <div class="callout-text">ElderConnect requires an active internet connection. All data is stored in the cloud (Supabase). PIN login and feed content will not work offline.</div>
+        </div>
+      </div>
+    </section>
+
+    <div class="divider"></div>
+
+    <!-- ── TEST ACCOUNTS ─────────────────────────────────────────────── -->
+    <section class="section" id="test-accounts">
+      <div class="section-header">
+        <div class="section-icon icon-teal">🔑</div>
+        <div>
+          <h2 class="section-title">Test Accounts</h2>
+          <p class="section-subtitle">All pre-seeded accounts for demonstration and testing</p>
+        </div>
+      </div>
+
+      <h2 class="inline-title">👴 Elder Accounts — PIN Login</h2>
+      <p class="intro-text" style="margin-bottom:16px">
+        Elders log in using a 4-digit PIN only. Enter the PIN on the Elder PIN Login screen. No email or password is needed.
+      </p>
+
+      <div class="cred-table-wrapper">
+        <table class="cred-table">
+          <thead>
+            <tr>
+              <th>Name</th>
+              <th>PIN</th>
+              <th>Interests</th>
+              <th>Linked To</th>
+              <th>Has Medications</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><strong>Pawan Perera</strong></td>
+              <td><span class="pin-chip">1234</span></td>
+              <td>News, Cricket, Gardening</td>
+              <td>Anusha Perera</td>
+              <td>✅ Yes</td>
+            </tr>
+            <tr>
+              <td><strong>Nimal Silva</strong></td>
+              <td><span class="pin-chip">2345</span></td>
+              <td>Music, Cricket, News</td>
+              <td>Anusha Perera</td>
+              <td>✅ Yes</td>
+            </tr>
+            <tr>
+              <td><strong>Sunil Fernando</strong></td>
+              <td><span class="pin-chip">3456</span></td>
+              <td>Sports, News, Gardening</td>
+              <td>Dilan Fernando</td>
+              <td>✅ Yes</td>
+            </tr>
+            <tr>
+              <td><strong>Kamal Jayasinghe</strong></td>
+              <td><span class="pin-chip">4567</span></td>
+              <td>News, Politics, Cricket</td>
+              <td>Dilan Fernando</td>
+              <td>✅ Yes</td>
+            </tr>
+            <tr>
+              <td><strong>Somawathi Perera</strong></td>
+              <td><span class="pin-chip">5678</span></td>
+              <td>Religion, Cooking, Gardening</td>
+              <td>Rashmi Silva</td>
+              <td>✅ Yes</td>
+            </tr>
+            <tr>
+              <td><strong>Kusum Wijeratne</strong></td>
+              <td><span class="pin-chip">6789</span></td>
+              <td>Music, Hobbies, News</td>
+              <td>Rashmi Silva</td>
+              <td>✅ Yes</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h2 class="inline-title">👨‍⚕️ Caretaker Accounts — Email &amp; Password</h2>
+      <p class="intro-text" style="margin-bottom:16px">
+        Caretakers log in with email and password from the Caretaker Login screen.
+      </p>
+
+      <div class="cred-table-wrapper">
+        <table class="cred-table">
+          <thead>
+            <tr>
+              <th>Name</th>
+              <th>Email</th>
+              <th>Password</th>
+              <th>Linked Elders</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><strong>Anusha Perera</strong></td>
+              <td><span class="mono">anusha.perera@gmail.com</span></td>
+              <td><span class="mono">Anusha@2024</span></td>
+              <td>Pawan, Nimal</td>
+            </tr>
+            <tr>
+              <td><strong>Dilan Fernando</strong></td>
+              <td><span class="mono">dilan.fernando@gmail.com</span></td>
+              <td><span class="mono">Dilan@2024</span></td>
+              <td>Sunil, Kamal</td>
+            </tr>
+            <tr>
+              <td><strong>Rashmi Silva</strong></td>
+              <td><span class="mono">rashmi.silva@gmail.com</span></td>
+              <td><span class="mono">Rashmi@2024</span></td>
+              <td>Somawathi, Kusum</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="callout callout-warning">
+        <span class="callout-icon">⚠️</span>
+        <div class="callout-body">
+          <div class="callout-title">Session Persistence</div>
+          <div class="callout-text">After first PIN entry, elder sessions are saved on the device. On subsequent opens, elders land directly on the home screen without needing to re-enter their PIN. Uninstalling the app clears the session.</div>
+        </div>
+      </div>
+    </section>
+
+    <div class="divider"></div>
+
+    <!-- ── FIRST LAUNCH ──────────────────────────────────────────────── -->
+    <section class="section" id="first-launch">
+      <div class="section-header">
+        <div class="section-icon icon-teal">🚀</div>
+        <div>
+          <h2 class="section-title">First Launch</h2>
+          <p class="section-subtitle">Splash screen and role selection flow</p>
+        </div>
+      </div>
+
+      <ol class="step-list">
+        <li>
+          <div class="step-text">
+            App opens to an animated <strong>Splash Screen</strong>.
+            After ~2 seconds it auto-navigates based on any stored session.
+          </div>
+        </li>
+        <li>
+          <div class="step-text">
+            If no saved session is found, the <strong>Role Selection</strong> screen appears.
+            Tap <em>"I am an Elder"</em> or <em>"I am a Caretaker / Family Member"</em>.
+          </div>
+        </li>
+        <li>
+          <div class="step-text">
+            If a previous session exists (e.g. already logged in as Pawan), the app
+            goes directly to the appropriate home screen — skipping login entirely.
+          </div>
+        </li>
+      </ol>
+    </section>
+
+    <div class="divider"></div>
+
+    <!-- ══════════════════════════════════════════════════════════════════ -->
+    <!-- ELDER PORTAL                                                      -->
+    <!-- ══════════════════════════════════════════════════════════════════ -->
+    <div class="portal-banner portal-banner-elder" style="margin-bottom:48px">
+      <h2>🏠 Elder Portal</h2>
+      <p>All screens and features accessible to elderly users.</p>
+    </div>
+
+    <!-- ── ELDER PIN LOGIN ───────────────────────────────────────────── -->
+    <section class="section" id="elder-pin-login">
+      <div class="section-header">
+        <div class="section-icon icon-teal">🔐</div>
+        <div>
+          <h2 class="section-title">PIN Login</h2>
+          <p class="section-subtitle">Elder authentication with 4-digit PIN</p>
+        </div>
+      </div>
+
+      <p class="intro-text">
+        Elders never type an email or password. Login is a single 4-digit PIN.
+        The PIN is matched against a secure bcrypt hash stored in the database.
+      </p>
+
+      <ol class="step-list">
+        <li>
+          <div class="step-text">
+            On the Role Selection screen tap <strong>"I am an Elder"</strong>.
+          </div>
+        </li>
+        <li>
+          <div class="step-text">
+            The <strong>Elder PIN Login</strong> screen shows 10 large tap-target digit buttons.
+            Tap your 4-digit PIN. The dots fill in as you tap.
+          </div>
+        </li>
+        <li>
+          <div class="step-text">
+            After 4 digits are entered, the app automatically verifies — no submit button to press.
+            A loading indicator appears briefly.
+          </div>
+        </li>
+        <li>
+          <div class="step-text">
+            On success, the app navigates to the <strong>Elder Home Screen</strong> and saves
+            the session locally. Future opens skip this step.
+          </div>
+        </li>
+      </ol>
+
+      <div class="callout callout-info">
+        <span class="callout-icon">💡</span>
+        <div class="callout-body">
+          <div class="callout-title">Wrong PIN</div>
+          <div class="callout-text">If the PIN is wrong, the dots shake and reset. The elder can try again immediately. There is no lock-out during testing. Tap "Need Help" at the bottom to contact a caretaker.</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ── ELDER HOME ────────────────────────────────────────────────── -->
+    <section class="section" id="elder-home">
+      <div class="section-header">
+        <div class="section-icon icon-teal">🏠</div>
+        <div>
+          <h2 class="section-title">Home Screen</h2>
+          <p class="section-subtitle">Elder dashboard — the main hub</p>
+        </div>
+      </div>
+
+      <p class="intro-text">
+        The Home Screen is the elder's daily landing page. It shows a personalised greeting, the current date, medication reminders, a mood card, connect prompt, emergency access, and a wellness tip.
+      </p>
+
+      <div class="feature-grid">
+        <div class="feature-item">
+          <div class="feature-item-icon icon-teal">👋</div>
+          <div class="feature-item-text">
+            <h4>Greeting Section</h4>
+            <p>Shows "Good Morning/Afternoon/Evening, [Name]!" and today's real date (e.g. Saturday, 25 April 2026).</p>
+          </div>
+        </div>
+        <div class="feature-item">
+          <div class="feature-item-icon icon-amber">💊</div>
+          <div class="feature-item-text">
+            <h4>Medical Reminder Card</h4>
+            <p>Lists all active medications. Each has a YES, I TOOK IT and NO, I DIDN'T button. Both responses are logged for the caretaker.</p>
+          </div>
+        </div>
+        <div class="feature-item">
+          <div class="feature-item-icon icon-teal">😊</div>
+          <div class="feature-item-text">
+            <h4>Mood Card</h4>
+            <p>Displays the latest detected mood with emoji. Derived from AI analysis of the elder's recent posts.</p>
+          </div>
+        </div>
+        <div class="feature-item">
+          <div class="feature-item-icon icon-amber">👥</div>
+          <div class="feature-item-text">
+            <h4>Connect Card</h4>
+            <p>Quick access to the social feed and a prompt to share something with friends and family.</p>
+          </div>
+        </div>
+        <div class="feature-item">
+          <div class="feature-item-icon icon-red">🆘</div>
+          <div class="feature-item-text">
+            <h4>Emergency Section</h4>
+            <p>Emergency Dial (amber) contacts the linked caretaker. SOS button (red) for serious emergencies.</p>
+          </div>
+        </div>
+        <div class="feature-item">
+          <div class="feature-item-icon icon-green">💡</div>
+          <div class="feature-item-text">
+            <h4>Wellness Tip</h4>
+            <p>A rotating daily tip from the wellness library — breathing, hydration, gratitude etc.</p>
+          </div>
+        </div>
+      </div>
+
+      <h2 class="inline-title">Bottom Navigation</h2>
+      <p class="intro-text">Four tabs at the bottom:</p>
+      <div class="cred-table-wrapper">
+        <table class="cred-table">
+          <thead>
+            <tr><th>Tab</th><th>Icon</th><th>What It Does</th><th>Shows When</th></tr>
+          </thead>
+          <tbody>
+            <tr><td><strong>Home</strong></td><td>🏠</td><td>Returns to the home dashboard</td><td>Always</td></tr>
+            <tr><td><strong>Feed</strong></td><td>📄</td><td>Social feed + news articles</td><td>Always</td></tr>
+            <tr><td><strong>Games</strong></td><td>🎮</td><td>Wellness games selection</td><td>Always</td></tr>
+            <tr><td><strong>Medication</strong></td><td>💊</td><td>Full medication schedule &amp; history</td><td>Only when caretaker has added medications</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="callout callout-info">
+        <span class="callout-icon">👤</span>
+        <div class="callout-body">
+          <div class="callout-title">Profile Access</div>
+          <div class="callout-text">Tap the circular avatar in the top-right corner of the app bar to access the Elder Profile screen. It is NOT a bottom nav tab.</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ── ELDER FEED ────────────────────────────────────────────────── -->
+    <section class="section" id="elder-feed">
+      <div class="section-header">
+        <div class="section-icon icon-teal">📰</div>
+        <div>
+          <h2 class="section-title">Social Feed</h2>
+          <p class="section-subtitle">Share posts, photos, and voice messages</p>
+        </div>
+      </div>
+
+      <p class="intro-text">
+        The Feed tab shows posts from the elder and their linked family/caretaker network, alongside personalised news articles.
+      </p>
+
+      <h2 class="inline-title">Posting</h2>
+      <ol class="step-list">
+        <li><div class="step-text">Tap the large <strong>compose button</strong> (pencil icon, bottom right).</div></li>
+        <li><div class="step-text">Type a message in the text field. The font size is large (18sp) for easy reading.</div></li>
+        <li><div class="step-text">Optionally tap the <strong>photo icon</strong> to attach an image from the gallery or camera.</div></li>
+        <li><div class="step-text">Tap <strong>Post</strong>. The post appears in the feed and is analysed by the MOSAIC AI for mood.</div></li>
+      </ol>
+
+      <h2 class="inline-title">Voice Messages (Talk Button)</h2>
+      <ol class="step-list">
+        <li><div class="step-text">Tap and <strong>hold</strong> the microphone button.</div></li>
+        <li><div class="step-text">Speak your message. Release to send.</div></li>
+        <li><div class="step-text">Audio is stored and playable by recipients. Voice is <strong>not</strong> processed by mood AI.</div></li>
+      </ol>
+
+      <div class="callout callout-success">
+        <span class="callout-icon">🧠</span>
+        <div class="callout-body">
+          <div class="callout-title">AI Mood Analysis</div>
+          <div class="callout-text">Every text post is automatically analysed by the Hugging Face NLP model. The mood result (POSITIVE / NEUTRAL / NEGATIVE) is stored and visible to the caretaker on their Mood History page — only if the elder has consented.</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ── ELDER GAMES ───────────────────────────────────────────────── -->
+    <section class="section" id="elder-games">
+      <div class="section-header">
+        <div class="section-icon icon-green">🎮</div>
+        <div>
+          <h2 class="section-title">Wellness Games</h2>
+          <p class="section-subtitle">Memory, trivia, and relaxation activities</p>
+        </div>
+      </div>
+
+      <p class="intro-text">Tap the Games tab to access four wellness activities. Scores are saved to the wellness log and visible to the caretaker on their dashboard.</p>
+
+      <div class="card-grid">
+        <div class="card">
+          <span class="card-icon">🧩</span>
+          <h3>Memory Match</h3>
+          <p>Flip cards and match pairs. Trains short-term memory. Score is time-based.</p>
+        </div>
+        <div class="card">
+          <span class="card-icon">❓</span>
+          <h3>Daily Trivia</h3>
+          <p>General knowledge questions with large tap targets. 10 questions per session.</p>
+        </div>
+        <div class="card">
+          <span class="card-icon">🌬️</span>
+          <h3>Breathing Exercise</h3>
+          <p>Animated breathing guide — inhale, hold, exhale. Tracks completed sessions.</p>
+        </div>
+        <div class="card">
+          <span class="card-icon">🧘</span>
+          <h3>Relaxation</h3>
+          <p>Guided relaxation prompts with background soundscapes.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- ── ELDER MEDICATIONS ─────────────────────────────────────────── -->
+    <section class="section" id="elder-medications">
+      <div class="section-header">
+        <div class="section-icon icon-amber">💊</div>
+        <div>
+          <h2 class="section-title">Medications Tab</h2>
+          <p class="section-subtitle">View schedule and confirm doses</p>
+        </div>
+      </div>
+
+      <p class="intro-text">
+        The Medications tab only appears in the bottom nav when a caretaker has added at least one medication for this elder. It has two sections.
+      </p>
+
+      <div class="two-col">
+        <div class="card">
+          <span class="card-icon">📋</span>
+          <h3>My Medications</h3>
+          <p>Lists all active medications assigned by the caretaker — pill name, colour, and dosage. Read-only; managed by caretaker.</p>
+        </div>
+        <div class="card">
+          <span class="card-icon">⏰</span>
+          <h3>Up Next &amp; History</h3>
+          <p>Shows the next scheduled dose and a history of taken/missed logs. Logs are created automatically by the server at scheduled times.</p>
+        </div>
+      </div>
+
+      <div class="callout callout-info">
+        <span class="callout-icon">🏠</span>
+        <div class="callout-body">
+          <div class="callout-title">Home Screen Card vs Medications Tab</div>
+          <div class="callout-text">The <strong>Medical Reminder Card</strong> on the home screen is a daily check-in for all medications — elder taps YES or NO to log the response. The <strong>Medications Tab</strong> shows the complete schedule and full history.</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ── ELDER NEWS ────────────────────────────────────────────────── -->
+    <section class="section" id="elder-news">
+      <div class="section-header">
+        <div class="section-icon icon-blue">📰</div>
+        <div>
+          <h2 class="section-title">News Feed</h2>
+          <p class="section-subtitle">Personalised articles based on interests and mood</p>
+        </div>
+      </div>
+
+      <p class="intro-text">
+        News articles appear in the Feed tab below the social posts. Articles are fetched from NewsAPI.org and filtered by each elder's interest tags set at registration.
+      </p>
+
+      <ol class="step-list">
+        <li><div class="step-text">Scroll down in the Feed tab to see article cards.</div></li>
+        <li><div class="step-text">Tap any article card to open a <strong>bottom sheet reader</strong> with font size optimised for elders.</div></li>
+        <li><div class="step-text">Tap the <strong>speaker icon</strong> to have the article read aloud using text-to-speech.</div></li>
+        <li><div class="step-text">Tap <strong>Read Full Article</strong> to open the original source in a browser tab within the app.</div></li>
+        <li><div class="step-text">The feed <strong>infinite-scrolls</strong> — keep scrolling past articles to load more (10 per page).</div></li>
+      </ol>
+    </section>
+
+    <!-- ── ELDER TTS ─────────────────────────────────────────────────── -->
+    <section class="section" id="elder-tts">
+      <div class="section-header">
+        <div class="section-icon icon-teal">🔊</div>
+        <div>
+          <h2 class="section-title">Text-to-Speech</h2>
+          <p class="section-subtitle">Audio reading for visually impaired elders</p>
+        </div>
+      </div>
+
+      <p class="intro-text">
+        TTS is controlled per-elder from their profile. When enabled, a speaker icon appears on posts and news cards.
+      </p>
+
+      <ol class="step-list">
+        <li><div class="step-text">Go to <strong>Profile</strong> (avatar in top-right).</div></li>
+        <li><div class="step-text">Toggle <strong>"Read content aloud (Text-to-Speech)"</strong> to ON.</div></li>
+        <li><div class="step-text">Return to the Feed. Each post and article card now shows a <strong>🔊 speaker button</strong>.</div></li>
+        <li><div class="step-text">Tap the speaker button to hear the content read aloud. Tap again to stop.</div></li>
+      </ol>
+    </section>
+
+    <!-- ── ELDER EMERGENCY ───────────────────────────────────────────── -->
+    <section class="section" id="elder-emergency">
+      <div class="section-header">
+        <div class="section-icon icon-red">🆘</div>
+        <div>
+          <h2 class="section-title">Emergency &amp; SOS</h2>
+          <p class="section-subtitle">One-tap emergency contact system</p>
+        </div>
+      </div>
+
+      <div class="callout callout-danger">
+        <span class="callout-icon">🚨</span>
+        <div class="callout-body">
+          <div class="callout-title">Emergency Features Are Live</div>
+          <div class="callout-text">The Emergency Dial and SOS button trigger real notifications to the linked caretaker's device. Use with caution during demos.</div>
+        </div>
+      </div>
+
+      <div class="two-col" style="margin-top:20px">
+        <div class="card">
+          <span class="card-icon">📞</span>
+          <h3>Emergency Dial (Amber)</h3>
+          <p>Calls or messages the linked caretaker. Displayed as a warm amber button. Use for non-critical situations like needing assistance.</p>
+        </div>
+        <div class="card" style="border: 2px solid rgba(186,26,26,0.3)">
+          <span class="card-icon">🆘</span>
+          <h3>SOS Button (Red)</h3>
+          <p>Reserved for genuine emergencies only. Sends an urgent FCM alert to all linked caretakers. Red colour distinguishes this from the general emergency button.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- ── ELDER PROFILE ─────────────────────────────────────────────── -->
+    <section class="section" id="elder-profile">
+      <div class="section-header">
+        <div class="section-icon icon-teal">👤</div>
+        <div>
+          <h2 class="section-title">Profile</h2>
+          <p class="section-subtitle">View and edit elder's personal settings</p>
+        </div>
+      </div>
+
+      <p class="intro-text">Access by tapping the avatar circle in the top-right of the app bar.</p>
+
+      <ul class="substep-list" style="font-size:15px; margin-top:0">
+        <li>View name, date of birth, and profile photo</li>
+        <li>Update interest tags (affects news feed personalisation)</li>
+        <li>Toggle Text-to-Speech on or off</li>
+        <li>View mood sharing consent status</li>
+        <li>Sign out (returns to Role Selection screen)</li>
+      </ul>
+    </section>
+
+    <div class="divider"></div>
+
+    <!-- ══════════════════════════════════════════════════════════════════ -->
+    <!-- CARETAKER PORTAL                                                  -->
+    <!-- ══════════════════════════════════════════════════════════════════ -->
+    <div class="portal-banner portal-banner-caretaker" style="margin-bottom:48px">
+      <h2>👨‍⚕️ Caretaker Portal</h2>
+      <p>All screens and features accessible to caretakers and family members.</p>
+    </div>
+
+    <!-- ── CARETAKER LOGIN ───────────────────────────────────────────── -->
+    <section class="section" id="caretaker-login">
+      <div class="section-header">
+        <div class="section-icon icon-blue">🔑</div>
+        <div>
+          <h2 class="section-title">Login &amp; Registration</h2>
+          <p class="section-subtitle">Caretaker email/password authentication</p>
+        </div>
+      </div>
+
+      <h2 class="inline-title">Logging In (Existing Account)</h2>
+      <ol class="step-list">
+        <li><div class="step-text">On Role Selection tap <strong>"I am a Caretaker / Family Member"</strong>.</div></li>
+        <li><div class="step-text">Enter your <strong>email address</strong> and <strong>password</strong>.</div></li>
+        <li><div class="step-text">Tap <strong>Sign In</strong>. You are taken to the Caretaker Dashboard.</div></li>
+      </ol>
+
+      <h2 class="inline-title">Creating a New Account</h2>
+      <ol class="step-list">
+        <li><div class="step-text">On the Login screen tap <strong>"Create Account"</strong>.</div></li>
+        <li><div class="step-text">Enter your full name, email address, phone number, and a password.</div></li>
+        <li><div class="step-text">Tap <strong>Register</strong>. You are taken to the dashboard immediately — no email confirmation required for testing.</div></li>
+      </ol>
+    </section>
+
+    <!-- ── CARETAKER DASHBOARD ───────────────────────────────────────── -->
+    <section class="section" id="caretaker-dashboard">
+      <div class="section-header">
+        <div class="section-icon icon-blue">📊</div>
+        <div>
+          <h2 class="section-title">Caretaker Dashboard</h2>
+          <p class="section-subtitle">Live overview of all linked elders</p>
+        </div>
+      </div>
+
+      <p class="intro-text">
+        The Dashboard (Tab 1) shows a priority alert card and a scrollable list of cards for each linked elder. All data updates in real-time.
+      </p>
+
+      <div class="feature-grid">
+        <div class="feature-item">
+          <div class="feature-item-icon icon-blue">🚨</div>
+          <div class="feature-item-text">
+            <h4>Priority Alert Card</h4>
+            <p>Highlights any elder with a WARNING or URGENT mood state. Tapping navigates to their mood history.</p>
+          </div>
+        </div>
+        <div class="feature-item">
+          <div class="feature-item-icon icon-teal">👴</div>
+          <div class="feature-item-text">
+            <h4>Elder Summary Cards</h4>
+            <p>One card per linked elder showing mood status, latest post, activity count, and medication adherence today.</p>
+          </div>
+        </div>
+        <div class="feature-item">
+          <div class="feature-item-icon icon-green">📈</div>
+          <div class="feature-item-text">
+            <h4>Activity Stats</h4>
+            <p>Posts created, games played, and medications taken — all for the current day.</p>
+          </div>
+        </div>
+        <div class="feature-item">
+          <div class="feature-item-icon icon-amber">🔔</div>
+          <div class="feature-item-text">
+            <h4>Push Notifications</h4>
+            <p>FCM alerts arrive when: medication is missed, mood deteriorates, or an SOS is triggered.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ── CARETAKER MEDICATIONS ─────────────────────────────────────── -->
+    <section class="section" id="caretaker-medications">
+      <div class="section-header">
+        <div class="section-icon icon-amber">💊</div>
+        <div>
+          <h2 class="section-title">Medication Manager</h2>
+          <p class="section-subtitle">Add and manage medications for linked elders</p>
+        </div>
+      </div>
+
+      <p class="intro-text">The Medications tab (Tab 2) lets caretakers add, edit, and deactivate medications for any linked elder.</p>
+
+      <h2 class="inline-title">Adding a New Medication</h2>
+      <ol class="step-list">
+        <li><div class="step-text">Tap the <strong>+ Add Medication</strong> button.</div></li>
+        <li><div class="step-text">Select the <strong>elder</strong> from the dropdown.</div></li>
+        <li><div class="step-text">Enter: <strong>Pill name</strong> (e.g. Metformin), <strong>dosage</strong> (e.g. 500mg), and <strong>pill colour</strong>.</div></li>
+        <li><div class="step-text">Add one or more <strong>reminder times</strong> (e.g. 08:00, 20:00).</div></li>
+        <li><div class="step-text">Tap <strong>Save</strong>. The medication immediately appears in the elder's app on their home screen and Medications tab.</div></li>
+      </ol>
+
+      <div class="callout callout-success">
+        <span class="callout-icon">✅</span>
+        <div class="callout-body">
+          <div class="callout-title">Instant Sync</div>
+          <div class="callout-text">Medications use Supabase Realtime. As soon as you save, the elder's app updates — no refresh needed.</div>
+        </div>
+      </div>
+
+      <h2 class="inline-title">Medication Log</h2>
+      <p class="intro-text">
+        Each reminder time creates a <em>medication log entry</em> when the scheduled time passes.
+        The elder's YES/NO response updates the log to <em>taken</em> or <em>missed</em>.
+        You can view the full history per elder in the Medications tab.
+      </p>
+    </section>
+
+    <!-- ── CARETAKER MOOD ────────────────────────────────────────────── -->
+    <section class="section" id="caretaker-mood">
+      <div class="section-header">
+        <div class="section-icon icon-purple">📉</div>
+        <div>
+          <h2 class="section-title">Mood History</h2>
+          <p class="section-subtitle">View 7-day mood chart and activity summary</p>
+        </div>
+      </div>
+
+      <p class="intro-text">
+        The Mood History tab (Tab 3) shows a bar chart of the elder's mood intensity over the last 7 days, their recent posts, and activity summary.
+      </p>
+
+      <div class="callout callout-info">
+        <span class="callout-icon">🔒</span>
+        <div class="callout-body">
+          <div class="callout-title">Consent Required</div>
+          <div class="callout-text">Mood data is only visible here if the elder has <strong>mood_sharing_consent = true</strong> on their profile. All 6 test elders have consent enabled.</div>
+        </div>
+      </div>
+
+      <ul class="substep-list" style="font-size:15px; margin:16px 0">
+        <li>Use the <strong>elder selector</strong> at the top to switch between linked elders</li>
+        <li>The <strong>7-day bar chart</strong> shows mood intensity (0.0–1.0) per day</li>
+        <li>Below the chart: <strong>Recent Posts</strong> from this elder</li>
+        <li>Activity summary: posts, games, and medication adherence for the past 7 days</li>
+        <li>Alert state badge: STABLE (green) / WARNING (amber) / URGENT (red)</li>
+      </ul>
+    </section>
+
+    <!-- ── CARETAKER LINKS ────────────────────────────────────────────── -->
+    <section class="section" id="caretaker-links">
+      <div class="section-header">
+        <div class="section-icon icon-blue">🔗</div>
+        <div>
+          <h2 class="section-title">Linking Elders</h2>
+          <p class="section-subtitle">Search and link new elderly users to your account</p>
+        </div>
+      </div>
+
+      <p class="intro-text">
+        Without a link, a caretaker cannot see any elder's data. Links are managed from the Settings tab (Tab 4) in the caretaker portal.
+      </p>
+
+      <h2 class="inline-title">Searching for an Elder</h2>
+      <ol class="step-list">
+        <li><div class="step-text">Go to <strong>Settings → Manage Elder Links</strong>.</div></li>
+        <li><div class="step-text">Tap <strong>Search &amp; Link Elder</strong>.</div></li>
+        <li><div class="step-text">Search by the elder's <strong>full name</strong> or <strong>phone number</strong>.</div></li>
+        <li><div class="step-text">Tap the elder's name in results and tap <strong>Send Link Request</strong>.</div></li>
+        <li><div class="step-text">Once accepted (or auto-accepted in test mode), the elder appears on your dashboard.</div></li>
+      </ol>
+
+      <div class="callout callout-warning">
+        <span class="callout-icon">⚠️</span>
+        <div class="callout-body">
+          <div class="callout-title">Pre-seeded Links Only in Testing</div>
+          <div class="callout-text">The 6 demo elders are already linked to their respective caretakers in the database. You do not need to re-link them. Searching and linking is for testing the registration flow with a new/registered elder account.</div>
+        </div>
+      </div>
+    </section>
+
+    <div class="divider"></div>
+
+    <!-- ── AI FEATURES ───────────────────────────────────────────────── -->
+    <section class="section" id="ai-features">
+      <div class="section-header">
+        <div class="section-icon icon-purple">🧠</div>
+        <div>
+          <h2 class="section-title">AI Features — MOSAIC</h2>
+          <p class="section-subtitle">Multi-signal mood intelligence engine</p>
+        </div>
+      </div>
+
+      <p class="intro-text">
+        MOSAIC (Multi-signal Observation of Sentiment and Affect with Intelligent Caretaker alerts) is the AI backbone of ElderConnect. It does NOT just detect mood from a single message — it fuses multiple signals over time.
+      </p>
+
+      <div class="callout callout-info">
+        <span class="callout-icon">🔬</span>
+        <div class="callout-body">
+          <div class="callout-title">Academic Framing</div>
+          <div class="callout-text">MOSAIC uses a two-layer architecture: (1) real-time emotion classification via Hugging Face Inference API (transformer NLP model), and (2) longitudinal trend analysis with sliding-window statistics over 7 days to detect deteriorating patterns.</div>
+        </div>
+      </div>
+
+      <h2 class="inline-title">How Mood Is Detected</h2>
+      <div class="cred-table-wrapper" style="margin-top:12px">
+        <table class="cred-table">
+          <thead>
+            <tr><th>Signal</th><th>Source</th><th>Weight</th></tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><strong>Text Sentiment</strong> <span class="tag tag-ai">AI</span></td>
+              <td>Post text → Hugging Face <span class="mono">j-hartmann/emotion-english-distilroberta-base</span></td>
+              <td>40%</td>
+            </tr>
+            <tr>
+              <td><strong>Self-Report Discrepancy</strong></td>
+              <td>Emoji tap vs NLP inference delta</td>
+              <td>20%</td>
+            </tr>
+            <tr>
+              <td><strong>Social Activity</strong></td>
+              <td>Post &amp; interaction count from <span class="mono">posts</span> table</td>
+              <td>20%</td>
+            </tr>
+            <tr>
+              <td><strong>Routine Adherence</strong></td>
+              <td>Medication logs taken / total from <span class="mono">medication_logs</span></td>
+              <td>20%</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h2 class="inline-title">Alert Levels</h2>
+      <div class="card-grid">
+        <div class="card" style="border-left: 4px solid #2E7D32">
+          <span class="card-icon">✅</span>
+          <h3>STABLE</h3>
+          <p>Mood trend flat or improving. No alert sent. Dashboard shows positive weekly summary.</p>
+        </div>
+        <div class="card" style="border-left: 4px solid #FDA54F">
+          <span class="card-icon">⚠️</span>
+          <h3>WARNING</h3>
+          <p>Negative slope for 3+ consecutive days. Push: "Consider checking in with [Name]".</p>
+        </div>
+        <div class="card" style="border-left: 4px solid #BA1A1A">
+          <span class="card-icon">🚨</span>
+          <h3>URGENT</h3>
+          <p>Severe decline 5+ days or single-day crash below threshold. Urgent FCM with emergency contact prompt.</p>
+        </div>
+      </div>
+    </section>
+
+    <div class="divider"></div>
+
+    <!-- ── ACCESSIBILITY ──────────────────────────────────────────────── -->
+    <section class="section" id="accessibility">
+      <div class="section-header">
+        <div class="section-icon icon-teal">♿</div>
+        <div>
+          <h2 class="section-title">Accessibility Design</h2>
+          <p class="section-subtitle">Built for zero digital literacy</p>
+        </div>
+      </div>
+
+      <p class="intro-text">
+        46.2% of elderly survey respondents needed help completing a paper form. ElderConnect is designed to be self-explanatory for someone who has never used a smartphone application.
+      </p>
+
+      <div class="cred-table-wrapper">
+        <table class="cred-table">
+          <thead>
+            <tr><th>Accessibility Rule</th><th>Implementation</th></tr>
+          </thead>
+          <tbody>
+            <tr><td>Minimum tap target</td><td>48 × 48 logical pixels on all interactive elements</td></tr>
+            <tr><td>Minimum font size</td><td>16sp — never below this in any screen</td></tr>
+            <tr><td>Body text</td><td>18sp default throughout</td></tr>
+            <tr><td>Button labels</td><td>20sp bold</td></tr>
+            <tr><td>Colour contrast</td><td>WCAG 2.1 AA — 4.5:1 normal text, 3:1 large text</td></tr>
+            <tr><td>No dark mode</td><td>Light mode only — high contrast by default</td></tr>
+            <tr><td>Semantic labels</td><td>All icon buttons have Semantics wrappers for screen readers</td></tr>
+            <tr><td>Touch spacing</td><td>≥ 8dp gap between adjacent touch targets</td></tr>
+            <tr><td>Colour as differentiator</td><td>Never used alone — always paired with icon or label</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <div class="divider"></div>
+
+    <!-- ── TROUBLESHOOTING ────────────────────────────────────────────── -->
+    <section class="section" id="troubleshooting">
+      <div class="section-header">
+        <div class="section-icon icon-red">🔧</div>
+        <div>
+          <h2 class="section-title">Troubleshooting</h2>
+          <p class="section-subtitle">Common issues and solutions</p>
+        </div>
+      </div>
+
+      <div class="feature-grid">
+
+        <div class="feature-item">
+          <div class="feature-item-icon icon-red">🔴</div>
+          <div class="feature-item-text">
+            <h4>"Invalid PIN" on every attempt</h4>
+            <p>Ensure the APK was built with the correct Supabase anon key. If using an older APK, reinstall from the latest build. See test account PINs table above.</p>
+          </div>
+        </div>
+
+        <div class="feature-item">
+          <div class="feature-item-icon icon-red">📡</div>
+          <div class="feature-item-text">
+            <h4>Feed shows no posts or news</h4>
+            <p>Check internet connection. News requires the NEWS_API_KEY to be set in the build. If articles are missing, the API key may have expired — rotate at newsapi.org.</p>
+          </div>
+        </div>
+
+        <div class="feature-item">
+          <div class="feature-item-icon icon-amber">💊</div>
+          <div class="feature-item-text">
+            <h4>Medication tab not showing</h4>
+            <p>The tab only appears when the linked caretaker has added at least one active medication. Log in as the caretaker and add a medication from the Medications tab.</p>
+          </div>
+        </div>
+
+        <div class="feature-item">
+          <div class="feature-item-icon icon-amber">😐</div>
+          <div class="feature-item-text">
+            <h4>Mood always shows NEUTRAL</h4>
+            <p>The Hugging Face model may be in cold-start mode (first request takes ~25 seconds). Post some text and wait. If the model returns an error, the system gracefully falls back to NEUTRAL.</p>
+          </div>
+        </div>
+
+        <div class="feature-item">
+          <div class="feature-item-icon icon-blue">🔔</div>
+          <div class="feature-item-text">
+            <h4>Not receiving push notifications</h4>
+            <p>FCM notifications require Firebase to be configured and notification permissions granted. Ensure the device has allowed notifications for ElderConnect in Settings → Apps.</p>
+          </div>
+        </div>
+
+        <div class="feature-item">
+          <div class="feature-item-icon icon-teal">🚪</div>
+          <div class="feature-item-text">
+            <h4>Stuck on splash screen</h4>
+            <p>This usually means a stale session token. Clear app data from Android → Settings → Apps → ElderConnect → Clear Data, then reopen and log in.</p>
+          </div>
+        </div>
+
+        <div class="feature-item">
+          <div class="feature-item-icon icon-blue">👁️</div>
+          <div class="feature-item-text">
+            <h4>Caretaker cannot see elder's mood data</h4>
+            <p>Mood data is protected by RLS. Check that <span class="mono">mood_sharing_consent = true</span> on the elder's user row in Supabase. All test elders have this enabled.</p>
+          </div>
+        </div>
+
+        <div class="feature-item">
+          <div class="feature-item-icon icon-red">🔗</div>
+          <div class="feature-item-text">
+            <h4>No linked elders on caretaker dashboard</h4>
+            <p>Ensure you logged in as the correct caretaker account. Each caretaker is only linked to 2 specific elders (see test accounts table). There is no cross-linking in test data.</p>
+          </div>
+        </div>
+
+      </div>
+
+      <div class="callout callout-info" style="margin-top:8px">
+        <span class="callout-icon">📋</span>
+        <div class="callout-body">
+          <div class="callout-title">Quick Credential Reference</div>
+          <div class="callout-text">
+            <strong>Anusha</strong> → anusha.perera@gmail.com / Anusha@2024 → sees Pawan (1234) &amp; Nimal (2345)<br>
+            <strong>Dilan</strong> → dilan.fernando@gmail.com / Dilan@2024 → sees Sunil (3456) &amp; Kamal (4567)<br>
+            <strong>Rashmi</strong> → rashmi.silva@gmail.com / Rashmi@2024 → sees Somawathi (5678) &amp; Kusum (6789)
+          </div>
+        </div>
+      </div>
+    </section>
+
+  </div><!-- end .content -->
+
+  <!-- Footer -->
+  <footer class="footer">
+    <div>
+      <div class="footer-brand">ElderConnect</div>
+      <div>BSc (Hons) Computer Science — Final Year Project</div>
+      <div style="margin-top:4px">Senod Hansindu Weerathunga · 2433323 · April 2026</div>
+    </div>
+    <div>
+      <div style="color:rgba(255,255,255,0.7); margin-bottom:6px; font-family:'Plus Jakarta Sans',sans-serif; font-weight:600">Supervisor</div>
+      <div>Ms. Dilushinie Fernando</div>
+      <div style="margin-top:8px; color:rgba(255,255,255,0.7); font-family:'Plus Jakarta Sans',sans-serif; font-weight:600">Institution</div>
+      <div>University of Bedfordshire / SLIIT City University, Colombo</div>
+    </div>
+    <div>
+      <div style="color:rgba(255,255,255,0.7); margin-bottom:6px; font-family:'Plus Jakarta Sans',sans-serif; font-weight:600">Tech Stack</div>
+      <div>Flutter · Dart · Supabase · Firebase FCM</div>
+      <div>Riverpod · GoRouter · Hugging Face API</div>
+    </div>
+  </footer>
+
+</main>
+
+<script>
+  // Highlight active nav item based on scroll position
+  const sections = document.querySelectorAll('section[id]');
+  const navItems = document.querySelectorAll('.nav-item');
+
+  const observer = new IntersectionObserver(entries => {
+    entries.forEach(entry => {
+      if (entry.isIntersecting) {
+        navItems.forEach(item => {
+          item.classList.toggle(
+            'active',
+            item.getAttribute('href') === '#' + entry.target.id
+          );
+        });
+      }
+    });
+  }, { rootMargin: '-20% 0px -70% 0px' });
+
+  sections.forEach(s => observer.observe(s));
+</script>
+</body>
+</html>

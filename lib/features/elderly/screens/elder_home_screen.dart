@@ -233,7 +233,7 @@ class _GreetingSection extends ConsumerWidget {
         ),
         const SizedBox(height: ElderSpacing.sm),
         Text(
-          "It's a beautiful sunny Tuesday.",
+          _currentDateLabel(),
           style: GoogleFonts.lexend(
             fontSize: 20,
             fontWeight: FontWeight.w300,
@@ -243,13 +243,31 @@ class _GreetingSection extends ConsumerWidget {
       ],
     );
   }
+
+  /// Returns e.g. "Saturday, 25 April 2026" using the device's local clock.
+  static String _currentDateLabel() {
+    const days = [
+      'Monday', 'Tuesday', 'Wednesday', 'Thursday',
+      'Friday', 'Saturday', 'Sunday',
+    ];
+    const months = [
+      '', 'January', 'February', 'March', 'April', 'May', 'June',
+      'July', 'August', 'September', 'October', 'November', 'December',
+    ];
+    final now = DateTime.now();
+    // weekday: 1=Monday … 7=Sunday
+    final day = days[now.weekday - 1];
+    return '$day, ${now.day} ${months[now.month]} ${now.year}';
+  }
 }
 
 // ── Medication Reminder Card ──────────────────────────────────────────────────
 
-/// Medication reminder card driven by live Supabase data.
-/// Hidden when no medications are assigned or no dose is pending.
-/// Dismisses with animation after the elder acts on it.
+/// Medical Reminder Notification card.
+/// Reads ALL active medications from [activeMedicationsProvider].
+/// Hidden when no medications exist.
+/// Shows each medication with "YES, I TOOK IT" / "NO, I DIDN'T" buttons.
+/// Each response is saved as a medication_log row for the caretaker to see.
 class _MedicationCard extends ConsumerStatefulWidget {
   const _MedicationCard();
 
@@ -258,109 +276,74 @@ class _MedicationCard extends ConsumerStatefulWidget {
 }
 
 class _MedicationCardState extends ConsumerState<_MedicationCard> {
-  // null = showing card | 'taken' = success message | 'snoozed' = reminder message
-  String? _dismissStatus;
-  bool _buttonPressed = false; // triggers green button feedback
-  bool _collapsed = false;     // triggers AnimatedSize collapse to zero
+  // medId → 'taken' | 'missed' | '' (pending)
+  final Map<String, String> _status = {};
+  // medId → saving in progress
+  final Map<String, bool> _saving = {};
 
-  Future<void> _onTaken(MedicationLogModel log) async {
-    setState(() => _buttonPressed = true);
-    // Log to Supabase — caretaker sees this in their dashboard.
+  Future<void> _respond(MedicationModel med, String response) async {
+    if (_status[med.id] != null && _status[med.id]!.isNotEmpty) return;
+    setState(() => _saving[med.id] = true);
+
+    final uid = Supabase.instance.client.auth.currentUser?.id;
     try {
-      await Supabase.instance.client.from('medication_logs').update({
-        'status': 'taken',
-        'taken_at': DateTime.now().toIso8601String(),
-      }).eq('id', log.id);
+      await Supabase.instance.client.from('medication_logs').insert({
+        'medication_id': med.id,
+        'user_id': uid,
+        'scheduled_time': DateTime.now().toIso8601String(),
+        'status': response, // 'taken' or 'missed'
+        if (response == 'taken')
+          'taken_at': DateTime.now().toIso8601String(),
+      });
+      // Refresh the Up-Next provider so the Meds tab also updates
+      ref.invalidate(nextMedicationProvider);
+      ref.invalidate(medicationHistoryProvider);
     } catch (_) {
-      // Non-critical — UI continues regardless of network state.
+      // Non-critical — status still updates in UI
+    } finally {
+      if (mounted) {
+        setState(() {
+          _status[med.id] = response;
+          _saving[med.id] = false;
+        });
+      }
     }
-    await Future.delayed(const Duration(milliseconds: 500));
-    if (!mounted) return;
-    setState(() => _dismissStatus = 'taken');
-    await Future.delayed(const Duration(seconds: 4));
-    if (mounted) setState(() => _collapsed = true);
-  }
-
-  void _onSnoozed() {
-    setState(() => _dismissStatus = 'snoozed');
-    Future.delayed(const Duration(seconds: 3), () {
-      if (mounted) setState(() => _collapsed = true);
-    });
   }
 
   @override
   Widget build(BuildContext context) {
-    if (_collapsed) return const SizedBox.shrink();
-
-    final hasMed = ref.watch(hasMedicationProvider);
-    if (!hasMed) return const SizedBox.shrink();
-
-    return AnimatedSize(
-      duration: const Duration(milliseconds: 400),
-      curve: Curves.easeOut,
-      child: AnimatedSwitcher(
-        duration: const Duration(milliseconds: 350),
-        child: _buildCurrentState(context),
-      ),
-    );
-  }
-
-  Widget _buildCurrentState(BuildContext context) {
-    if (_dismissStatus == 'taken') {
-      return _FeedbackTile(
-        key: const ValueKey('taken'),
-        emoji: '🎉',
-        title: 'Well done!',
-        message: "Medication marked as taken. Your caretaker has been notified. Keep up the great work!",
-        color: const Color(0xFFE8F5E9),
-        titleColor: const Color(0xFF2E7D32),
-      );
-    }
-    if (_dismissStatus == 'snoozed') {
-      return _FeedbackTile(
-        key: const ValueKey('snoozed'),
-        emoji: '⏰',
-        title: 'No problem!',
-        message: "Don't forget to take your medication. We'll remind you again soon.",
-        color: ElderColors.surfaceContainerLow,
-        titleColor: ElderColors.onSurfaceVariant,
-      );
-    }
-
-    return ref.watch(nextMedicationProvider).when(
-      loading: () => const SizedBox.shrink(key: ValueKey('loading')),
-      error: (_, __) => const SizedBox.shrink(key: ValueKey('error')),
-      data: (log) {
-        if (log == null) return const SizedBox.shrink(key: ValueKey('empty'));
-        return _buildCard(context, log);
+    final medsAsync = ref.watch(activeMedicationsProvider);
+    return medsAsync.when(
+      loading: () => const SizedBox.shrink(),
+      error: (_, __) => const SizedBox.shrink(),
+      data: (meds) {
+        if (meds.isEmpty) return const SizedBox.shrink();
+        return _buildCard(context, meds);
       },
     );
   }
 
-  Widget _buildCard(BuildContext context, MedicationLogModel log) {
+  Widget _buildCard(BuildContext context, List<MedicationModel> meds) {
     return Container(
-      key: const ValueKey('card'),
       clipBehavior: Clip.antiAlias,
       decoration: BoxDecoration(
         color: ElderColors.primaryContainer,
         borderRadius: BorderRadius.circular(_kCardRadius),
         boxShadow: [
           BoxShadow(
-            color: ElderColors.primaryContainer.withValues(alpha: 0.40),
-            blurRadius: 16,
-            offset: const Offset(0, 6),
+            color: ElderColors.primaryContainer.withValues(alpha: 0.35),
+            blurRadius: 20,
+            offset: const Offset(0, 8),
           ),
         ],
       ),
       child: Stack(
         children: [
-          // Decorative glow circle
+          // Decorative circle
           Positioned(
-            right: -40,
-            top: -40,
+            right: -40, top: -40,
             child: Container(
-              width: 200,
-              height: 200,
+              width: 200, height: 200,
               decoration: const BoxDecoration(
                 shape: BoxShape.circle,
                 color: Color(0x1AFFFFFF),
@@ -372,126 +355,193 @@ class _MedicationCardState extends ConsumerState<_MedicationCard> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                // ── Header ─────────────────────────────────────────────
                 Row(
                   children: [
-                    const Icon(Icons.medication, color: Colors.white, size: 36),
+                    const Icon(Icons.notifications_active_rounded,
+                        color: Colors.white, size: 32),
                     const SizedBox(width: ElderSpacing.md),
-                    Text(
-                      'COMING UP SOON',
-                      style: GoogleFonts.plusJakartaSans(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w700,
-                        color: Colors.white,
-                        letterSpacing: 1.5,
+                    Expanded(
+                      child: Text(
+                        'MEDICAL REMINDER NOTIFICATION',
+                        style: GoogleFonts.plusJakartaSans(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w700,
+                          color: Colors.white,
+                          letterSpacing: 1.2,
+                        ),
                       ),
                     ),
                   ],
                 ),
-                const SizedBox(height: ElderSpacing.md),
+                const SizedBox(height: ElderSpacing.sm),
                 Text(
-                  '${log.pillName} ${log.dosage}'.trim(),
+                  'Did you take your medication today?',
+                  style: GoogleFonts.lexend(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w400,
+                    color: Colors.white.withValues(alpha: 0.88),
+                  ),
+                ),
+                const SizedBox(height: ElderSpacing.lg),
+                // ── One row per medication ───────────────────────────
+                for (int i = 0; i < meds.length; i++) ...[
+                  if (i > 0) const SizedBox(height: ElderSpacing.md),
+                  _MedRow(
+                    med: meds[i],
+                    status: _status[meds[i].id] ?? '',
+                    saving: _saving[meds[i].id] ?? false,
+                    onTaken: () => _respond(meds[i], 'taken'),
+                    onMissed: () => _respond(meds[i], 'missed'),
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Single medication row inside the reminder card.
+class _MedRow extends StatelessWidget {
+  const _MedRow({
+    required this.med,
+    required this.status,
+    required this.saving,
+    required this.onTaken,
+    required this.onMissed,
+  });
+
+  final MedicationModel med;
+  final String status;  // '' | 'taken' | 'missed'
+  final bool saving;
+  final VoidCallback onTaken;
+  final VoidCallback onMissed;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(ElderSpacing.md),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Pill name + dosage
+          Row(
+            children: [
+              const Icon(Icons.medication_rounded,
+                  size: 22, color: Colors.white),
+              const SizedBox(width: ElderSpacing.sm),
+              Expanded(
+                child: Text(
+                  '${med.pillName}${med.dosage.isNotEmpty ? '  •  ${med.dosage}' : ''}',
                   style: GoogleFonts.plusJakartaSans(
-                    fontSize: 28,
+                    fontSize: 18,
                     fontWeight: FontWeight.w700,
                     color: Colors.white,
                   ),
                 ),
-                const SizedBox(height: ElderSpacing.xs),
-                Text(
-                  'Scheduled for ${log.timestampFormatted}',
-                  style: GoogleFonts.lexend(
-                    fontSize: 22,
-                    fontWeight: FontWeight.w500,
-                    color: ElderColors.onPrimaryContainer.withValues(alpha: 0.90),
-                  ),
-                ),
-                const SizedBox(height: ElderSpacing.xl),
-                // "Yes, I took it" — changes green on press
-                Semantics(
-                  label: 'Yes, I took my medication',
-                  button: true,
-                  child: AnimatedContainer(
-                    duration: const Duration(milliseconds: 300),
-                    width: double.infinity,
-                    height: 56,
-                    decoration: BoxDecoration(
-                      color: _buttonPressed
-                          ? const Color(0xFF2E7D32)
-                          : Colors.white,
-                      borderRadius: BorderRadius.circular(16),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withValues(alpha: 0.15),
-                          blurRadius: 6,
-                          offset: const Offset(0, 3),
-                        ),
-                      ],
-                    ),
-                    child: Material(
-                      color: Colors.transparent,
-                      borderRadius: BorderRadius.circular(16),
-                      child: InkWell(
-                        borderRadius: BorderRadius.circular(16),
-                        onTap: _buttonPressed ? null : () => _onTaken(log),
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(
-                              _buttonPressed
-                                  ? Icons.check_circle
-                                  : Icons.check_circle_outline,
-                              color: _buttonPressed
-                                  ? Colors.white
-                                  : ElderColors.primaryContainer,
-                              size: 26,
-                            ),
-                            const SizedBox(width: ElderSpacing.sm),
-                            Text(
-                              _buttonPressed ? 'Marked!' : 'Yes, I took it',
-                              style: GoogleFonts.plusJakartaSans(
-                                fontSize: 20,
-                                fontWeight: FontWeight.w700,
-                                color: _buttonPressed
-                                    ? Colors.white
-                                    : ElderColors.primaryContainer,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: ElderSpacing.md),
-                // "Not yet" — snooze
-                Semantics(
-                  label: 'Not yet — remind me later',
-                  button: true,
-                  child: SizedBox(
-                    width: double.infinity,
-                    child: TextButton(
-                      onPressed: _buttonPressed ? null : _onSnoozed,
-                      style: TextButton.styleFrom(
-                        backgroundColor: ElderColors.primary.withValues(alpha: 0.20),
-                        foregroundColor: Colors.white,
-                        textStyle: GoogleFonts.lexend(
-                          fontSize: 18,
-                          fontWeight: FontWeight.w600,
-                        ),
-                        padding: const EdgeInsets.symmetric(
-                          vertical: ElderSpacing.md,
-                        ),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(16),
-                        ),
-                      ),
-                      child: const Text('Not yet'),
-                    ),
-                  ),
-                ),
-              ],
-            ),
+              ),
+            ],
           ),
+          const SizedBox(height: ElderSpacing.md),
+          if (status.isEmpty) ...[  // not yet responded
+            // YES, I TOOK IT button
+            Semantics(
+              label: 'Yes, I took ${med.pillName}',
+              button: true,
+              child: SizedBox(
+                width: double.infinity,
+                height: 56,
+                child: ElevatedButton.icon(
+                  onPressed: saving ? null : onTaken,
+                  icon: saving
+                      ? const SizedBox(
+                          width: 20, height: 20,
+                          child: CircularProgressIndicator(
+                              strokeWidth: 2, color: Colors.white))
+                      : const Icon(Icons.check_circle_outline_rounded,
+                          size: 24),
+                  label: Text(
+                    'YES, I TOOK IT',
+                    style: GoogleFonts.plusJakartaSans(
+                        fontSize: 18, fontWeight: FontWeight.w800),
+                  ),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.white,
+                    foregroundColor: ElderColors.primaryContainer,
+                    elevation: 0,
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(14)),
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(height: ElderSpacing.sm),
+            // NO, I DIDN'T button
+            Semantics(
+              label: "No, I didn't take ${med.pillName}",
+              button: true,
+              child: SizedBox(
+                width: double.infinity,
+                height: 56,
+                child: OutlinedButton.icon(
+                  onPressed: saving ? null : onMissed,
+                  icon: const Icon(Icons.cancel_outlined, size: 24),
+                  label: Text(
+                    "NO, I DIDN'T",
+                    style: GoogleFonts.plusJakartaSans(
+                        fontSize: 18, fontWeight: FontWeight.w700),
+                  ),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: Colors.white,
+                    side: const BorderSide(color: Colors.white, width: 1.5),
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(14)),
+                  ),
+                ),
+              ),
+            ),
+          ] else ...[  // already responded
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(
+                  vertical: ElderSpacing.md, horizontal: ElderSpacing.md),
+              decoration: BoxDecoration(
+                color: status == 'taken'
+                    ? const Color(0xFF2E7D32)
+                    : Colors.white.withValues(alpha: 0.20),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(
+                    status == 'taken'
+                        ? Icons.check_circle_rounded
+                        : Icons.cancel_rounded,
+                    color: Colors.white, size: 22,
+                  ),
+                  const SizedBox(width: ElderSpacing.sm),
+                  Text(
+                    status == 'taken'
+                        ? 'Marked as taken ✓'
+                        : 'Marked as missed',
+                    style: GoogleFonts.plusJakartaSans(
+                      fontSize: 17,
+                      fontWeight: FontWeight.w700,
+                      color: Colors.white,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
         ],
       ),
     );

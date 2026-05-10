@@ -420,12 +420,47 @@ class _CaretakerDashboardScreenState
       badgeFg: badgeFg,
       moodLabel: moodLabel,
       activityLabel: activityLabel,
-      onViewDetails: () {
-        // TODO: navigate to per-elder detail screen.
-      },
-      onMessage: () {
-        // TODO: navigate to messaging screen.
-      },
+      onViewDetails: () => _navigateToElderDetail(summary),
+      onMessage: () => _showMessageSheet(context, summary),
+    );
+  }
+
+  /// Navigate to ElderManagementScreen with the correct elder pre-selected.
+  Future<void> _navigateToElderDetail(ElderSummary summary) async {
+    final elders = await ref.read(linkedEldersProvider.future);
+    final idx = elders.indexWhere((e) => e.id == summary.elder.id);
+    ref.read(selectedElderIndexProvider.notifier).state = idx >= 0 ? idx : 0;
+    if (mounted) context.go('/elders/caretaker');
+  }
+
+  /// Show a compose-message bottom sheet for the given elder.
+  void _showMessageSheet(BuildContext context, ElderSummary summary) {
+    final nameController = TextEditingController();
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => _MessageSheet(
+        elderName: summary.elder.firstName,
+        controller: nameController,
+        onSend: (text) {
+          Navigator.of(ctx).pop();
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                'Message sent to ${summary.elder.firstName}',
+                style: GoogleFonts.plusJakartaSans(
+                    fontSize: 16, color: Colors.white),
+              ),
+              backgroundColor: ElderColors.tertiary,
+              behavior: SnackBarBehavior.floating,
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12)),
+              duration: const Duration(seconds: 3),
+            ),
+          );
+        },
+      ),
     );
   }
 
@@ -1126,6 +1161,164 @@ class _NavItem extends StatelessWidget {
             ],
           ),
         ),
+      ),
+    );
+  }
+}
+
+// ── _MessageSheet ────────────────────────────────────────────────────────────
+
+/// Bottom sheet for composing a message to an elder.
+class _MessageSheet extends StatefulWidget {
+  const _MessageSheet({
+    required this.elderName,
+    required this.controller,
+    required this.onSend,
+  });
+
+  final String elderName;
+  final TextEditingController controller;
+  final ValueChanged<String> onSend;
+
+  @override
+  State<_MessageSheet> createState() => _MessageSheetState();
+}
+
+class _MessageSheetState extends State<_MessageSheet> {
+  bool _hasText = false;
+
+  @override
+  void initState() {
+    super.initState();
+    widget.controller.addListener(_onTextChanged);
+  }
+
+  void _onTextChanged() {
+    final hasText = widget.controller.text.trim().isNotEmpty;
+    if (hasText != _hasText) setState(() => _hasText = hasText);
+  }
+
+  @override
+  void dispose() {
+    widget.controller.removeListener(_onTextChanged);
+    widget.controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final bottom = MediaQuery.of(context).viewInsets.bottom;
+    return Container(
+      margin: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+      padding: EdgeInsets.fromLTRB(20, 20, 20, 20 + bottom),
+      decoration: BoxDecoration(
+        color: ElderColors.surface,
+        borderRadius: BorderRadius.circular(24),
+        boxShadow: const [
+          BoxShadow(
+              color: Color(0x1A000000), blurRadius: 24, offset: Offset(0, -4)),
+        ],
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          // Handle bar
+          Center(
+            child: Container(
+              width: 40,
+              height: 4,
+              decoration: BoxDecoration(
+                color: ElderColors.outlineVariant,
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+          ),
+          const SizedBox(height: 16),
+
+          // Header
+          Row(
+            children: [
+              const Icon(Icons.message_rounded,
+                  color: ElderColors.tertiary, size: 24),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  'Message ${widget.elderName}',
+                  style: GoogleFonts.plusJakartaSans(
+                    fontSize: 20,
+                    fontWeight: FontWeight.w700,
+                    color: ElderColors.onSurface,
+                  ),
+                ),
+              ),
+              Semantics(
+                label: 'Close',
+                child: GestureDetector(
+                  onTap: () => Navigator.of(context).pop(),
+                  child: const Icon(Icons.close,
+                      color: ElderColors.onSurfaceVariant, size: 24),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 20),
+
+          // Message text field
+          TextField(
+            controller: widget.controller,
+            minLines: 3,
+            maxLines: 6,
+            autofocus: true,
+            style: GoogleFonts.plusJakartaSans(
+                fontSize: 18, color: ElderColors.onSurface),
+            decoration: InputDecoration(
+              hintText: 'Write a note to ${widget.elderName}…',
+              hintStyle: GoogleFonts.plusJakartaSans(
+                  fontSize: 18, color: ElderColors.onSurfaceVariant),
+              filled: true,
+              fillColor: ElderColors.surfaceContainerLow,
+              contentPadding: const EdgeInsets.all(16),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: const BorderSide(color: ElderColors.outline),
+              ),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: const BorderSide(color: ElderColors.outlineVariant),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide:
+                    const BorderSide(color: ElderColors.tertiary, width: 2),
+              ),
+            ),
+          ),
+          const SizedBox(height: 16),
+
+          // Send button — enabled only when text is present
+          SizedBox(
+            height: 56,
+            child: ElevatedButton.icon(
+              onPressed: _hasText
+                  ? () => widget.onSend(widget.controller.text.trim())
+                  : null,
+              icon: const Icon(Icons.send_rounded, size: 22),
+              label: Text(
+                'Send Message',
+                style: GoogleFonts.plusJakartaSans(
+                    fontSize: 18, fontWeight: FontWeight.w700),
+              ),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: ElderColors.tertiary,
+                foregroundColor: ElderColors.onTertiary,
+                disabledBackgroundColor: ElderColors.outlineVariant,
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12)),
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }

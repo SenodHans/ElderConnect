@@ -6,6 +6,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../core/constants/elder_colors.dart';
 import '../../../core/constants/elder_spacing.dart';
+import '../../../shared/models/medication_model.dart';
 import '../providers/medications_provider.dart';
 
 // ── Screen-level constants ────────────────────────────────────────────────────
@@ -46,6 +47,12 @@ class ElderMedicationListScreen extends ConsumerWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+                  // ── Caretaker-added medication schedule ─────────────────
+                  _SectionTitle(label: 'My Medications'),
+                  const SizedBox(height: ElderSpacing.lg),
+                  const _MyMedicationsSection(),
+                  const SizedBox(height: ElderSpacing.xxl),
+                  // ── Reminder-driven next dose ────────────────────────────
                   _SectionTitle(label: 'Up Next'),
                   const SizedBox(height: ElderSpacing.lg),
                   const _UpNextCard(showDetailButtons: false),
@@ -126,6 +133,172 @@ class _SectionTitle extends StatelessWidget {
         fontSize: 20,
         fontWeight: FontWeight.w600,
         color: ElderColors.onSurface,
+      ),
+    );
+  }
+}
+
+// ── My Medications Section ────────────────────────────────────────────────────
+/// Displays the elder's full medication schedule added by a caretaker.
+/// Reads directly from the `medications` table via [activeMedicationsProvider],
+/// so any medication the caretaker adds is immediately visible here.
+class _MyMedicationsSection extends ConsumerWidget {
+  const _MyMedicationsSection();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final medsAsync = ref.watch(activeMedicationsProvider);
+
+    return medsAsync.when(
+      loading: () => Column(
+        children: List.generate(
+          2,
+          (_) => Padding(
+            padding: const EdgeInsets.only(bottom: ElderSpacing.md),
+            child: Container(
+              height: 96,
+              decoration: BoxDecoration(
+                color: ElderColors.surfaceContainerLow,
+                borderRadius: BorderRadius.circular(_kCardRadius),
+              ),
+            ),
+          ),
+        ),
+      ),
+      error: (_, __) => Text(
+        'Could not load medications.',
+        style: GoogleFonts.lexend(
+            fontSize: 18, color: ElderColors.onSurfaceVariant),
+      ),
+      data: (meds) {
+        if (meds.isEmpty) {
+          return Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(ElderSpacing.xl),
+            decoration: BoxDecoration(
+              color: ElderColors.surfaceContainerLowest,
+              borderRadius: BorderRadius.circular(_kCardRadius),
+            ),
+            child: Text(
+              'No medications added by your caretaker yet.',
+              style: GoogleFonts.lexend(
+                  fontSize: 18, color: ElderColors.onSurfaceVariant),
+              textAlign: TextAlign.center,
+            ),
+          );
+        }
+        return Column(
+          children: [
+            for (int i = 0; i < meds.length; i++) ...[
+              if (i > 0) const SizedBox(height: ElderSpacing.md),
+              _MedicationScheduleCard(med: meds[i]),
+            ],
+          ],
+        );
+      },
+    );
+  }
+}
+
+class _MedicationScheduleCard extends StatelessWidget {
+  const _MedicationScheduleCard({required this.med});
+  final MedicationModel med;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      constraints: const BoxConstraints(minHeight: 96),
+      padding: const EdgeInsets.all(ElderSpacing.lg),
+      decoration: BoxDecoration(
+        color: ElderColors.surfaceContainerLowest,
+        borderRadius: BorderRadius.circular(_kCardRadius),
+        boxShadow: [
+          BoxShadow(
+            color: ElderColors.primary.withValues(alpha: 0.06),
+            blurRadius: 20,
+            offset: const Offset(0, 6),
+          ),
+        ],
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          // Pill icon
+          Container(
+            width: 56,
+            height: 56,
+            decoration: BoxDecoration(
+              color: ElderColors.primaryFixed,
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: const Icon(Icons.medication_rounded,
+                size: 28, color: ElderColors.onPrimaryFixed),
+          ),
+          const SizedBox(width: ElderSpacing.lg),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  med.pillName,
+                  style: GoogleFonts.plusJakartaSans(
+                    fontSize: 20,
+                    fontWeight: FontWeight.w700,
+                    color: ElderColors.onSurface,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  med.dosage.isEmpty ? '—' : med.dosage,
+                  style: GoogleFonts.lexend(
+                    fontSize: 16,
+                    color: ElderColors.onSurfaceVariant,
+                  ),
+                ),
+                if (med.reminderTimes.isNotEmpty) ...[
+                  const SizedBox(height: ElderSpacing.sm),
+                  Wrap(
+                    spacing: ElderSpacing.xs,
+                    runSpacing: 4,
+                    children: med.reminderTimes.map((t) {
+                      final parts = t.split(':');
+                      final hour = int.tryParse(parts[0]) ?? 0;
+                      final min =
+                          int.tryParse(parts.length > 1 ? parts[1] : '0') ?? 0;
+                      final tod = TimeOfDay(hour: hour, minute: min);
+                      return Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: ElderSpacing.sm, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: ElderColors.primaryFixed,
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Text(
+                          tod.format(context),
+                          style: GoogleFonts.lexend(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
+                            color: ElderColors.onPrimaryFixed,
+                          ),
+                        ),
+                      );
+                    }).toList(),
+                  ),
+                ],
+                if (med.pillColour.isNotEmpty) ...[
+                  const SizedBox(height: 4),
+                  Text(
+                    med.pillColour,
+                    style: GoogleFonts.lexend(
+                      fontSize: 14,
+                      color: ElderColors.onSurfaceVariant,
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }
